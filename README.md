@@ -17,8 +17,8 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 
 | Path | What it is |
 |---|---|
-| `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` |
-| `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront |
+| `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` — [README](backend/README.md) with routes & file structure |
+| `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
 | `CLAUDE.md` | Project spec and source of truth for every product/design decision |
 | `DEPLOY.md` | Production deployment guide (VPS backend + Vercel frontend, backups) |
 | `prompts/` | The step-by-step build prompts this project was built from |
@@ -150,118 +150,6 @@ Guarantees worth knowing:
 - **Tracking is not a guessing oracle.** Lookup requires an exact code + phone match;
   a mismatch on either returns the same generic 404.
 - Checkout carries a honeypot field; bots get a convincing fake response and nothing is stored.
-
-## Route map
-
-The API routes are the table above. Everything else the two apps serve:
-
-**Storefront (Next.js)**
-
-| Route | Rendering | What it is |
-|---|---|---|
-| `/` | static, 60s revalidate | Home — hero, featured rail, how-it-works, category tiles |
-| `/shop` | dynamic | Filterable catalog; all filter state lives in the URL query string |
-| `/fragrance/{slug}` | dynamic | Fragrance detail + size selector + add to cart (404s on unknown/inactive slugs) |
-| `/checkout` | static shell | Cart summary + contact form (cart itself is client-side) |
-| `/order/complete?code=…` | dynamic | Tracking code + order summary, survives refresh via the URL |
-| `/track` | dynamic | Tracking code + phone → status timeline |
-| `/robots.txt`, `/icon.svg` | static | SEO rules (checkout/order pages disallowed) and favicon |
-
-**Admin panel (Filament — everything below requires login)**
-
-| Route | What it is |
-|---|---|
-| `/admin/login` | The only public admin route |
-| `/admin` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
-| `/admin/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
-| `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
-| `/admin/production-schedule` | Aggregated daily decant schedule |
-
-**Backend utility routes (deployment-relevant)**
-
-| Route | What it is |
-|---|---|
-| `/up` | Laravel health check — point uptime monitors / load-balancer probes here |
-| `/storage/{path}` | Uploaded images — requires `php artisan storage:link` on every deploy target |
-| `/` | Plain Laravel welcome page; the real storefront lives on the frontend host |
-
-## Project structure
-
-Trimmed to the files you'd look for first. Deployment-relevant paths are marked `←`.
-
-**Backend (`backend/`)**
-
-```text
-backend/
-├── app/
-│   ├── Console/Commands/FreshStart.php     # php artisan decant:fresh-start (handover wipe)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus
-│   ├── Filament/
-│   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ its Blade view)
-│   │   ├── Resources/                      # Brands/, Fragrances/, Orders/ — each: Resource + Schemas/ (form) + Tables/ + Pages/
-│   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants
-│   ├── Http/
-│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder
-│   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
-│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem (+ Concerns/HasSlug)
-│   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject
-│   ├── Providers/
-│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
-│   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
-│   └── Support/Money.php                   # the one Kyat formatter — all money display goes through it
-├── bootstrap/app.php                       # routing + middleware wiring (api: routes/api.php)
-├── config/cors.php                         # allowlist = FRONTEND_URL           ← must match storefront origin
-├── database/
-│   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items
-│   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
-├── public/                                 # ← web root — point Nginx/PHP-FPM here, never at the repo root
-├── routes/api.php                          # /api/v1/* with per-endpoint throttles
-├── storage/                                # ← must be writable (www-data); app/public = uploaded images (back this up)
-├── tests/Feature/                          # 39 tests: domain, admin catalog, admin orders, public API, fresh-start
-├── .env.example                            # ← template for the production .env (see DEPLOY.md)
-└── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
-```
-
-**Frontend (`frontend/`)**
-
-```text
-frontend/
-├── src/
-│   ├── app/                                # ← routes: one folder per URL (App Router)
-│   │   ├── layout.tsx                      # nav + footer + cart drawer + OG defaults (NEXT_PUBLIC_SITE_URL)
-│   │   ├── globals.css                     # ← the whole design system: Tailwind v4 @theme tokens (mist/pine/…)
-│   │   ├── page.tsx                        # /
-│   │   ├── shop/page.tsx                   # /shop (+ loading.tsx skeleton)
-│   │   ├── fragrance/[slug]/page.tsx       # /fragrance/:slug
-│   │   ├── checkout/page.tsx               # /checkout
-│   │   ├── order/complete/page.tsx         # /order/complete
-│   │   ├── track/page.tsx                  # /track
-│   │   ├── robots.ts · icon.svg            # /robots.txt, favicon
-│   │   └── error.tsx · not-found.tsx       # branded error/404 pages
-│   ├── components/
-│   │   ├── ui/                             # primitives: Pill, Button, ImagePlate, QuantityStepper, Skeleton
-│   │   ├── layout/                         # Navbar, Footer (social links from /meta), MobileNav, CartButton
-│   │   ├── catalog/                        # FragranceCard/Grid, filter bar/sheet/controls, Pagination
-│   │   ├── product/                        # SizeSelector, PurchasePanel (add to cart)
-│   │   ├── cart/                           # CartDrawer, CartItemRow
-│   │   ├── checkout/                       # CheckoutForm/Client, OrderSummaryCard, OrderCompleteClient
-│   │   ├── tracking/                       # TrackingForm, TrackClient, StatusTimeline (the vial fill)
-│   │   └── home/                           # Hero (GSAP), ScrollReveal, FeaturedRail
-│   ├── lib/
-│   │   ├── api.ts                          # ← every call to the Laravel API; base URL = NEXT_PUBLIC_API_URL
-│   │   ├── cart-context.tsx                # client-side cart (localStorage), drawer state
-│   │   ├── types.ts                        # TypeScript mirrors of the API resources
-│   │   └── format.ts                       # formatKyat
-│   └── hooks/useCart.ts
-├── next.config.ts                          # ← allowed image hosts follow NEXT_PUBLIC_API_URL automatically
-├── .env.local.example                      # ← template: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_URL
-└── package.json                            # Node 24 LTS, Next.js 16, Tailwind v4, GSAP, Motion
-```
-
-Build artifacts (`frontend/.next/`, `backend/vendor/`, `node_modules/`) and secrets
-(`backend/.env`, `frontend/.env.local`) are git-ignored — deploys recreate them with
-`composer install` / `npm run build` and the env templates above.
 
 ## Testing
 

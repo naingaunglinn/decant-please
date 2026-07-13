@@ -1,58 +1,138 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Decant Please! — Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 13 application serving two things:
 
-## About Laravel
+1. the **public JSON API** (`/api/v1/*`) that the Next.js storefront in
+   [`../frontend`](../frontend) consumes, and
+2. the **admin panel** (`/admin`, Filament v5) where the decanter manages the catalog,
+   reviews orders, and reads the daily production schedule.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Project-wide context lives in [`../README.md`](../README.md) (system overview),
+[`../CLAUDE.md`](../CLAUDE.md) (spec / source of truth), and
+[`../DEPLOY.md`](../DEPLOY.md) (production deployment).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**Requirements:** PHP 8.3+ · Composer · MySQL 8.0+
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Setup
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env        # set DB_* and ADMIN_PASSWORD
+php artisan key:generate
+php artisan migrate --seed  # demo catalog + admin user
+php artisan storage:link    # serve uploaded images from /storage
+php artisan serve           # http://localhost:8000
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you seeded.
 
-## Contributing
+## Environment variables
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Variable | Purpose |
+|---|---|
+| `APP_URL` | This app's own URL — image URLs in API responses are built from it |
+| `FRONTEND_URL` | Storefront origin — the CORS allowlist **and** admin "View on site" links |
+| `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
+| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/meta` for the storefront footer; blank = hidden |
+| `DB_*` | MySQL connection |
 
-## Code of Conduct
+Production values and hardening (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE`, config
+caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Routes
 
-## Security Vulnerabilities
+**Public API — `/api/v1`, JSON, rate-limited**
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Method | Route | Purpose | Throttle |
+|---|---|---|---|
+| GET | `/api/v1/fragrances` | Filterable, paginated catalog | 120/min |
+| GET | `/api/v1/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
+| GET | `/api/v1/brands` | Active brands | 120/min |
+| GET | `/api/v1/meta` | Filter options, price bounds, social links | 120/min |
+| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
+| GET | `/api/v1/orders/track` | Order status by tracking code + phone | 20/min |
 
-## License
+**Admin panel — everything below `/admin` requires login**
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Route | What it is |
+|---|---|
+| `/admin/login` | The only public admin route |
+| `/admin` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
+| `/admin/brands` + `/create`, `/{id}/edit` | Brand CRUD |
+| `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
+| `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
+| `/admin/production-schedule` | Aggregated daily decant schedule |
+
+**Utility**
+
+| Route | What it is |
+|---|---|
+| `/up` | Health check — point uptime monitors / load-balancer probes here |
+| `/storage/{path}` | Uploaded images — requires `php artisan storage:link` on every deploy target |
+| `/` | Plain Laravel welcome page; the real storefront is the frontend app |
+
+## File structure
+
+Trimmed to the files you'd look for first. Deployment-relevant paths are marked `←`.
+
+```text
+backend/
+├── app/
+│   ├── Console/Commands/FreshStart.php     # php artisan decant:fresh-start (handover wipe)
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus
+│   ├── Filament/
+│   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ Blade view in resources/)
+│   │   ├── Resources/                      # Brands/, Fragrances/, Orders/ — each: Resource + Schemas/ (form) + Tables/ + Pages/
+│   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants
+│   ├── Http/
+│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder
+│   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
+│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem (+ Concerns/HasSlug)
+│   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject
+│   ├── Providers/
+│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
+│   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
+│   └── Support/Money.php                   # the one Kyat formatter — all money display goes through it
+├── bootstrap/app.php                       # routing + middleware wiring (api: routes/api.php)
+├── config/cors.php                         # allowlist = FRONTEND_URL           ← must match storefront origin
+├── database/
+│   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items
+│   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
+├── public/                                 # ← web root — point Nginx/PHP-FPM here, never at the repo root
+├── resources/views/filament/               # production schedule Blade view
+├── routes/api.php                          # /api/v1/* with per-endpoint throttles
+├── storage/                                # ← must be writable (www-data); app/public = uploaded images (back this up)
+├── tests/Feature/                          # 39 tests: domain, admin catalog, admin orders, public API, fresh-start
+├── .env.example                            # ← template for the production .env
+└── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
+```
+
+## Domain rules that live here
+
+- **Order item prices are snapshots.** `Order::newFromCheckout()` accepts only
+  `fragrance_id` / `size_ml` / `quantity`, re-derives every price from the current catalog
+  (rejecting inactive or out-of-stock items), and freezes name + price onto the order item.
+- **Tracking codes** are 10 chars from an ambiguity-free alphabet (no `0/O/1/I`), generated
+  on creation. Lookup requires an exact code + phone match; any mismatch returns the same
+  generic 404.
+- **Website orders** start at `awaiting_confirmation`; manual admin entries start at
+  `pending`. `accept()` assigns dates, `reject()` records a reason — both guarded so they
+  only fire from `awaiting_confirmation`.
+- **Cancelled/rejected orders** are excluded from revenue widgets and the production schedule.
+
+## Testing
+
+```bash
+php artisan test
+```
+
+39 tests / 245 assertions on an in-memory SQLite database — your dev MySQL data is never
+touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
+
+## Useful artisan commands
+
+```bash
+php artisan decant:fresh-start   # wipe demo fragrances + orders; keep brands and admin user
+php artisan db:seed              # reseed demo data (idempotent admin user)
+php artisan cache:clear          # /api/v1 responses are cached for 10 minutes
+```
