@@ -53,21 +53,13 @@ export function CheckoutClient() {
       });
 
       try {
+        // just the lookup pair — the complete page fetches the real receipt
         window.sessionStorage.setItem(
-          "decant-please.last-order",
-          JSON.stringify({
-            code: order.tracking_code,
-            total_formatted: order.total_formatted,
-            placed_at: new Date().toISOString(),
-            items: lines.map((line) => ({
-              name: `${line.brandName} ${line.name}`,
-              size_ml: line.sizeMl,
-              quantity: line.quantity,
-            })),
-          }),
+          "decant-please.receipt",
+          JSON.stringify({ code: order.tracking_code, phone: contact.phone }),
         );
       } catch {
-        // sessionStorage unavailable — complete page falls back to code only
+        // sessionStorage unavailable — complete page asks for the phone instead
       }
 
       clear();

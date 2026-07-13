@@ -3,6 +3,7 @@ import { getFragrances } from "@/lib/api";
 import { Hero } from "@/components/home/Hero";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
 import { FeaturedRail } from "@/components/home/FeaturedRail";
+import { RecentlyViewedRail } from "@/components/catalog/RecentlyViewed";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
 import type { Fragrance } from "@/lib/types";
@@ -84,6 +85,8 @@ export default async function HomePage() {
           </section>
         </ScrollReveal>
       )}
+
+      <RecentlyViewedRail />
 
       <ScrollReveal>
         <section className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 md:py-20">
