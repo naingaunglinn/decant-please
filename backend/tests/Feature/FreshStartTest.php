@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\PromoCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,6 +26,7 @@ class FreshStartTest extends TestCase
 
         $this->assertSame(0, Order::count());
         $this->assertSame(0, Fragrance::count());
+        $this->assertSame(0, PromoCode::count());
         $this->assertSame($brandCount, Brand::count());
         $this->assertSame(1, User::count());
     }
@@ -36,7 +38,7 @@ class FreshStartTest extends TestCase
 
         $this->artisan('decant:fresh-start')
             ->expectsConfirmation(
-                'This permanently deletes ALL orders and ALL fragrances (with their prices and images). Brands and the admin login are kept. Continue?',
+                'This permanently deletes ALL orders, ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?',
                 'no'
             )
             ->assertSuccessful();

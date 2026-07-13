@@ -14,13 +14,17 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'total_mmk', 'notes'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
     private const TRACKING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     private const TRACKING_LENGTH = 10;
+
+    /** Not persisted — set when a promo lapsed between preview and submission,
+     *  so the checkout response can explain the dropped discount. */
+    public ?string $promoNote = null;
 
     protected static function booted(): void
     {
@@ -53,15 +57,7 @@ class Order extends Model
             ]);
 
             foreach ($data['items'] as $i => $item) {
-                $price = DecantPrice::query()
-                    ->where('fragrance_id', $item['fragrance_id'])
-                    ->where('size_ml', $item['size_ml'])
-                    ->where('in_stock', true)
-                    ->whereHas('fragrance', fn ($query) => $query
-                        ->where('is_active', true)
-                        ->whereHas('brand', fn ($q) => $q->where('is_active', true)))
-                    ->with('fragrance.brand')
-                    ->first();
+                $price = self::currentPriceFor((int) $item['fragrance_id'], (int) $item['size_ml']);
 
                 if (! $price) {
                     throw ValidationException::withMessages([
@@ -78,10 +74,51 @@ class Order extends Model
                 ]);
             }
 
+            if (! empty($data['promo_code'])) {
+                $order->applyPromo($data['promo_code']);
+            }
+
             $order->recalculateTotal();
 
             return $order;
         });
+    }
+
+    /**
+     * Re-evaluates the code against the real subtotal at submission time — never
+     * the preview result — with the promo row locked so a limited-use code can't
+     * be double-spent. A code that lapsed since preview drops silently (promoNote
+     * explains why) instead of failing a real order over a dead coupon.
+     * Must run inside newFromCheckout's transaction (lockForUpdate needs one).
+     */
+    protected function applyPromo(string $code): void
+    {
+        $subtotal = (int) $this->items()->sum('line_total_mmk');
+        $result = PromoCode::evaluate($code, $subtotal, lock: true);
+
+        if (! $result['valid']) {
+            $this->promoNote = "That code was no longer valid, so it wasn't applied — you can still place this order without it.";
+
+            return;
+        }
+
+        $result['promo']->increment('times_used');
+        $this->discount_mmk = $result['discount_mmk'];
+        $this->promo_code = $result['promo']->code;
+    }
+
+    /** The current-catalog price lookup checkout and promo preview both use. */
+    public static function currentPriceFor(int $fragranceId, int $sizeMl): ?DecantPrice
+    {
+        return DecantPrice::query()
+            ->where('fragrance_id', $fragranceId)
+            ->where('size_ml', $sizeMl)
+            ->where('in_stock', true)
+            ->whereHas('fragrance', fn ($query) => $query
+                ->where('is_active', true)
+                ->whereHas('brand', fn ($q) => $q->where('is_active', true)))
+            ->with('fragrance.brand')
+            ->first();
     }
 
     public function accept(CarbonInterface $decantDate, ?CarbonInterface $deliveryDate = null): void
@@ -143,7 +180,7 @@ class Order extends Model
      * A customer-actionable reason: name the fragrance/size so the frontend
      * can say more than "something failed".
      */
-    protected static function unavailableItemMessage(array $item): string
+    public static function unavailableItemMessage(array $item): string
     {
         $fragrance = Fragrance::query()->find($item['fragrance_id'] ?? null);
 
