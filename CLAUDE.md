@@ -1,9 +1,57 @@
-# CLAUDE.md — Decant Please! (v2)
+# CLAUDE.md — Decant Please! (v4)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v2
+## 0. What changed in v2, then v3, then v4
+
+**v4** adds two independent features on top of v3's receipt/polish work:
+- A **Burmese/English toggle** for the customer site — UI chrome only by default
+  (nav, buttons, labels, the Step-8 receipt), with an optional additive schema change
+  (`notes_mm`/`vibes_mm`/`performance_mm`/`description_mm` on `fragrances`) if the
+  decanter wants bilingual catalog text too. No URL-based locale routing — a
+  deliberate simplicity trade-off against full per-language SEO, flagged as such
+  rather than silently skipped. See `09-burmese-language-toggle.md`.
+- **Promo/discount codes at checkout** — a new `promo_codes` table, live validation
+  before the customer commits (a preview endpoint, re-validated atomically at actual
+  submission), and a `promo_code` snapshot column on `orders` so the receipt can name
+  which code was used. The decanter's existing ability to hand-edit `discount_mmk` on
+  any order in Filament is unchanged — promo codes just supply the *initial* value
+  and a record of why. See `10-promo-codes.md`.
+
+Files new in v4: this section, `09-burmese-language-toggle.md`,
+`10-promo-codes.md`. Nothing from v3 or earlier changed to make room for these —
+both are purely additive.
+
+## 0.1 What changed in v2, then v3 (for reference)
+
+
+**v2** added the self-service checkout described below (cart, checkout, order-complete,
+tracking, admin accept/reject, production schedule) in place of v1's DM-only flow.
+
+**v3** makes the post-checkout experience actually feel like a receipt instead of a
+stub, and adds a small set of e-commerce fundamentals that were still missing:
+- The order-complete and tracking views now show the same full detail — order
+  number, customer info, shipping address, a real itemized payment breakdown, and
+  delivery-date messaging that's honest about what isn't confirmed yet — instead of
+  order-complete depending on a fragile client-side cache of the checkout response.
+- `GET /orders/track` now also returns `order_number`, `customer_name`, `phone`,
+  `address`, and per-item/summary pricing. Earlier versions of this spec said not to
+  return the address — that was overly cautious: the code+phone pair already gates
+  the whole endpoint, so withholding just the address protected against nothing
+  while breaking the ordinary "confirm your delivery address" UX a receipt needs.
+- A customer can now cancel their own order while it's still `awaiting_confirmation`,
+  using the same code+phone the tracking page already asks for.
+- The order-complete/tracking view is printable (a real print stylesheet, not a new
+  PDF dependency — "Save as PDF" in the browser's print dialog covers "download").
+- A handful of standard catalog fundamentals: related fragrances on the detail page,
+  a recently-viewed rail, and a generated sitemap.
+
+Files updated for v3: this file and the new `08-order-confirmation-and-polish.md`.
+`02` through `07` are otherwise unchanged — see `08` for the full brief; it's additive
+to what's already built, not a redo of any earlier step.
+
+## 0.1 What changed in v2 (for reference)
 
 The original spec was DM-only: browse on the website, order by DMing TikTok/Facebook,
 decanter transcribes the order into the admin panel. **v2 adds a real, self-service
@@ -137,10 +185,17 @@ sparingly (never as a large fill except buttons and the vial-fill status track).
   decanter is accepting it by typing it in).
 - `delivery_date` — unchanged, nullable
 - `status`: `awaiting_confirmation` \| `pending` \| `decanted` \| `delivered` \|
-  `cancelled` \| `rejected` — **`awaiting_confirmation` and `rejected` are new.**
+  `cancelled` \| `rejected` — **`awaiting_confirmation` and `rejected` are new in v2.**
   Website checkouts start at `awaiting_confirmation`; manual admin entries start at
-  `pending` (the decanter already accepted it by entering it).
+  `pending` (the decanter already accepted it by entering it). **v3:** `cancelled` can
+  now also be reached by the customer themselves, not just an admin override — see
+  `08-order-confirmation-and-polish.md`. A cancel is only allowed while a website
+  order is still `awaiting_confirmation`; once accepted, cancelling means calling the
+  decanter, same as it always has.
 - `rejection_reason` — **new.** Nullable string, set when status becomes `rejected`.
+- `id` — the existing primary key, now also doing double duty as a human-readable
+  **order number** on the receipt (`Order #{id}`) — no new column, just a display
+  convention introduced in v3.
 - `deposit_mmk`, `delivery_fee_mmk`, `discount_mmk`, `notes`, `total_mmk` — unchanged
 
 ### OrderItem — unchanged from v1
