@@ -15,10 +15,10 @@ export default async function TrackPage({
 
   return (
     <div className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16">
-      <h1 className="text-[28px] font-bold uppercase tracking-[0.12em] text-ink-strong">
+      <h1 className="no-print text-[28px] font-bold uppercase tracking-[0.12em] text-ink-strong">
         Track your order
       </h1>
-      <p className="mt-2 text-sm text-muted">
+      <p className="no-print mt-2 text-sm text-muted">
         Enter the tracking code from your order-complete page, plus the phone number you
         ordered with.
       </p>

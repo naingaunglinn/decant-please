@@ -92,7 +92,7 @@ export function OrderCompleteClient({ code }: { code: string }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      <h1 className="text-[28px] font-bold uppercase tracking-[0.12em] text-ink-strong sm:text-[32px]">
+      <h1 className="no-print text-[28px] font-bold uppercase tracking-[0.12em] text-ink-strong sm:text-[32px]">
         Order placed
       </h1>
       <p className="no-print mt-2 max-w-md text-sm leading-relaxed text-muted">
@@ -122,9 +122,9 @@ export function OrderCompleteClient({ code }: { code: string }) {
         </p>
       )}
 
-      <div className="mt-10 border-t border-rule pt-8">
+      <div className="mt-10 border-t border-rule pt-8 print:mt-0 print:border-0 print:pt-0">
         {phase === "loading" && (
-          <div className="flex flex-col gap-4" aria-label="Loading your receipt">
+          <div className="no-print flex flex-col gap-4" aria-label="Loading your receipt">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-24 w-full" />
@@ -136,7 +136,7 @@ export function OrderCompleteClient({ code }: { code: string }) {
         )}
 
         {phase === "needs-phone" && (
-          <div>
+          <div className="no-print">
             <h2 className="text-sm font-medium uppercase tracking-[0.15em]">
               Confirm your phone number to view your receipt
             </h2>
