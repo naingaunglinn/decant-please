@@ -150,7 +150,10 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
             <SummaryRow label="Delivery fee" amount={formatKyat(order.delivery_fee_mmk)} />
           )}
           {order.discount_mmk !== 0 && (
-            <SummaryRow label="Discount" amount={`−${formatKyat(order.discount_mmk)}`} />
+            <SummaryRow
+              label={order.promo_code ? `Discount (${order.promo_code})` : "Discount"}
+              amount={`−${formatKyat(order.discount_mmk)}`}
+            />
           )}
           {order.deposit_mmk !== 0 && (
             <SummaryRow label="Deposit received" amount={formatKyat(order.deposit_mmk)} />
