@@ -1,0 +1,18 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# backend (Laravel keeps its own .gitignore too)
+/backend/vendor/
+/backend/.env
+/backend/storage/*.key
+/backend/node_modules/
+
+# frontend (Next.js keeps its own .gitignore too)
+/frontend/node_modules/
+/frontend/.next/
+/frontend/.env.local
+/frontend/next-env.d.ts
