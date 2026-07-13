@@ -29,7 +29,7 @@ adds a Burmese/English toggle and promo codes. Full history in `00-CLAUDE.md` §
    | 6 | `06-frontend-nextjs.md` | Next.js storefront — catalog, cart, checkout, tracking, design system | built |
    | 7 | `07-polish-deploy.md` | Seeding real data, performance, SEO, deployment notes | built |
    | 8 | `08-order-confirmation-and-polish.md` | Real receipt, printable/PDF, customer cancellation, related fragrances, sitemap | built |
-   | 10 | `10-promo-codes.md` | Promo/discount codes at checkout | spec ready — do before 09 |
+   | 10 | `10-promo-codes.md` | Promo/discount codes at checkout | built |
    | 9 | `09-burmese-language-toggle.md` | Burmese/English toggle for the customer site | spec ready — do last, translates 08 & 10's new strings too |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:

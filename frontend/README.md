@@ -43,7 +43,7 @@ checkout/tracking calls fail CORS.
 | `/` | static, 60s revalidate | Home — hero, featured rail, how-it-works, category tiles |
 | `/shop` | dynamic | Filterable catalog; all filter state lives in the URL query string |
 | `/fragrance/{slug}` | dynamic | Fragrance detail + size selector + add to cart (404s on unknown/inactive slugs) |
-| `/checkout` | static shell | Cart summary + contact form (cart itself is client-side) |
+| `/checkout` | static shell | Cart summary + promo code + contact form (cart itself is client-side) |
 | `/order/complete?code=…` | dynamic | Full receipt (fetched by code + phone), printable, survives refresh via the URL |
 | `/track` | dynamic | Tracking code + phone → the same receipt, with the vial-fill timeline |
 | `/sitemap.xml` | static, 60s revalidate | Home, shop, and every active fragrance |
