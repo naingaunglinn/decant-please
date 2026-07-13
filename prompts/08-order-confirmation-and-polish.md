@@ -39,13 +39,6 @@ Same shape as the tracking lookup: body `{ tracking_code, phone }`, same generic
 Rate limit it the same as the other public write endpoint (`POST /orders`), not the
 looser read limit.
 
-> Implementation note (discovered while building this): Laravel's inline
-> `throttle:n,1` keys guests by IP alone — no path — so every route sharing that
-> middleware shape shares one counter, and catalog browsing was eating the checkout
-> allowance. The build switched all four public limits to named limiters with
-> per-endpoint buckets (see `AppServiceProvider`); any future public endpoint should
-> follow that pattern, not inline `throttle:n,1`.
-
 ## 2. Frontend — one shared receipt view, not two overlapping ones
 
 `OrderCompleteClient` and `TrackClient` currently both render an items list + total
@@ -74,7 +67,7 @@ Takes the (now-expanded) tracking response and renders, top to bottom:
   decanter actually commits to) — never fabricate a date. Once set, "Estimated
   delivery: {delivery_date, formatted}"
 - **Cancel this order** — only rendered while `status === awaiting_confirmation`;
-  confirms before calling `POST /orders/cancel`, then re-renders the now-cancelled
+  confirks before calling `POST /orders/cancel`, then re-renders the now-cancelled
   state in place rather than navigating away
 - **Print / Save as PDF** button (see §4) and the context-appropriate CTA row —
   Order Complete shows "Track this order" + "Keep browsing"; the Track page (already
@@ -99,16 +92,43 @@ after a successful order. `OrderCompleteClient`:
 Test this specifically in a private/incognito window with `sessionStorage` cleared,
 since that's the exact condition the current implementation silently degrades under.
 
-## 3. Print / download as a receipt, not a new dependency
+## 3. Print / download as a receipt — a real document, not the live view with chrome hidden
 
-No PDF library — a real `@media print` stylesheet plus the browser's native
-"Save as PDF" print destination covers both "print" and "download" from the same
-button. In `OrderReceipt`'s print styles: hide nav, footer, cart icon, and every
-button except none (buttons shouldn't print at all — mark them `.no-print`); show a
-letterhead (`DECANT PLEASE!` wordmark + "RECEIPT" + today's date) that only appears
-in print output; keep the pine accent for the total line, simplify everything else to
-print cleanly on plain paper. The button itself: `<button className="no-print"
-onClick={() => window.print()}>Print / Save as PDF</button>`.
+**Corrected — the original version of this section only said to hide nav/footer/
+buttons for print, which produces a printed live-tracking-page rather than a receipt.
+Concretely wrong in what shipped: the interactive status timeline prints as-is, so a
+PDF saved the moment an order is placed permanently shows "AWAITING CONFIRMATION" and
+"We'll confirm shortly" — accurate for the ten seconds after checkout, wrong for every
+time that saved file is opened again after. A receipt is a snapshot of a completed
+transaction; anything phrased as "shortly," or a progress track with future steps
+sitting empty, promises live updates a static document can't deliver.**
+
+Still no PDF library — `@media print` plus the browser's native "Save as PDF"
+destination is still the right mechanism. What changes is that print gets its own
+content, not the live view with some elements hidden:
+
+- Add a `.print-only` block inside `OrderReceipt` — `display: none` on screen,
+  `display: block` only inside `@media print` (mirror image of `.no-print`, which
+  stays for nav/footer/cart icon/every button). This block is the actual receipt:
+  - **Heading is the document type, not the live-page heading** — "RECEIPT," not
+    "Order placed." `DECANT PLEASE!` as the letterhead above it.
+  - Order number + tracking code, the date the order was placed, and — only if it
+    reads distinctly from that — a "Printed on {today}" line. Don't show today's date
+    twice under two different labels when they're the same day.
+  - **Status as one static fact, not the interactive timeline:** "Status at time of
+    printing: {current status label}." The live `StatusTimeline` component itself
+    gets `.no-print` — it does not appear in the printed output in any form.
+  - Customer and shipping blocks, itemized list, payment summary — these parts of
+    the existing live view were fine, carry them into the print-only block as-is.
+  - Payment-method note, reworded to hold up over time: "No online payment is taken —
+    payment is arranged by bank transfer, mobile banking, or cash on delivery once
+    the order is confirmed." Not "we'll confirm within a few hours" — true right
+    after checkout, meaningless read back a week later.
+- The print button stays as it was: `<button className="no-print"
+  onClick={() => window.print()}>Print / Save as PDF</button>`.
+- Keep the pine accent on the total line in print; simplify everything else (no
+  interactive states, no hover styles) to print cleanly on plain paper.
+
 
 ## 4. Related fragrances (detail page)
 
@@ -141,7 +161,9 @@ already reference one.
 - Confirm the cancel button appears only pre-confirmation, and that cancelling
   updates the view in place without a reload.
 - Print preview (or actual "Save as PDF") on both Order Complete and Track — confirm
-  nav/footer/buttons are gone and the layout reads as a real receipt.
+  nav/footer/buttons are gone, the interactive status timeline is *not* in the
+  printed output at all, a single static "Status at time of printing" line is, and
+  the heading reads "Receipt," not "Order placed."
 - Confirm delivery-fee/discount/deposit rows are absent when zero and present once
   an admin sets them (accept an order, add a delivery fee, re-check the customer's
   tracking view).
