@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { TrackingForm } from "./TrackingForm";
-import { StatusTimeline } from "./StatusTimeline";
-import { Pill } from "@/components/ui/Pill";
+import { OrderReceipt } from "./OrderReceipt";
 import { trackOrder } from "@/lib/api";
 import type { OrderStatusResponse } from "@/lib/types";
 
@@ -31,7 +30,7 @@ export function TrackClient({ initialCode }: { initialCode?: string }) {
 
   return (
     <div className="flex flex-col gap-10">
-      <TrackingForm initialCode={initialCode} pending={pending} onSubmit={lookUp} />
+      {!result && <TrackingForm initialCode={initialCode} pending={pending} onSubmit={lookUp} />}
 
       {notFound && (
         <p role="alert" className="rounded-2xl border border-rule px-5 py-4 text-sm text-muted">
@@ -47,41 +46,16 @@ export function TrackClient({ initialCode }: { initialCode?: string }) {
       )}
 
       {result && (
-        <section aria-live="polite" className="border-t border-rule pt-8">
-          <div className="mb-8 flex flex-wrap items-center gap-3">
-            <Pill tone="pine" className="font-mono">{result.tracking_code}</Pill>
-            <Pill tone={result.status === "rejected" || result.status === "cancelled" ? "danger" : "pending"}>
-              {result.status_label}
-            </Pill>
-          </div>
-
-          <StatusTimeline
-            status={result.status}
-            placedAt={result.placed_at}
-            decantDate={result.decant_date}
-            deliveryDate={result.delivery_date}
-            rejectionReason={result.rejection_reason}
+        <section aria-live="polite">
+          <OrderReceipt
+            key={result.tracking_code}
+            order={result}
+            context="track"
+            onSearchAgain={() => {
+              setResult(null);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           />
-
-          <div className="mt-10 rounded-2xl border border-rule px-5 py-4">
-            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-              In this order
-            </h2>
-            <ul className="mt-3 flex flex-col gap-2">
-              {result.items.map((item, index) => (
-                <li key={index} className="flex items-baseline justify-between gap-4 text-sm">
-                  <span>{item.fragrance_name}</span>
-                  <span className="whitespace-nowrap text-muted">
-                    {item.size_ml}ml × {item.quantity}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 flex items-baseline justify-between border-t border-rule pt-3">
-              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Total</span>
-              <span className="text-sm font-medium">{result.total_formatted}</span>
-            </div>
-          </div>
         </section>
       )}
     </div>

@@ -87,3 +87,25 @@ body {
     animation-delay: 0s !important;
   }
 }
+
+/* ---- Print (the receipt) ----------------------------------------------- */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  body {
+    background: white;
+  }
+}

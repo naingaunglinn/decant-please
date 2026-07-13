@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
@@ -104,6 +105,30 @@ class Order extends Model
         $this->status = OrderStatus::Rejected;
         $this->rejection_reason = $reason;
         $this->save();
+    }
+
+    /**
+     * Customer self-cancellation — only while the decanter hasn't committed
+     * time or stock to it yet. After acceptance it's a phone call, not a click.
+     */
+    public function cancel(): void
+    {
+        if ($this->status !== OrderStatus::AwaitingConfirmation) {
+            throw new LogicException('Only orders awaiting confirmation can be cancelled by the customer.');
+        }
+
+        $this->status = OrderStatus::Cancelled;
+        $this->save();
+    }
+
+    /** The one lookup both public tracking endpoints share: exact pair or nothing. */
+    public static function findByTracking(string $code, string $phone): ?self
+    {
+        return self::query()
+            ->where('tracking_code', Str::upper(trim($code)))
+            ->where('phone', trim($phone))
+            ->with('items.fragrance.brand')
+            ->first();
     }
 
     public function recalculateTotal(): void

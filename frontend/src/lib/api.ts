@@ -102,3 +102,36 @@ export async function trackOrder(
 
   return response.json();
 }
+
+/** Thrown when a cancel arrives too late — the order is already being prepared. */
+export class ApiConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiConflictError";
+  }
+}
+
+/** Same generic-404 contract as trackOrder; 409 (already accepted) throws
+ *  ApiConflictError with the server's customer-facing message. */
+export async function cancelOrder(
+  trackingCode: string,
+  phone: string,
+): Promise<OrderStatusResponse | null> {
+  const response = await fetch(`${BASE}/orders/cancel`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ tracking_code: trackingCode, phone }),
+    cache: "no-store",
+  });
+
+  if (response.status === 404) return null;
+  if (response.status === 409) {
+    const body = await response.json().catch(() => null);
+    throw new ApiConflictError(
+      body?.message ?? "This order's already being prepared — call to cancel or change it.",
+    );
+  }
+  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+
+  return response.json();
+}

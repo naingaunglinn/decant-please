@@ -103,13 +103,28 @@ export type OrderStatus =
 
 export interface OrderStatusResponse {
   tracking_code: string;
+  order_number: string;
   status: OrderStatus;
   status_label: string;
   placed_at: string;
   decant_date: string | null;
   delivery_date: string | null;
   rejection_reason: string | null;
-  items: { fragrance_name: string; size_ml: number; quantity: number }[];
+  customer_name: string;
+  phone: string;
+  address: string;
+  items: {
+    fragrance_name: string;
+    size_ml: number;
+    quantity: number;
+    unit_price_mmk: number;
+    line_total_mmk: number;
+  }[];
+  subtotal_mmk: number;
+  delivery_fee_mmk: number;
+  discount_mmk: number;
+  deposit_mmk: number;
+  total_mmk: number;
   total_formatted: string;
 }
 

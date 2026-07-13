@@ -196,21 +196,67 @@ class PublicApiTest extends TestCase
     {
         $code = $this->postJson('/api/v1/orders', $this->payload())->assertCreated()->json('tracking_code');
 
+        $order = Order::where('tracking_code', $code)->firstOrFail();
+
         $this->getJson('/api/v1/orders/track?tracking_code='.strtolower($code).'&phone=09-771234561')
             ->assertOk()
             ->assertJsonPath('tracking_code', $code)  // lowercase input normalized
+            ->assertJsonPath('order_number', "#{$order->id}")
             ->assertJsonPath('status', 'awaiting_confirmation')
             ->assertJsonPath('status_label', 'Awaiting Confirmation')
             ->assertJsonPath('decant_date', null)
             ->assertJsonPath('rejection_reason', null)
+            ->assertJsonPath('customer_name', 'Su Su')
+            ->assertJsonPath('phone', '09-771234561')
+            ->assertJsonPath('address', 'No. 12, Bahan Township, Yangon')
             ->assertJsonPath('items.0.fragrance_name', 'Chanel — Allure Homme Sport (Cologne)')
             ->assertJsonPath('items.0.size_ml', 10)
+            ->assertJsonPath('items.0.unit_price_mmk', 55000)
+            ->assertJsonPath('items.0.line_total_mmk', 55000)
+            ->assertJsonPath('subtotal_mmk', 55000)
+            ->assertJsonPath('delivery_fee_mmk', 0)
+            ->assertJsonPath('discount_mmk', 0)
+            ->assertJsonPath('deposit_mmk', 0)
+            ->assertJsonPath('total_mmk', 55000)
             ->assertJsonPath('total_formatted', '55,000 Ks')
             ->assertJsonStructure(['placed_at']);
 
         $wrongPhone = $this->getJson("/api/v1/orders/track?tracking_code={$code}&phone=09-000000000")->assertNotFound();
         $wrongCode = $this->getJson('/api/v1/orders/track?tracking_code=WRONGCODE9&phone=09-771234561')->assertNotFound();
         $this->assertSame($wrongPhone->json(), $wrongCode->json()); // identical — no oracle
+    }
+
+    public function test_customer_can_cancel_only_while_awaiting_confirmation(): void
+    {
+        $code = $this->postJson('/api/v1/orders', $this->payload())->assertCreated()->json('tracking_code');
+        $pair = ['tracking_code' => $code, 'phone' => '09-771234561'];
+
+        // wrong pair → the same generic 404 tracking uses
+        $wrong = $this->postJson('/api/v1/orders/cancel', ['tracking_code' => $code, 'phone' => '09-000000000'])
+            ->assertNotFound();
+        $this->assertSame(
+            $this->getJson('/api/v1/orders/track?tracking_code=WRONGCODE9&phone=x')->json(),
+            $wrong->json(),
+        );
+
+        // awaiting_confirmation → cancels, returns the updated receipt in place
+        $this->postJson('/api/v1/orders/cancel', $pair)
+            ->assertOk()
+            ->assertJsonPath('status', 'cancelled')
+            ->assertJsonPath('subtotal_mmk', 55000);
+        $this->assertSame(OrderStatus::Cancelled, Order::where('tracking_code', $code)->firstOrFail()->status);
+
+        // already cancelled → 409, exact copy the receipt shows
+        $this->postJson('/api/v1/orders/cancel', $pair)
+            ->assertStatus(409)
+            ->assertJsonPath('message', "This order's already being prepared — call to cancel or change it.");
+
+        // accepted order → 409, status untouched
+        $accepted = Order::newFromCheckout($this->payload());
+        $accepted->accept(today()->addDay());
+        $this->postJson('/api/v1/orders/cancel', ['tracking_code' => $accepted->tracking_code, 'phone' => '09-771234561'])
+            ->assertStatus(409);
+        $this->assertSame(OrderStatus::Pending, $accepted->fresh()->status);
     }
 
     public function test_checkout_rate_limit_is_tight(): void
@@ -229,6 +275,10 @@ class PublicApiTest extends TestCase
         }
 
         $this->getJson('/api/v1/orders/track?tracking_code=X&phone=Y')->assertStatus(429);
+
+        // buckets are per-endpoint: exhausting tracking must not starve checkout or cancel
+        $this->postJson('/api/v1/orders/cancel', ['tracking_code' => 'X', 'phone' => 'Y'])->assertNotFound();
+        $this->postJson('/api/v1/orders', [])->assertUnprocessable();
     }
 
     private function payload(array $overrides = []): array
