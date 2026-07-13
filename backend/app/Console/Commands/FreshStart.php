@@ -6,6 +6,7 @@ use App\Models\DecantPrice;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PromoCode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class FreshStart extends Command
     public function handle(): int
     {
         if (! $this->option('force') && ! $this->confirm(
-            'This permanently deletes ALL orders and ALL fragrances (with their prices and images). Brands and the admin login are kept. Continue?'
+            'This permanently deletes ALL orders, ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?'
         )) {
             $this->info('Nothing deleted.');
 
@@ -41,6 +42,7 @@ class FreshStart extends Command
             Fragrance::query()->whereNotNull('image_path')->pluck('image_path')
                 ->each(fn (string $path) => Storage::disk('public')->delete($path));
             Fragrance::query()->delete();
+            PromoCode::query()->delete();
 
             return $counts;
         });

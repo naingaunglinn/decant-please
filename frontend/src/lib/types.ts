@@ -83,6 +83,7 @@ export interface CheckoutPayload {
   phone: string;
   address: string;
   note?: string;
+  promo_code?: string;
   website?: string; // honeypot — always empty for humans
   items: CheckoutItem[];
 }
@@ -91,6 +92,16 @@ export interface CheckoutResponse {
   tracking_code: string;
   total_mmk: number;
   total_formatted: string;
+  /** Set only when a promo lapsed between preview and submission. */
+  promo_note: string | null;
+}
+
+export interface PromoPreview {
+  valid: boolean;
+  discount_mmk: number;
+  discount_formatted: string;
+  new_total_formatted: string;
+  message: string | null;
 }
 
 export type OrderStatus =
@@ -123,6 +134,7 @@ export interface OrderStatusResponse {
   subtotal_mmk: number;
   delivery_fee_mmk: number;
   discount_mmk: number;
+  promo_code: string | null;
   deposit_mmk: number;
   total_mmk: number;
   total_formatted: string;

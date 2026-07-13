@@ -36,6 +36,8 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
   shipping details, itemized pricing, a status timeline that fills like liquid rising in
   a vial, and a print / save-as-PDF view
 - Customer self-cancellation while an order is still awaiting confirmation
+- Promo codes at checkout — live preview before committing, re-validated atomically at
+  submission, named on the receipt
 - Related fragrances on every detail page, a recently-viewed rail, and a generated sitemap
 
 **Admin panel (`/admin`, login required)**
@@ -46,6 +48,7 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Manual order entry for customers who still order by DM
 - **Production schedule** — per-day, aggregated view of which fragrances/sizes to decant
   and how many vials, across all upcoming orders
+- Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Dashboard: monthly revenue, orders by status, decants due today, top fragrances
 - CSV export of orders, respecting the current tab/filters/sort
 - "View on site" jump from any fragrance row to its public page
@@ -146,6 +149,7 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 | POST | `/orders` | Guest checkout | 10/min |
 | GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/orders/cancel` | Customer cancel while awaiting confirmation | 10/min |
+| POST | `/orders/validate-promo` | Preview a promo code against the cart | 10/min |
 
 Guarantees worth knowing:
 

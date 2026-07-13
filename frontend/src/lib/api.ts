@@ -1,12 +1,14 @@
 import type {
   Brand,
   CatalogMeta,
+  CheckoutItem,
   CheckoutPayload,
   CheckoutResponse,
   Fragrance,
   FragranceFilters,
   OrderStatusResponse,
   Paginated,
+  PromoPreview,
 } from "./types";
 
 const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api"}/v1`;
@@ -81,6 +83,19 @@ export async function createOrder(payload: CheckoutPayload): Promise<CheckoutRes
   return apiFetch("/orders", {
     method: "POST",
     body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+}
+
+/** Preview a promo against the current cart — server re-derives the subtotal.
+ *  Business rejections come back as { valid: false, message } with a 200. */
+export async function validatePromo(
+  code: string,
+  items: CheckoutItem[],
+): Promise<PromoPreview> {
+  return apiFetch("/orders/validate-promo", {
+    method: "POST",
+    body: JSON.stringify({ code, items }),
     cache: "no-store",
   });
 }

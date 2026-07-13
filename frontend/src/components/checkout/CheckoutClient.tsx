@@ -21,6 +21,7 @@ export function CheckoutClient() {
   const router = useRouter();
   const [errors, setErrors] = useState<CheckoutErrors>(NO_ERRORS);
   const [submitting, setSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
 
   if (!hydrated) return null;
 
@@ -45,6 +46,7 @@ export function CheckoutClient() {
       const order = await createOrder({
         ...contact,
         website: honeypot,
+        promo_code: promoCode ?? undefined,
         items: lines.map((line) => ({
           fragrance_id: line.fragranceId,
           size_ml: line.sizeMl,
@@ -53,10 +55,15 @@ export function CheckoutClient() {
       });
 
       try {
-        // just the lookup pair — the complete page fetches the real receipt
+        // just the lookup pair — the complete page fetches the real receipt.
+        // promo_note rides along so a lapsed code gets explained there, once.
         window.sessionStorage.setItem(
           "decant-please.receipt",
-          JSON.stringify({ code: order.tracking_code, phone: contact.phone }),
+          JSON.stringify({
+            code: order.tracking_code,
+            phone: contact.phone,
+            promo_note: order.promo_note ?? null,
+          }),
         );
       } catch {
         // sessionStorage unavailable — complete page asks for the phone instead
@@ -101,7 +108,7 @@ export function CheckoutClient() {
       </div>
 
       <div className="order-1 md:order-2">
-        <OrderSummaryCard lineErrors={errors.lines} />
+        <OrderSummaryCard lineErrors={errors.lines} onPromoChange={setPromoCode} />
       </div>
     </div>
   );

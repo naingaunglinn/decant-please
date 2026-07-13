@@ -64,6 +64,7 @@ class TrackOrderController extends Controller
             'subtotal_mmk' => (int) $order->items->sum('line_total_mmk'),
             'delivery_fee_mmk' => $order->delivery_fee_mmk,
             'discount_mmk' => $order->discount_mmk,
+            'promo_code' => $order->promo_code,
             'deposit_mmk' => $order->deposit_mmk,
             'total_mmk' => $order->total_mmk,
             'total_formatted' => Money::kyat($order->total_mmk),

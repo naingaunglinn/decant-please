@@ -145,7 +145,12 @@ class OrderForm
                             ->minValue(0)
                             ->default(0)
                             ->suffix('Ks')
-                            ->live(onBlur: true),
+                            ->live(onBlur: true)
+                            // promo_code is a snapshot of where the initial discount came
+                            // from — editing the amount here deliberately leaves it alone
+                            ->helperText(fn ($record): ?string => $record?->promo_code
+                                ? "Set by promo code {$record->promo_code} at checkout — adjust freely."
+                                : null),
                         TextInput::make('deposit_mmk')
                             ->label('Deposit paid')
                             ->numeric()

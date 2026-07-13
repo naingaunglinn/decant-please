@@ -18,6 +18,7 @@ class OrderController extends Controller
             'phone' => ['required', 'string', 'max:30'],
             'address' => ['required', 'string', 'max:1000'],
             'note' => ['nullable', 'string', 'max:1000'],
+            'promo_code' => ['nullable', 'string', 'max:64'],
             'website' => ['nullable', 'string', 'max:255'], // honeypot — real customers never see it
             'items' => ['required', 'array', 'min:1', 'max:20'],
             'items.*.fragrance_id' => ['required', 'integer'],
@@ -33,6 +34,7 @@ class OrderController extends Controller
                 'tracking_code' => Order::generateTrackingCode(),
                 'total_mmk' => 0,
                 'total_formatted' => Money::kyat(0),
+                'promo_note' => null,
             ], 201);
         }
 
@@ -41,6 +43,7 @@ class OrderController extends Controller
             'phone' => $data['phone'],
             'address' => $data['address'],
             'notes' => $data['note'] ?? null,
+            'promo_code' => $data['promo_code'] ?? null,
             'items' => $data['items'],
         ]);
 
@@ -48,6 +51,8 @@ class OrderController extends Controller
             'tracking_code' => $order->tracking_code,
             'total_mmk' => $order->total_mmk,
             'total_formatted' => Money::kyat($order->total_mmk),
+            // set only when a promo lapsed between preview and submission
+            'promo_note' => $order->promoNote,
         ], 201);
     }
 }

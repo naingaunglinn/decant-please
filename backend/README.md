@@ -52,6 +52,7 @@ caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
 | POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
 | GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
+| POST | `/api/v1/orders/validate-promo` | Preview a promo code — nothing persisted; checkout re-validates | 10/min |
 
 Each limit is its own per-IP bucket (named limiters in `AppServiceProvider`), so heavy
 catalog browsing can never starve checkout, tracking, or cancellation.
@@ -65,6 +66,7 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 | `/admin/brands` + `/create`, `/{id}/edit` | Brand CRUD |
 | `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
 | `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
+| `/admin/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
 | `/admin/production-schedule` | Aggregated daily decant schedule |
 
 **Utility**
@@ -83,16 +85,17 @@ Trimmed to the files you'd look for first. Deployment-relevant paths are marked 
 backend/
 ├── app/
 │   ├── Console/Commands/FreshStart.php     # php artisan decant:fresh-start (handover wipe)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PromoType
 │   ├── Filament/
 │   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ Blade view in resources/)
-│   │   ├── Resources/                      # Brands/, Fragrances/, Orders/ — each: Resource + Schemas/ (form) + Tables/ + Pages/
+│   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants
 │   ├── Http/
 │   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder
 │   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
-│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem (+ Concerns/HasSlug)
+│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem, PromoCode (+ Concerns/HasSlug)
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
+│   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
@@ -123,6 +126,11 @@ backend/
   `pending`. `accept()` assigns dates, `reject()` records a reason, and the customer-facing
   `cancel()` backs out — all three guarded so they only fire from `awaiting_confirmation`.
 - **Cancelled/rejected orders** are excluded from revenue widgets and the production schedule.
+- **Promo codes** are evaluated once in `PromoCode::evaluate()` — preview and checkout share
+  it, checkout re-runs it inside the order transaction with the row locked (no double-spend
+  of a limited code), and a code that lapsed between preview and submit drops the discount
+  instead of blocking the order. `orders.promo_code` is a snapshot; editing `discount_mmk`
+  in Filament never touches it.
 
 ## Testing
 

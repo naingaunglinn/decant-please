@@ -17,6 +17,7 @@ export function OrderCompleteClient({ code }: { code: string }) {
   const [lookupFailed, setLookupFailed] = useState(false);
   const [pending, setPending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [promoNote, setPromoNote] = useState<string | null>(null);
 
   const fetchReceipt = async (phone: string): Promise<boolean> => {
     try {
@@ -46,8 +47,10 @@ export function OrderCompleteClient({ code }: { code: string }) {
     try {
       const stored = window.sessionStorage.getItem("decant-please.receipt");
       if (stored) {
-        const parsed: { code?: string; phone?: string } = JSON.parse(stored);
+        const parsed: { code?: string; phone?: string; promo_note?: string | null } =
+          JSON.parse(stored);
         if (parsed.code === code && parsed.phone) phone = parsed.phone;
+        if (parsed.code === code && parsed.promo_note) setPromoNote(parsed.promo_note);
       }
     } catch {
       // fall through to the phone form
@@ -109,6 +112,15 @@ export function OrderCompleteClient({ code }: { code: string }) {
           {copied ? "Copied" : "Tap to copy"}
         </span>
       </button>
+
+      {promoNote && (
+        <p
+          role="status"
+          className="no-print mt-6 rounded-2xl border border-status-pending/40 px-5 py-4 text-sm leading-relaxed text-status-pending"
+        >
+          {promoNote}
+        </p>
+      )}
 
       <div className="mt-10 border-t border-rule pt-8">
         {phase === "loading" && (
