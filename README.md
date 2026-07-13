@@ -32,8 +32,11 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Fragrance detail pages with decant sizes/prices, notes, vibes, longevity
 - Cart drawer (client-side, survives refresh via `localStorage`)
 - Guest checkout — name, phone, address; no card, no account
-- Order-complete page with a tracking code, and a tracking page (code + phone) showing a
-  status timeline that fills like liquid rising in a vial
+- Order-complete and tracking pages sharing one full receipt — order number, customer +
+  shipping details, itemized pricing, a status timeline that fills like liquid rising in
+  a vial, and a print / save-as-PDF view
+- Customer self-cancellation while an order is still awaiting confirmation
+- Related fragrances on every detail page, a recently-viewed rail, and a generated sitemap
 
 **Admin panel (`/admin`, login required)**
 
@@ -55,6 +58,7 @@ stateDiagram-v2
     [*] --> pending: manual entry (DM order)
     awaiting_confirmation --> pending: accepted — dates assigned
     awaiting_confirmation --> rejected: rejected — with reason
+    awaiting_confirmation --> cancelled: customer self-cancel
     pending --> decanted: vials filled
     decanted --> delivered: handed to customer
     pending --> cancelled
@@ -140,7 +144,8 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 | GET | `/brands` | Active brands | 120/min |
 | GET | `/meta` | Filter options, price bounds, social links | 120/min |
 | POST | `/orders` | Guest checkout | 10/min |
-| GET | `/orders/track` | Status by tracking code + phone | 20/min |
+| GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |
+| POST | `/orders/cancel` | Customer cancel while awaiting confirmation | 10/min |
 
 Guarantees worth knowing:
 

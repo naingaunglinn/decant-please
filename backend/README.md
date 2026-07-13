@@ -50,7 +50,11 @@ caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
 | GET | `/api/v1/brands` | Active brands | 120/min |
 | GET | `/api/v1/meta` | Filter options, price bounds, social links | 120/min |
 | POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
-| GET | `/api/v1/orders/track` | Order status by tracking code + phone | 20/min |
+| GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
+| POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
+
+Each limit is its own per-IP bucket (named limiters in `AppServiceProvider`), so heavy
+catalog browsing can never starve checkout, tracking, or cancellation.
 
 **Admin panel — everything below `/admin` requires login**
 
@@ -85,10 +89,10 @@ backend/
 │   │   ├── Resources/                      # Brands/, Fragrances/, Orders/ — each: Resource + Schemas/ (form) + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants
 │   ├── Http/
-│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder
+│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder
 │   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
 │   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem (+ Concerns/HasSlug)
-│   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject
+│   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
@@ -116,8 +120,8 @@ backend/
   on creation. Lookup requires an exact code + phone match; any mismatch returns the same
   generic 404.
 - **Website orders** start at `awaiting_confirmation`; manual admin entries start at
-  `pending`. `accept()` assigns dates, `reject()` records a reason — both guarded so they
-  only fire from `awaiting_confirmation`.
+  `pending`. `accept()` assigns dates, `reject()` records a reason, and the customer-facing
+  `cancel()` backs out — all three guarded so they only fire from `awaiting_confirmation`.
 - **Cancelled/rejected orders** are excluded from revenue widgets and the production schedule.
 
 ## Testing

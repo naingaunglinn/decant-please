@@ -16,3 +16,6 @@ Thumbs.db
 /frontend/.next/
 /frontend/.env.local
 /frontend/next-env.d.ts
+
+# Windows/WSL download artifacts
+*Zone.Identifier

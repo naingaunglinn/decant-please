@@ -44,8 +44,9 @@ checkout/tracking calls fail CORS.
 | `/shop` | dynamic | Filterable catalog; all filter state lives in the URL query string |
 | `/fragrance/{slug}` | dynamic | Fragrance detail + size selector + add to cart (404s on unknown/inactive slugs) |
 | `/checkout` | static shell | Cart summary + contact form (cart itself is client-side) |
-| `/order/complete?code=…` | dynamic | Tracking code + order summary, survives refresh via the URL |
-| `/track` | dynamic | Tracking code + phone → status timeline (the vial fill) |
+| `/order/complete?code=…` | dynamic | Full receipt (fetched by code + phone), printable, survives refresh via the URL |
+| `/track` | dynamic | Tracking code + phone → the same receipt, with the vial-fill timeline |
+| `/sitemap.xml` | static, 60s revalidate | Home, shop, and every active fragrance |
 | `/robots.txt`, `/icon.svg` | static | SEO rules (checkout/order pages disallowed) and favicon |
 
 ## File structure
@@ -64,16 +65,16 @@ frontend/
 │   │   ├── checkout/page.tsx               # /checkout
 │   │   ├── order/complete/page.tsx         # /order/complete
 │   │   ├── track/page.tsx                  # /track
-│   │   ├── robots.ts · icon.svg            # /robots.txt, favicon
+│   │   ├── robots.ts · sitemap.ts · icon.svg # /robots.txt, /sitemap.xml, favicon
 │   │   └── error.tsx · not-found.tsx       # branded error/404 pages
 │   ├── components/
 │   │   ├── ui/                             # primitives: Pill, Button, ImagePlate, QuantityStepper, Skeleton
 │   │   ├── layout/                         # Navbar, Footer (social links from /meta), MobileNav, CartButton
-│   │   ├── catalog/                        # FragranceCard/Grid, filter bar/sheet/controls, Pagination
+│   │   ├── catalog/                        # FragranceCard/Grid, filters, Pagination, RecentlyViewed
 │   │   ├── product/                        # SizeSelector, PurchasePanel (add to cart)
 │   │   ├── cart/                           # CartDrawer, CartItemRow
 │   │   ├── checkout/                       # CheckoutForm/Client, OrderSummaryCard, OrderCompleteClient
-│   │   ├── tracking/                       # TrackingForm, TrackClient, StatusTimeline (the vial fill)
+│   │   ├── tracking/                       # TrackingForm, TrackClient, OrderReceipt (printable), StatusTimeline
 │   │   └── home/                           # Hero (GSAP), ScrollReveal, FeaturedRail
 │   ├── lib/
 │   │   ├── api.ts                          # ← every call to the Laravel API; base URL = NEXT_PUBLIC_API_URL
