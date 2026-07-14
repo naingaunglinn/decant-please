@@ -40,7 +40,7 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
           name="customer_name"
           required
           autoComplete="name"
-          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-sm"
+          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base"
         />
       </Field>
 
@@ -55,7 +55,7 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
           type="tel"
           autoComplete="tel"
           placeholder="09-…"
-          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-sm placeholder:text-muted/70"
+          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base placeholder:text-muted/70"
         />
       </Field>
 
@@ -65,7 +65,7 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
           required
           rows={3}
           autoComplete="street-address"
-          className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-sm"
+          className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-base"
         />
       </Field>
 
@@ -74,7 +74,7 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
           name="note"
           rows={2}
           placeholder="Anything we should know — e.g. call before delivery"
-          className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-sm placeholder:text-muted/70"
+          className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-base placeholder:text-muted/70"
         />
       </Field>
 

@@ -1,4 +1,4 @@
-# Decant Please! — Claude Code Prompt Pack (v4)
+# Decant Please! — Claude Code Prompt Pack (v5)
 
 A step-by-step prompt pack to build **Decant Please!**, a perfume decant catalog,
 checkout, and order-management system for Myanmar decanters, using **Next.js**
@@ -8,7 +8,9 @@ checkout, and order-management system for Myanmar decanters, using **Next.js**
 
 v1 → v2 added self-service checkout in place of DM-only ordering. v3 turned the
 order-complete page into a real receipt and added a few catalog fundamentals. v4
-adds a Burmese/English toggle and promo codes. Full history in `00-CLAUDE.md` §0.
+adds a Burmese/English toggle and promo codes. v5 is a responsive/mobile pass plus
+Flutter-ready foundations (a written API contract and portable design tokens).
+Full history in `00-CLAUDE.md` §0.
 
 ## How to use this pack
 
@@ -31,6 +33,7 @@ adds a Burmese/English toggle and promo codes. Full history in `00-CLAUDE.md` §
    | 8 | `08-order-confirmation-and-polish.md` | Real receipt, printable/PDF, customer cancellation, related fragrances, sitemap | built |
    | 10 | `10-promo-codes.md` | Promo/discount codes at checkout | built |
    | 9 | `09-burmese-language-toggle.md` | Burmese/English toggle for the customer site | spec ready — do last, translates 08 & 10's new strings too |
+   | 11 | `11-responsive-and-mobile-foundations.md` | Responsive pass (wider PDP/receipt pages, 16px inputs, touch targets) + API contract & design tokens | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

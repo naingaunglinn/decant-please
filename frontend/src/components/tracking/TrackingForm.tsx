@@ -30,7 +30,7 @@ export function TrackingForm({ initialCode = "", pending, onSubmit }: TrackingFo
           placeholder="e.g. DP7K2M9QXA"
           required
           autoComplete="off"
-          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 font-mono text-sm uppercase tracking-[0.2em] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70"
+          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 font-mono text-base uppercase tracking-[0.2em] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70"
         />
       </label>
 
@@ -45,7 +45,7 @@ export function TrackingForm({ initialCode = "", pending, onSubmit }: TrackingFo
           required
           type="tel"
           autoComplete="tel"
-          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-sm placeholder:text-muted/70"
+          className="w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base placeholder:text-muted/70"
         />
       </label>
 

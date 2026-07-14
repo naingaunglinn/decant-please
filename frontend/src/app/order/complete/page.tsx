@@ -14,7 +14,7 @@ export default async function OrderCompletePage({
   const { code } = await searchParams;
 
   return (
-    <div className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16">
+    <div className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">
       {code ? (
         <OrderCompleteClient code={code} />
       ) : (

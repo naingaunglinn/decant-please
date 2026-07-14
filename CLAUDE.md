@@ -1,9 +1,28 @@
-# CLAUDE.md — Decant Please! (v4)
+# CLAUDE.md — Decant Please! (v5)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v2, then v3, then v4
+## 0. What changed in v2, then v3, then v4, then v5
+
+**v5** is a responsive/mobile pass plus groundwork for a possible native client:
+- The 480px "reference card" pages (fragrance detail, order-complete, track) now
+  widen at `lg`/`xl` (640/720px); real form inputs are 16px at every breakpoint
+  (below 16px, iOS Safari zooms the viewport on focus — worst on checkout);
+  Pagination and the cart's Remove got the app's standard ~44px touch targets; the
+  shop grid gained its missing `md` column step. See
+  `11-responsive-and-mobile-foundations.md`.
+- **A Flutter mobile client is a stated future plan (not scheduled, not started).**
+  Because of this: keep all customer-facing business logic — pricing, promo
+  evaluation, order-status rules — in the Laravel API, never client-side-only in
+  Next.js, so a second client can reuse it without re-deriving the rules. This is a
+  constraint on *where logic lives* going forward, not a request to start mobile work.
+- For that future client (and useful today regardless): `backend/docs/api.md` is the
+  written contract for the 8 public endpoints, and `design-tokens.json` at the repo
+  root is the portable copy of §3's palette — translate those, not the CSS.
+
+Files new in v5: `11-responsive-and-mobile-foundations.md`, `backend/docs/api.md`,
+`design-tokens.json`.
 
 **v4** adds two independent features on top of v3's receipt/polish work:
 - A **Burmese/English toggle** for the customer site — UI chrome only by default
