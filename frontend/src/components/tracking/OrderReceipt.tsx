@@ -43,76 +43,15 @@ function SummaryRow({
   );
 }
 
-/** The one receipt — order-complete and tracking both render this, on screen
- *  and in print (the print stylesheet strips the site chrome around it). */
-export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderReceiptProps) {
-  // local copy so a cancel can update the view in place without a reload
-  const [order, setOrder] = useState(initial);
-  const [confirmingCancel, setConfirmingCancel] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-
-  const negative = order.status === "rejected" || order.status === "cancelled";
-  const deliveryLine =
-    order.status === "delivered" || negative
-      ? null
-      : order.delivery_date
-        ? `Estimated delivery: ${formatDate(order.delivery_date)}`
-        : "We'll confirm within a few hours and let you know the exact delivery date.";
-
-  const cancel = async () => {
-    setCancelling(true);
-    setCancelError(null);
-    try {
-      const updated = await cancelOrder(order.tracking_code, order.phone);
-      if (updated) setOrder(updated);
-      else setCancelError("We couldn't find this order anymore — refresh and try again.");
-    } catch (error) {
-      setCancelError(
-        error instanceof ApiConflictError
-          ? error.message
-          : "Something went wrong — give it a moment and try again.",
-      );
-    } finally {
-      setCancelling(false);
-      setConfirmingCancel(false);
-    }
-  };
-
+/** Customer/shipping blocks + itemized list + payment summary — rendered once in
+ *  the live view and once in the print-only document. Only the payment note
+ *  differs: on screen it can reference what happens next; on paper it must still
+ *  read true a month later. */
+function ReceiptBody({ order, note }: { order: OrderStatusResponse; note: string }) {
   return (
-    <div>
-      {/* letterhead — print output only, since the printed page has no site chrome */}
-      <div className="print-only mb-8 border-b border-rule pb-6">
-        <p className="text-lg font-bold uppercase tracking-[0.2em] text-ink-strong">
-          Decant Please!
-        </p>
-        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-          Receipt — {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-bold uppercase tracking-[0.12em] text-ink-strong">
-          Order {order.order_number}
-        </h2>
-        <Pill tone="pine" className="font-mono">
-          {order.tracking_code}
-        </Pill>
-        <Pill tone={negative ? "danger" : "pending"}>{order.status_label}</Pill>
-      </div>
-
-      <div className="mt-8">
-        <StatusTimeline
-          status={order.status}
-          placedAt={order.placed_at}
-          decantDate={order.decant_date}
-          deliveryDate={order.delivery_date}
-          rejectionReason={order.rejection_reason}
-        />
-      </div>
-
+    <>
       {/* customer + shipping — the vial-label pattern, not a bare list */}
-      <div className="mt-10 grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-rule px-5 py-4">
           <Pill tone="muted">Customer</Pill>
           <p className="mt-3 text-sm font-medium">{order.customer_name}</p>
@@ -162,64 +101,172 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
         </div>
 
         <p className="mt-4 border-t border-rule pt-4 text-xs leading-relaxed text-muted">
-          No online payment — we confirm every order first, then arrange bank transfer, mobile
-          banking or cash on delivery.
+          {note}
         </p>
       </div>
+    </>
+  );
+}
 
-      {deliveryLine && <p className="mt-6 text-sm text-muted">{deliveryLine}</p>}
+/** The one receipt — order-complete and tracking both render this. On screen it's
+ *  the live view (timeline, cancel, CTAs); in print it's a static document — the
+ *  live view never prints, and the printed receipt never promises live updates. */
+export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderReceiptProps) {
+  // local copy so a cancel can update the view in place without a reload
+  const [order, setOrder] = useState(initial);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
-      {/* self-cancellation — only until the decanter commits time to it */}
-      {order.status === "awaiting_confirmation" && (
-        <div className="no-print mt-8 rounded-2xl border border-rule px-5 py-4">
-          <p className="text-sm text-muted">
-            Changed your mind? You can cancel until we confirm the order — after that, just
-            call us.
+  const negative = order.status === "rejected" || order.status === "cancelled";
+  const deliveryLine =
+    order.status === "delivered" || negative
+      ? null
+      : order.delivery_date
+        ? `Estimated delivery: ${formatDate(order.delivery_date)}`
+        : "We'll confirm within a few hours and let you know the exact delivery date.";
+
+  // "Printed on" only earns a line when it reads distinctly from the placed date
+  const placed = new Date(order.placed_at);
+  const now = new Date();
+  const printedOnDiffers =
+    !Number.isNaN(placed.getTime()) && placed.toDateString() !== now.toDateString();
+
+  const cancel = async () => {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const updated = await cancelOrder(order.tracking_code, order.phone);
+      if (updated) setOrder(updated);
+      else setCancelError("We couldn't find this order anymore — refresh and try again.");
+    } catch (error) {
+      setCancelError(
+        error instanceof ApiConflictError
+          ? error.message
+          : "Something went wrong — give it a moment and try again.",
+      );
+    } finally {
+      setCancelling(false);
+      setConfirmingCancel(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* ------ the printed document — a static snapshot of the transaction ------ */}
+      <div className="print-only">
+        <p className="text-lg font-bold uppercase tracking-[0.2em] text-ink-strong">
+          Decant Please!
+        </p>
+        <h2 className="mt-2 text-2xl font-bold uppercase tracking-[0.15em] text-ink-strong">
+          Receipt
+        </h2>
+
+        <div className="mt-4 flex flex-col gap-1 text-sm">
+          <p>
+            Order {order.order_number} ·{" "}
+            <span className="font-mono tracking-[0.15em]">{order.tracking_code}</span>
           </p>
-          {cancelError && (
-            <p role="alert" className="mt-3 text-sm text-status-danger">
-              {cancelError}
+          <p className="text-muted">Placed {formatDate(order.placed_at)}</p>
+          {printedOnDiffers && (
+            <p className="text-muted">
+              Printed on{" "}
+              {now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap gap-3">
-            {confirmingCancel ? (
-              <>
-                <Button variant="outline" onClick={cancel} disabled={cancelling}>
-                  {cancelling ? "Cancelling…" : "Yes, cancel this order"}
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirmingCancel(false)} disabled={cancelling}>
-                  Keep it
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => setConfirmingCancel(true)}>
-                Cancel this order
-              </Button>
-            )}
-          </div>
+          <p className="mt-2">
+            Status at time of printing: <span className="font-medium">{order.status_label}</span>
+          </p>
         </div>
-      )}
 
-      {/* CTA row — never printed */}
-      <div className="no-print mt-10 flex flex-wrap gap-3">
-        {context === "complete" && (
-          <>
-            <Button href={`/track?code=${encodeURIComponent(order.tracking_code)}`}>
-              Track this order
-            </Button>
-            <Button href="/shop" variant="ghost">
-              Keep browsing
-            </Button>
-          </>
+        <ReceiptBody
+          order={order}
+          note="No online payment is taken — payment is arranged by bank transfer, mobile banking, or cash on delivery once the order is confirmed."
+        />
+      </div>
+
+      {/* ------ the live page — none of it appears in print ------ */}
+      <div className="no-print">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-bold uppercase tracking-[0.12em] text-ink-strong">
+            Order {order.order_number}
+          </h2>
+          <Pill tone="pine" className="font-mono">
+            {order.tracking_code}
+          </Pill>
+          <Pill tone={negative ? "danger" : "pending"}>{order.status_label}</Pill>
+        </div>
+
+        <div className="mt-8">
+          <StatusTimeline
+            status={order.status}
+            placedAt={order.placed_at}
+            decantDate={order.decant_date}
+            deliveryDate={order.delivery_date}
+            rejectionReason={order.rejection_reason}
+          />
+        </div>
+
+        <div className="mt-4">
+          <ReceiptBody
+            order={order}
+            note="No online payment — we confirm every order first, then arrange bank transfer, mobile banking or cash on delivery."
+          />
+        </div>
+
+        {deliveryLine && <p className="mt-6 text-sm text-muted">{deliveryLine}</p>}
+
+        {/* self-cancellation — only until the decanter commits time to it */}
+        {order.status === "awaiting_confirmation" && (
+          <div className="mt-8 rounded-2xl border border-rule px-5 py-4">
+            <p className="text-sm text-muted">
+              Changed your mind? You can cancel until we confirm the order — after that, just
+              call us.
+            </p>
+            {cancelError && (
+              <p role="alert" className="mt-3 text-sm text-status-danger">
+                {cancelError}
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-3">
+              {confirmingCancel ? (
+                <>
+                  <Button variant="outline" onClick={cancel} disabled={cancelling}>
+                    {cancelling ? "Cancelling…" : "Yes, cancel this order"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setConfirmingCancel(false)} disabled={cancelling}>
+                    Keep it
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => setConfirmingCancel(true)}>
+                  Cancel this order
+                </Button>
+              )}
+            </div>
+          </div>
         )}
-        {context === "track" && onSearchAgain && (
-          <Button variant="ghost" onClick={onSearchAgain}>
-            Search another order
+
+        <div className="mt-10 flex flex-wrap gap-3">
+          {context === "complete" && (
+            <>
+              <Button href={`/track?code=${encodeURIComponent(order.tracking_code)}`}>
+                Track this order
+              </Button>
+              <Button href="/shop" variant="ghost">
+                Keep browsing
+              </Button>
+            </>
+          )}
+          {context === "track" && onSearchAgain && (
+            <Button variant="ghost" onClick={onSearchAgain}>
+              Search another order
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => window.print()}>
+            Print / Save as PDF
           </Button>
-        )}
-        <Button variant="outline" onClick={() => window.print()}>
-          Print / Save as PDF
-        </Button>
+        </div>
       </div>
     </div>
   );
