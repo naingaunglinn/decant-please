@@ -34,12 +34,12 @@ Tasks:
    (`admin@decantplease.local` / password from `.env`, never hard-coded).
 2. `frontend/`: create a new Next.js 16 app (Node 24+) with TypeScript,
    Tailwind CSS v4, ESLint, App Router, `src/` directory. Add `.env.local.example`
-   with `NEXT_PUBLIC_API_URL=http://localhost:8000/api`. Also run
+   with `NEXT_PUBLIC_API_URL=http://localhost:8010/api`. Also run
    `npm install gsap motion` now — Step 6 needs both; nothing to configure yet,
    just get them installed.
 3. Add a root `README.md` with local dev instructions:
-   - backend: `php artisan serve` (port 8000), `php artisan migrate --seed`
-   - frontend: `npm run dev` (port 3000)
+   - backend: `php artisan serve --port=8010`, `php artisan migrate --seed`
+   - frontend: `npm run dev -- -p 3001` (port 3001)
 4. Add sensible root `.gitignore` covering both apps.
 5. Verify both apps boot (`php artisan about`, `npm run build` or dev server check)
    and report results.

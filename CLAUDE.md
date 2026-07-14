@@ -247,6 +247,11 @@ client on checkout (see `05-api-layer.md`).
 
 ## 7. Conventions
 
+- **Local dev ports are fixed:** API `http://localhost:8010`, storefront
+  `http://localhost:3001` — 3000, 3010, 8000, and 8001 belong to other projects
+  running on this dev machine. `docker compose up` at the repo root runs
+  MySQL + both apps on those ports (see `docker-compose.yml`); keep every URL,
+  env example, and doc consistent with them.
 - Laravel: enums via PHP backed enums; money stored as unsigned integers (Kyat);
   API resources for JSON shaping; eager-load to avoid N+1.
 - **Checkout-specific:** the server re-derives `unit_price_mmk` and validates

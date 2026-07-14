@@ -11,7 +11,7 @@ import type {
   PromoPreview,
 } from "./types";
 
-const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api"}/v1`;
+const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api"}/v1`;
 
 /** Thrown on 422s so callers can surface per-field / per-item messages. */
 export class ApiValidationError extends Error {

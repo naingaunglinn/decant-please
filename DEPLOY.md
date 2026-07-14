@@ -134,13 +134,13 @@ cd backend
 composer install
 cp .env.example .env && php artisan key:generate   # first time only; set ADMIN_PASSWORD
 php artisan migrate --seed                          # first time only
-php artisan serve                                   # http://localhost:8000, admin at /admin
+php artisan serve --port=8010                       # http://localhost:8010, admin at /admin
 
 # terminal 2 — frontend
 cd frontend
 npm install
 cp .env.local.example .env.local                    # first time only
-npm run dev                                         # http://localhost:3000
+npm run dev -- -p 3001                              # http://localhost:3001
 ```
 
 Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you seeded.

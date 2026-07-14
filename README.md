@@ -96,7 +96,7 @@ docker run -d --name decant-mysql \
   -p 3306:3306 -v decant_mysql_data:/var/lib/mysql mysql:8
 ```
 
-### 1. Backend — http://localhost:8000
+### 1. Backend — http://localhost:8010
 
 ```bash
 cd backend
@@ -104,20 +104,32 @@ composer install
 cp .env.example .env        # set DB_* and ADMIN_PASSWORD
 php artisan key:generate
 php artisan migrate --seed  # demo catalog + admin user
-php artisan serve
+php artisan serve --port=8010
 ```
 
-Admin: **http://localhost:8000/admin** — `admin@decantplease.local` /
+Admin: **http://localhost:8010/admin** — `admin@decantplease.local` /
 whatever `ADMIN_PASSWORD` was when you seeded.
 
-### 2. Frontend — http://localhost:3000
+### 2. Frontend — http://localhost:3001
 
 ```bash
 cd frontend
 npm install
 cp .env.local.example .env.local
-npm run dev
+npm run dev -- -p 3001
 ```
+
+### Or: the whole stack in one terminal with Docker
+
+```bash
+docker compose up   # MySQL + API on :8010 + storefront on :3001
+```
+
+Runs on 8010/3001 (8000/3000/3010 are taken by other local projects) and reuses the
+`decant_mysql_data` volume from the `docker run` above, so existing data carries
+over — stop/remove the standalone `decant-mysql` container first, it's replaced
+by the compose `mysql` service. `.env` files are read as-is; only `DB_HOST` is
+overridden to point at that service.
 
 ## Configuration
 
@@ -133,7 +145,7 @@ npm run dev
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8000/api` |
+| `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` |
 | `NEXT_PUBLIC_SITE_URL` | Public site URL — canonical/OG metadata |
 
 ## Public API

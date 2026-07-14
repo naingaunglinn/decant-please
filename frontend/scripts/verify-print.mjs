@@ -2,7 +2,7 @@
 // (corrected step-8 §3). Drives the real app in headless Chromium:
 // order-complete phone-confirm fallback → live receipt → print emulation.
 //
-//   CODE=ABC123XYZ0 PHONE=09-... [BASE_URL=http://localhost:3000] node scripts/verify-print.mjs
+//   CODE=ABC123XYZ0 PHONE=09-... [BASE_URL=http://localhost:3001] node scripts/verify-print.mjs
 //
 // Writes screen/print screenshots + the actual Save-as-PDF output to OUT_DIR
 // (default: <os tmpdir>/decant-print-check) and exits non-zero on any failure.
@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const BASE = process.env.BASE_URL ?? "http://localhost:3000";
+const BASE = process.env.BASE_URL ?? "http://localhost:3001";
 const CODE = process.env.CODE;
 const PHONE = process.env.PHONE;
 const OUT = process.env.OUT_DIR ?? join(tmpdir(), "decant-print-check");

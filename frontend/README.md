@@ -15,7 +15,7 @@ Project-wide context lives in [`../README.md`](../README.md) (system overview),
 ```bash
 npm install
 cp .env.local.example .env.local
-npm run dev                 # http://localhost:3000
+npm run dev -- -p 3001      # http://localhost:3001 (3000/3010 are taken by other local projects)
 ```
 
 | Script | What it does |
@@ -30,7 +30,7 @@ Both are inlined at **build time** — changing them requires a rebuild.
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8000/api` — every fetch and the allowed image host derive from it |
+| `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` — every fetch and the allowed image host derive from it |
 | `NEXT_PUBLIC_SITE_URL` | This site's public URL — canonical/OG metadata |
 
 The backend's `FRONTEND_URL` must match this site's origin exactly, or browser-side
