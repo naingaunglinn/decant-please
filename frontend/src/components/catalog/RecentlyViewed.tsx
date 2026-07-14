@@ -36,7 +36,7 @@ export function RecordRecentlyViewed({ slug }: { slug: string }) {
 }
 
 /** The home-page rail. Renders nothing until there's something to show. */
-export function RecentlyViewedRail() {
+export function RecentlyViewedRail({ exclude = [] }: { exclude?: string[] }) {
   const [fragrances, setFragrances] = useState<Fragrance[]>([]);
 
   useEffect(() => {
@@ -57,7 +57,12 @@ export function RecentlyViewedRail() {
     };
   }, []);
 
-  if (fragrances.length === 0) return null;
+  // <ViewTransition> names must be unique page-wide, and the same card twice on
+  // one screen is noise anyway — skip fragrances another rail already shows.
+  const excluded = new Set(exclude);
+  const visible = fragrances.filter((f) => !excluded.has(f.slug));
+
+  if (visible.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 md:py-16">
@@ -65,7 +70,7 @@ export function RecentlyViewedRail() {
         Recently viewed
       </h2>
       <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-4 md:gap-6 md:overflow-visible md:px-0">
-        {fragrances.map((fragrance) => (
+        {visible.map((fragrance) => (
           <li
             key={fragrance.id}
             className="w-[68vw] max-w-[280px] shrink-0 snap-start md:w-auto md:max-w-none"

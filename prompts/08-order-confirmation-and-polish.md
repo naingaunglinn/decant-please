@@ -141,7 +141,10 @@ existing `getFragrances()` fetcher; no new API endpoint needed.
 
 Client-side only — `localStorage`, last ~6 fragrance slugs visited, a small rail on
 `/shop` or the home page (your call). Fetch card data for those slugs on render; drop
-any slug that 404s (deactivated since it was viewed).
+any slug that 404s (deactivated since it was viewed). If the page already shows some
+of those fragrances elsewhere (the home page's featured rail), skip them in this rail —
+`<ViewTransition>` names must be unique page-wide, and the same card twice on one
+screen is noise anyway.
 
 ## 6. Sitemap
 
