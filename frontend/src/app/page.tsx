@@ -86,7 +86,7 @@ export default async function HomePage() {
         </ScrollReveal>
       )}
 
-      <RecentlyViewedRail />
+      <RecentlyViewedRail exclude={featured.map((f) => f.slug)} />
 
       <ScrollReveal>
         <section className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 md:py-20">
