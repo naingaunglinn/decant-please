@@ -276,7 +276,7 @@ host; no layout shift on images (fixed aspect ratios); semantic HTML throughout.
 
 ## 10. Verify
 
-- Run backend (`:8000`, seeded) + frontend (`:3000`) together.
+- Run backend (`:8010`, seeded) + frontend (`:3001`) together.
 - Every filter on `/shop` changes the URL; sharing a filtered URL reproduces the
   state (unchanged from v1).
 - Add multiple fragrances/sizes to the cart, refresh the page, confirm the cart

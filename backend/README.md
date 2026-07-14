@@ -21,7 +21,7 @@ cp .env.example .env        # set DB_* and ADMIN_PASSWORD
 php artisan key:generate
 php artisan migrate --seed  # demo catalog + admin user
 php artisan storage:link    # serve uploaded images from /storage
-php artisan serve           # http://localhost:8000
+php artisan serve --port=8010   # http://localhost:8010 (8000 is taken by another local project)
 ```
 
 Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you seeded.

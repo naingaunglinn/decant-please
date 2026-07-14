@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getFragrances } from "@/lib/api";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001";
 
   const entries: MetadataRoute.Sitemap = [
     { url: site, changeFrequency: "weekly", priority: 1 },
