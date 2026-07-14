@@ -1,0 +1,50 @@
+# One-terminal dev runner: `docker compose up` = MySQL + Laravel API (:8010) + Next.js (:3001).
+# 3001 not 3000/3010: those are held by other local projects that run in parallel.
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: decant_please
+    ports:
+      - "3306:3306"
+    volumes:
+      - decant_mysql_data:/var/lib/mysql
+
+  backend:
+    build: ./backend
+    user: "1000:1000" # host uid — vendor/ and storage/ writes stay owned by you
+    working_dir: /var/www/decant-please/backend
+    volumes:
+      # same path as on the host so absolute paths/symlinks made by artisan work on both sides
+      - ./backend:/var/www/decant-please/backend
+    environment:
+      HOME: /tmp # composer needs a writable home
+      DB_HOST: mysql # the only override vs .env — DB is the compose service, not 127.0.0.1
+    depends_on:
+      - mysql
+    ports:
+      - "8010:8010"
+      - "3001:3001" # the frontend's port — it shares this network namespace (see below)
+    # php -S directly instead of `php artisan serve`: serve re-spawns the real server
+    # with its env stripped to a whitelist, so the DB_HOST override above would never
+    # reach web requests. Same router file + cwd=public/, exactly as artisan serve runs it.
+    command: sh -c "composer install && cd public && php -S 0.0.0.0:8010 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
+
+  frontend:
+    image: node:24
+    # ponytail: share the backend's network namespace so server-side fetches to
+    # NEXT_PUBLIC_API_URL=http://localhost:8010 work unchanged — no internal/external
+    # URL split, no app code touched. Give it its own network if that ever hurts.
+    network_mode: service:backend
+    user: node
+    working_dir: /var/www/decant-please/frontend
+    volumes:
+      - ./frontend:/var/www/decant-please/frontend
+    environment:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" # fresh npm installs shouldn't pull ~400MB of test browsers
+    command: sh -c "npm install && npm run dev -- -p 3001"
+
+volumes:
+  decant_mysql_data:
+    name: decant_mysql_data # reuse the volume from the README's `docker run` — existing data carries over
