@@ -155,7 +155,7 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
             placeholder="Promo code"
             aria-label="Promo code"
             autoComplete="off"
-            className="min-w-0 flex-1 rounded-full border border-rule bg-transparent px-4 py-2 font-mono text-sm uppercase tracking-[0.15em] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70"
+            className="min-w-0 flex-1 rounded-full border border-rule bg-transparent px-4 py-2 font-mono text-base uppercase tracking-[0.15em] placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70"
           />
           <button
             type="submit"

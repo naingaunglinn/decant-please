@@ -60,7 +60,7 @@ export default async function FragrancePage({ params }: PageProps) {
   const related = await getRelated(fragrance);
 
   return (
-    <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16">
+    <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">
       <RecordRecentlyViewed slug={fragrance.slug} />
       {/* brand pill → name (concentration in pine) — the reference card, rebuilt */}
       <header className="flex flex-col items-start gap-4">
@@ -78,7 +78,7 @@ export default async function FragrancePage({ params }: PageProps) {
           <ImagePlate
             src={fragrance.image_url}
             alt={`${fragrance.brand.name} ${fragrance.name}`}
-            sizes="(max-width: 768px) 100vw, 480px"
+            sizes="(max-width: 768px) 100vw, (max-width: 1023px) 480px, (max-width: 1279px) 640px, 720px"
             priority
           />
         </div>
@@ -130,7 +130,7 @@ export default async function FragrancePage({ params }: PageProps) {
           <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
             You may also like
           </h2>
-          <div className="mt-5 grid grid-cols-2 gap-4">
+          <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
             {related.map((item) => (
               <FragranceCard key={item.id} fragrance={item} />
             ))}

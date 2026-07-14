@@ -50,7 +50,7 @@ export function CartItemRow({ line, error }: { line: CartLine; error?: string })
           <button
             type="button"
             onClick={() => remove(key)}
-            className="text-xs uppercase tracking-[0.15em] text-muted underline-offset-4 transition-colors hover:text-status-danger hover:underline"
+            className="inline-flex min-h-11 items-center text-xs uppercase tracking-[0.15em] text-muted underline-offset-4 transition-colors hover:text-status-danger hover:underline"
           >
             Remove
           </button>

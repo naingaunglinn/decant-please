@@ -33,7 +33,7 @@ export function FragranceGrid({ fragrances }: { fragrances: Fragrance[] }) {
       initial={reduced ? false : "hidden"}
       animate="visible"
       variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
-      className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-3 xl:grid-cols-4"
     >
       {fragrances.map((fragrance) => (
         <motion.li

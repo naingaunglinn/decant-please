@@ -26,7 +26,7 @@ export function Pagination({ meta, searchParams }: PaginationProps) {
       {current > 1 ? (
         <Link
           href={pageHref(current - 1)}
-          className="text-xs font-medium uppercase tracking-[0.15em] text-pine hover:underline underline-offset-4"
+          className="inline-flex min-h-11 items-center text-xs font-medium uppercase tracking-[0.15em] text-pine hover:underline underline-offset-4"
         >
           ← Previous
         </Link>
@@ -41,7 +41,7 @@ export function Pagination({ meta, searchParams }: PaginationProps) {
       {current < last ? (
         <Link
           href={pageHref(current + 1)}
-          className="text-xs font-medium uppercase tracking-[0.15em] text-pine hover:underline underline-offset-4"
+          className="inline-flex min-h-11 items-center text-xs font-medium uppercase tracking-[0.15em] text-pine hover:underline underline-offset-4"
         >
           Next →
         </Link>

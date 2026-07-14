@@ -137,7 +137,7 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
         <select
           value={searchParams.get("sort") ?? "newest"}
           onChange={(event) => setParams({ sort: event.target.value === "newest" ? null : event.target.value })}
-          className="w-full rounded-full border border-rule bg-transparent px-4 py-2.5 text-sm"
+          className="w-full rounded-full border border-rule bg-transparent px-4 py-2.5 text-base"
         >
           <option value="newest">Newest first</option>
           <option value="price_asc">Price — low to high</option>
@@ -247,7 +247,7 @@ function DebouncedInput({
         value={draft}
         placeholder={placeholder}
         onChange={(event) => setDraft(event.target.value)}
-        className="w-full rounded-full border border-rule bg-transparent px-4 py-2.5 text-sm placeholder:text-muted/70"
+        className="w-full rounded-full border border-rule bg-transparent px-4 py-2.5 text-base placeholder:text-muted/70"
       />
     </label>
   );
