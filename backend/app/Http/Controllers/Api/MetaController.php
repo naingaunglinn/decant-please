@@ -29,7 +29,9 @@ class MetaController extends Controller
                 'brand_types' => $this->options(BrandType::cases()),
                 'genders' => $this->options(Gender::cases()),
                 'concentrations' => $this->options(Concentration::cases()),
-                'sizes' => $available->clone()->distinct()->orderBy('size_ml')->pluck('size_ml'),
+                // ->all(): cache a plain array — a Collection object doesn't survive
+                // the cache store's hardened unserialize (comes back as __PHP_Incomplete_Class)
+                'sizes' => $available->clone()->distinct()->orderBy('size_ml')->pluck('size_ml')->all(),
                 'price' => [
                     'min' => $min !== null ? (int) $min : null,
                     'max' => $max !== null ? (int) $max : null,
