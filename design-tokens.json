@@ -1,0 +1,18 @@
+{
+  "description": "Canonical Decant Please! design tokens — mirrors the @theme block in frontend/src/app/globals.css and CLAUDE.md §3. A future non-web client (e.g. Flutter ThemeData) translates THIS file; if a value changes, change it in globals.css and here in the same commit.",
+  "color": {
+    "mist": "#F2F8FC",
+    "ink": "#212121",
+    "ink-strong": "#000000",
+    "pine": "#013E37",
+    "pine-soft": "#E7ECE3",
+    "rule": "#D6E4EB",
+    "surface-alt": "#E3EEF4",
+    "muted": "#63707A",
+    "status-pending": "#B08D57",
+    "status-danger": "#8C4A34"
+  },
+  "font": {
+    "sans": "'Helvetica Neue', Helvetica, Arial, sans-serif"
+  }
+}
