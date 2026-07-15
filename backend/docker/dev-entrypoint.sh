@@ -27,10 +27,12 @@ if [ ! -e public/storage ]; then
     php artisan storage:link
 fi
 
-# Migrate, waiting out MySQL's first-boot initialization. The compose healthcheck
-# already gates `up`, but a plain `docker compose run backend` has no such gate.
+# Wait out MySQL's first-boot initialization. The compose healthcheck already gates
+# `up`, but a plain `docker compose run backend` has no such gate. This probes the
+# connection rather than retrying `migrate`, so a failing migration reports itself
+# instead of being mistaken for 30 attempts' worth of "MySQL isn't up yet".
 tries=0
-until php artisan migrate --force; do
+until php artisan db:show >/dev/null 2>&1; do
     tries=$((tries + 1))
     if [ "$tries" -ge 30 ]; then
         echo "[bootstrap] database still unreachable after $tries attempts — giving up" >&2
@@ -39,6 +41,8 @@ until php artisan migrate --force; do
     echo "[bootstrap] waiting for MySQL (attempt $tries/30)..."
     sleep 2
 done
+
+php artisan migrate --force
 
 # Demo seed, exactly once: only when no user exists yet (fresh volume or fresh
 # clone). `decant:fresh-start` keeps the admin user, so it won't re-trigger this.

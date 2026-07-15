@@ -115,10 +115,11 @@ Then:
 
 Ports are 8010/3001 because 8000/3000/3010 are taken by other local projects. The
 database lives in the `decant_mysql_data` volume: it survives `docker compose down`,
-and `down -v` wipes it so the next `up` migrates and seeds from scratch. If you still
-have the standalone `decant-mysql` container from an earlier version of this README,
-stop/remove it first — the compose `mysql` service reuses its volume, so existing
-data carries over.
+and `down -v` wipes it so the next `up` migrates and seeds from scratch. If you have
+the standalone `decant-mysql` container running — from
+[Running without Docker](#running-without-docker) below, or from an earlier version of
+this README — stop/remove it first: it holds port 3306, and the compose `mysql` service
+reuses its volume, so existing data carries over.
 
 An existing `backend/.env` is read as-is, with one exception: the `DB_*` connection
 is pinned to the compose `mysql` service, so the same file keeps working whether the
