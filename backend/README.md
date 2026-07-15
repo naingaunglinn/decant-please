@@ -111,7 +111,7 @@ backend/
 ├── resources/views/filament/               # production schedule Blade view
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
 ├── storage/                                # ← must be writable (www-data); app/public = uploaded images (back this up)
-├── tests/Feature/                          # 39 tests: domain, admin catalog, admin orders, public API, fresh-start
+├── tests/Feature/                          # 47 tests: domain, admin catalog, admin orders, public API, promo codes, fresh-start
 ├── .env.example                            # ← template for the production .env
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -140,7 +140,7 @@ backend/
 php artisan test
 ```
 
-39 tests / 245 assertions on an in-memory SQLite database — your dev MySQL data is never
+47 tests / 329 assertions on an in-memory SQLite database — your dev MySQL data is never
 touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 ## Useful artisan commands
@@ -150,3 +150,6 @@ php artisan decant:fresh-start   # wipe demo fragrances + orders; keep brands an
 php artisan db:seed              # reseed demo data (idempotent admin user)
 php artisan cache:clear          # /api/v1 responses are cached for 10 minutes
 ```
+
+Running the stack in Docker? Prefix any of these — including `php artisan test` — with
+`docker compose exec backend`, from the repo root.
