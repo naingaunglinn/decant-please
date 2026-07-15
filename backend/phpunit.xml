@@ -33,6 +33,11 @@
         <server name="DB_CONNECTION" value="sqlite"/>
         <server name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <!-- The tests seed the admin user, and the seeder refuses to run without
+             this. Set it here so the suite doesn't depend on whatever the developer
+             happens to have in .env. -->
+        <env name="ADMIN_PASSWORD" value="testing-admin-password" force="true"/>
+        <server name="ADMIN_PASSWORD" value="testing-admin-password"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

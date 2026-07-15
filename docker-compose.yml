@@ -23,7 +23,11 @@ services:
 
   backend:
     build: ./backend
-    user: "1000:1000" # host uid — vendor/ and storage/ writes stay owned by you
+    # no `user:` pin — runs as root, which is the only thing that can write the
+    # checkout wherever it lives (your home dir, or a root-owned /var/www) and keeps
+    # `docker compose exec` consistent with the server process. Pinning a uid instead
+    # only works where that guess matches the checkout's owner. Cost: vendor/ and
+    # node_modules/ come out root-owned on the host; the .env files are handed back.
     working_dir: /var/www/decant-please/backend
     volumes:
       # same path as on the host so absolute paths/symlinks made by artisan work on both sides
@@ -50,19 +54,18 @@ services:
 
   frontend:
     image: node:24
-    # ponytail: share the backend's network namespace so server-side fetches to
+    # share the backend's network namespace so server-side fetches to
     # NEXT_PUBLIC_API_URL=http://localhost:8010 work unchanged — no internal/external
     # URL split, no app code touched. Give it its own network if that ever hurts.
     network_mode: service:backend
-    user: node
     working_dir: /var/www/decant-please/frontend
     volumes:
       - ./frontend:/var/www/decant-please/frontend
     environment:
+      HOME: /tmp # npm needs a writable home
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" # fresh npm installs shouldn't pull ~400MB of test browsers
-    # .env.local is optional (the code falls back to these same localhost URLs) —
-    # the copy just keeps parity with the documented manual setup
-    command: sh -c '[ -f .env.local ] || cp .env.local.example .env.local; npm install && npm run dev -- -p 3001'
+    # .env.local + npm install + the dev server — no `user:` pin, same as the backend
+    command: sh docker/dev-entrypoint.sh
 
 volumes:
   decant_mysql_data:

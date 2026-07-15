@@ -12,6 +12,11 @@ set -e
 if [ ! -f .env ]; then
     echo "[bootstrap] no backend/.env — creating it from .env.example"
     cp .env.example .env
+    # Hand it to whoever owns the checkout so it stays editable from the host without
+    # sudo. Everything here runs as root — that is what lets the same compose file
+    # work against a checkout owned by you, by another uid, or by root (/var/www) —
+    # so files it creates would otherwise all be root's.
+    chown "$(stat -c %u .)":"$(stat -c %g .)" .env 2>/dev/null || true
 fi
 
 composer install
@@ -47,19 +52,27 @@ php artisan migrate --force
 # Demo seed, exactly once: only when no user exists yet (fresh volume or fresh
 # clone). `decant:fresh-start` keeps the admin user, so it won't re-trigger this.
 db_state=$(php artisan tinker --execute='echo \App\Models\User::count() === 0 ? "DB_EMPTY" : "DB_SEEDED";' | tail -n 1) || true
+
+# The seeder refuses to create the admin user without ADMIN_PASSWORD — generate one
+# rather than fail, persisted in .env so it survives restarts. This runs whatever the
+# database state is: `db:seed` and `decant:fresh-start` need it too, and a carried-over
+# database with a freshly copied .env would otherwise leave it blank and break them.
+if ! grep -q '^ADMIN_PASSWORD=.' .env; then
+    admin_password=$(php -r 'echo bin2hex(random_bytes(8));')
+    if grep -q '^ADMIN_PASSWORD=' .env; then
+        sed -i "s/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/" .env
+    else
+        printf '\nADMIN_PASSWORD=%s\n' "${admin_password}" >>.env
+    fi
+    echo "[bootstrap] ADMIN_PASSWORD was blank — generated one and saved it to backend/.env"
+    if [ "$db_state" = "DB_SEEDED" ]; then
+        echo "[bootstrap] your existing admin user keeps the password it already has —"
+        echo "[bootstrap] this new one only takes effect the next time you seed"
+    fi
+fi
+
 case "$db_state" in
 DB_EMPTY)
-    # The seeder refuses to create the admin user without ADMIN_PASSWORD —
-    # generate one rather than fail, persisted in .env so it survives restarts.
-    if ! grep -q '^ADMIN_PASSWORD=.' .env; then
-        admin_password=$(php -r 'echo bin2hex(random_bytes(8));')
-        if grep -q '^ADMIN_PASSWORD=' .env; then
-            sed -i "s/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/" .env
-        else
-            printf '\nADMIN_PASSWORD=%s\n' "${admin_password}" >>.env
-        fi
-        echo "[bootstrap] ADMIN_PASSWORD was blank — generated one and saved it to backend/.env"
-    fi
     php artisan db:seed --force
     echo ""
     echo "=================================================================="

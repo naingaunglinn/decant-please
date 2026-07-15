@@ -125,6 +125,13 @@ An existing `backend/.env` is read as-is, with one exception: the `DB_*` connect
 is pinned to the compose `mysql` service, so the same file keeps working whether the
 stack runs in Docker or against a host MySQL.
 
+Everything in the containers runs as root, so the same compose file works whether your
+checkout lives in your home directory or somewhere root-owned like `/var/www`. The
+`.env` files are handed back to whoever owns the checkout; `vendor/` and `node_modules/`
+stay root-owned, which matters only if you delete them by hand. Ran an older version of
+this stack? `docker compose up --build` once — a plain `up` reuses your existing image
+and won't pick up changes to `backend/Dockerfile`.
+
 ### Running without Docker
 
 Prerequisites: PHP 8.3+ and Composer, Node.js 24 LTS, and MySQL 8.0+ — or run just
