@@ -11,7 +11,9 @@ Project-wide context lives in [`../README.md`](../README.md) (system overview),
 [`../CLAUDE.md`](../CLAUDE.md) (spec / source of truth), and
 [`../DEPLOY.md`](../DEPLOY.md) (production deployment).
 
-**Requirements:** PHP 8.3+ · Composer · MySQL 8.0+
+**Requirements:** PHP 8.3+ · Composer · MySQL 8.0+ — or none of those:
+`docker compose up` at the repo root runs every step below automatically
+(see the [root README](../README.md#getting-started)).
 
 ## Setup
 

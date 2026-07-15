@@ -1,5 +1,7 @@
 # One-terminal dev runner: `docker compose up` = MySQL + Laravel API (:8010) + Next.js (:3001).
 # 3001 not 3000/3010: those are held by other local projects that run in parallel.
+# Zero local prerequisites: a fresh clone bootstraps itself on first `up` —
+# backend/docker/dev-entrypoint.sh installs deps, creates .env, migrates, seeds.
 services:
   mysql:
     image: mysql:8.4
@@ -10,6 +12,14 @@ services:
       - "3306:3306"
     volumes:
       - decant_mysql_data:/var/lib/mysql
+    healthcheck:
+      # a real query, not `mysqladmin ping` (which can report alive before auth works);
+      # -h127.0.0.1 forces TCP — first-boot initialization runs a socket-only temp
+      # server that must not count as "ready"
+      test: ["CMD", "mysql", "-h127.0.0.1", "-uroot", "-psecret", "-e", "SELECT 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
 
   backend:
     build: ./backend
@@ -20,16 +30,23 @@ services:
       - ./backend:/var/www/decant-please/backend
     environment:
       HOME: /tmp # composer needs a writable home
-      DB_HOST: mysql # the only override vs .env — DB is the compose service, not 127.0.0.1
+      # the whole DB_* block is pinned to the compose mysql service (real env beats
+      # .env in Laravel), so `up` works with a fresh auto-copied .env or one
+      # hand-tuned for a host MySQL — nothing else in .env is overridden
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: decant_please
+      DB_USERNAME: root
+      DB_PASSWORD: secret
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy # first boot: wait out MySQL's initialization
     ports:
       - "8010:8010"
       - "3001:3001" # the frontend's port — it shares this network namespace (see below)
-    # php -S directly instead of `php artisan serve`: serve re-spawns the real server
-    # with its env stripped to a whitelist, so the DB_HOST override above would never
-    # reach web requests. Same router file + cwd=public/, exactly as artisan serve runs it.
-    command: sh -c "composer install && cd public && php -S 0.0.0.0:8010 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
+    # first-run bootstrap (.env, composer install, APP_KEY, storage link, migrate,
+    # seed) + the dev server — see the script for why it's php -S, not artisan serve
+    command: sh docker/dev-entrypoint.sh
 
   frontend:
     image: node:24
@@ -43,7 +60,9 @@ services:
       - ./frontend:/var/www/decant-please/frontend
     environment:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" # fresh npm installs shouldn't pull ~400MB of test browsers
-    command: sh -c "npm install && npm run dev -- -p 3001"
+    # .env.local is optional (the code falls back to these same localhost URLs) —
+    # the copy just keeps parity with the documented manual setup
+    command: sh -c '[ -f .env.local ] || cp .env.local.example .env.local; npm install && npm run dev -- -p 3001'
 
 volumes:
   decant_mysql_data:
