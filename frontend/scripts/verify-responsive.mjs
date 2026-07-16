@@ -54,11 +54,26 @@ const maxWidth = (loc) => loc.evaluate((el) => getComputedStyle(el).maxWidth);
 const gridCols = (loc) => loc.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
 const heightOf = async (loc) => (await loc.boundingBox())?.height ?? 0;
 
-// one PDP slug for the whole run
+// one PDP slug for the whole run — prefer a fragrance with an uploaded image so
+// the image checks actually run (cards without one render the vial placeholder);
+// walk the shop pages to find one, falling back to the very first card
 await page.goto(`${BASE}/shop`);
-const firstCard = page.locator('main a[href^="/fragrance/"]').first();
-await firstCard.waitFor();
-const pdpPath = await firstCard.getAttribute("href");
+const cards = page.locator('main a[href^="/fragrance/"]');
+await cards.first().waitFor();
+let pdpPath = await cards.first().getAttribute("href");
+for (let p = 1; p <= 5; p++) {
+  if (p > 1) {
+    await page.goto(`${BASE}/shop?page=${p}`);
+    await cards.first().waitFor({ timeout: 4000 }).catch(() => {});
+    if ((await cards.count()) === 0) break; // past the last page
+  }
+  // waitFor, not a one-shot count — the grid can still be committing cards
+  const withImage = cards.filter({ has: page.locator("img") }).first();
+  if (await withImage.waitFor({ timeout: 2500 }).then(() => true).catch(() => false)) {
+    pdpPath = await withImage.getAttribute("href");
+    break;
+  }
+}
 
 for (const width of WIDTHS) {
   try {
@@ -113,6 +128,10 @@ for (const width of WIDTHS) {
     if ((await pdpImg.count()) > 0) {
       await check(width, "PDP image sizes hint matches container tiers",
         () => pdpImg.getAttribute("sizes"), (v) => v === IMG_SIZES);
+      // catches the optimizer rejecting localhost upstreams (issue #13) — a
+      // blocked /_next/image response leaves naturalWidth at 0
+      await check(width, "PDP image actually loads through /_next/image",
+        () => pdpImg.evaluate((el) => el.complete && el.naturalWidth > 0), (v) => v === true);
     } else {
       console.log(`SKIP  [${ENGINE} ${width}] PDP has no image`);
     }
