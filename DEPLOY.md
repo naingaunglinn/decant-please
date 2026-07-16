@@ -116,6 +116,27 @@ the build succeeded: `heroku logs --tail -a decant-please-api`.
 There is no `storage:link`, no Nginx server block, and no `chown` step here — the buildpack
 provides nginx + PHP-FPM, and images live in R2 rather than on the dyno.
 
+### Image upload size
+
+Fragrance images run ~2 MB, right at PHP's default `upload_max_filesize` (2M) — the same
+edge the bare-VPS guide handled by raising Nginx's `client_max_body_size` to 5m. On Heroku
+the upload transits nginx **and** php-fpm, so both layers need headroom:
+
+- **PHP** is handled in-repo by `backend/public/.user.ini` (`upload_max_filesize=8M`,
+  `post_max_size=10M`) — Heroku's php-fpm reads it automatically; it's a no-op locally.
+- **Nginx** — if an upload returns **413** at the proxy, the buildpack's default
+  `client_max_body_size` is too low. Add a config partial and point the web process at it:
+  ```nginx
+  # backend/conf/nginx/uploads.conf
+  client_max_body_size 10m;
+  ```
+  ```procfile
+  # backend/Procfile — web line becomes:
+  web: vendor/bin/heroku-php-nginx -C conf/nginx/uploads.conf public/
+  ```
+  Left out of the default Procfile because the buildpack's default may already clear a 2 MB
+  image; add it only if a real upload 413s, then redeploy.
+
 ### Seed the admin login
 
 ```bash
@@ -268,8 +289,11 @@ from zero.
 - [ ] `FRONTEND_URL` = exact storefront origin `https://decant-please.cornerarea.me` (CORS +
       admin "View on site" links)
 - [ ] `ADMIN_PASSWORD` strong; admin login verified at `https://api.cornerarea.me/admin`
+- [ ] API routing works past `/`: `curl -I https://api.cornerarea.me/api/v1/meta` returns
+      `200` — a 404 here while `/` serves means the buildpack needs a custom nginx conf (`-C`)
 - [ ] `FILESYSTEM_DISK=s3` + R2 vars set — upload a fragrance image in `/admin` and confirm
-      its URL resolves under `https://images.cornerarea.me/`, not a `local`-disk path
+      its URL resolves under `https://images.cornerarea.me/`, not a `local`-disk path (a 413
+      means the upload limits need raising — see "Image upload size")
 - [ ] Storefront image gap (#22) resolved before relying on catalog photos in production
 - [ ] `api.cornerarea.me` shows **Cert issued** (`heroku certs:auto`)
 - [ ] Both backup layers working: `heroku pg:backups` produces a capture **and** the
