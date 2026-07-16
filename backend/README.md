@@ -11,7 +11,7 @@ Project-wide context lives in [`../README.md`](../README.md) (system overview),
 [`../CLAUDE.md`](../CLAUDE.md) (spec / source of truth), and
 [`../DEPLOY.md`](../DEPLOY.md) (production deployment).
 
-**Requirements:** PHP 8.3+ · Composer · MySQL 8.0+ — or none of those:
+**Requirements:** PHP 8.3+ · Composer · PostgreSQL 17+ — or none of those:
 `docker compose up` at the repo root runs every step below automatically
 (see the [root README](../README.md#getting-started)).
 
@@ -36,7 +36,7 @@ Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
 | `FRONTEND_URL` | Storefront origin — the CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/meta` for the storefront footer; blank = hidden |
-| `DB_*` | MySQL connection |
+| `DB_*` | PostgreSQL connection. `DATABASE_URL` (not `DB_URL`) overrides them all — that's the name Heroku injects |
 
 Production values and hardening (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE`, config
 caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
@@ -140,8 +140,13 @@ backend/
 php artisan test
 ```
 
-47 tests / 329 assertions on an in-memory SQLite database — your dev MySQL data is never
-touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
+47 tests / 329 assertions on an in-memory SQLite database — your dev Postgres data is
+never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
+
+SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`
+mistake and a select alias inside `ORDER BY`, both of which Postgres rejects, so the
+suite can pass over a broken query. `sh scripts/verify-postgres-portability.sh` checks
+those against the running stack — reach for it whenever a change is engine-specific.
 
 ## Useful artisan commands
 

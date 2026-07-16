@@ -6,10 +6,10 @@ Two apps, deployed separately: `backend/` (Laravel + Filament admin + JSON API) 
 
 ---
 
-## 1. Backend — a small VPS with PHP-FPM + Nginx + MySQL
+## 1. Backend — a small VPS with PHP-FPM + Nginx + PostgreSQL
 
 Works the same on a bare VPS, Laravel Forge, or Ploi. Requirements: **PHP 8.3+**
-(with `pdo_mysql`, `mbstring`, `intl`, `gd`), **MySQL 8.0+**, **Composer**, Nginx.
+(with `pdo_pgsql`, `mbstring`, `intl`, `gd`), **PostgreSQL 17+**, **Composer**, Nginx.
 
 ### First deploy
 
@@ -87,7 +87,7 @@ backup below) just work.
 Order history is the decanter's financial record. Nightly dump, kept two weeks:
 
 ```cron
-30 18 * * * mysqldump --single-transaction decant_please | gzip > /var/backups/decant_please-$(date +\%F).sql.gz
+30 18 * * * pg_dump decant_please | gzip > /var/backups/decant_please-$(date +\%F).sql.gz
 40 18 * * * find /var/backups -name 'decant_please-*.sql.gz' -mtime +14 -delete
 ```
 
@@ -132,7 +132,7 @@ Or one terminal and no local toolchains: `docker compose up` at the repo root do
 of this for you — see the [root README](README.md#getting-started).
 
 ```bash
-# terminal 1 — backend  (MySQL running; see backend/.env for credentials)
+# terminal 1 — backend  (PostgreSQL running; see backend/.env for credentials)
 cd backend
 composer install
 cp .env.example .env && php artisan key:generate   # first time only; set ADMIN_PASSWORD
@@ -171,7 +171,7 @@ at "add fragrance", not from zero.
 - [ ] `FRONTEND_URL` = exact storefront origin (CORS + admin "View on site" links)
 - [ ] `ADMIN_PASSWORD` strong, admin login verified at `/admin`
 - [ ] `storage:link` run — upload a fragrance image and see it on the storefront
-- [ ] Nightly `mysqldump` cron in place and produces a file
+- [ ] Nightly `pg_dump` cron in place and produces a file
 - [ ] Place one test order end-to-end: checkout → tracking page → accept in admin →
       production schedule shows it → CSV export contains it
 - [ ] `php artisan decant:fresh-start` run once real inventory entry begins

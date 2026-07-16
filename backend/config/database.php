@@ -86,7 +86,11 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            // DATABASE_URL, not DB_URL: Heroku injects the connection string under
+            // that name, and a mismatch here doesn't error — it just quietly ignores
+            // the provisioned credentials and falls through to the DB_* defaults
+            // below. The other connections still read DB_URL.
+            'url' => env('DATABASE_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),

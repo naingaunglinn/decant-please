@@ -1,9 +1,33 @@
-# CLAUDE.md — Decant Please! (v5)
+# CLAUDE.md — Decant Please! (v6)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v2, then v3, then v4, then v5
+## 0. What changed in v2, then v3, then v4, then v5, then v6
+
+**v6** swaps the database engine from MySQL 8 to **PostgreSQL 17**, and nothing else:
+- Heroku is the chosen host and has no first-party MySQL. Its only credit-eligible,
+  natively-supported database is Postgres; MySQL there is paid third-party add-ons
+  (JawsDB, ClearDB) that the GitHub Student credit excludes. So §2's "fixed — do not
+  substitute" table changes for the first time, deliberately. See
+  `12-mysql-to-postgresql-migration.md`.
+- The domain model, column names, API shape, and admin panel are untouched. What did
+  change beyond configuration is **two MySQL-specific behaviours in the catalog query**
+  that Postgres does not share, both fixed in the same step:
+  - `LIKE` is case-insensitive on MySQL and case-sensitive on Postgres, so the catalog
+    search now uses `whereLike(caseSensitive: false)` — `ilike` on Postgres, `like`
+    elsewhere. A bare `LIKE` would have made search silently return nothing.
+  - Postgres resolves a select alias in `ORDER BY` only as a bare name, so the price
+    sort's old `min_price IS NULL, min_price ASC` (fine on MySQL) raised
+    "column min_price does not exist". It's `min_price ASC NULLS LAST` now.
+  - **Neither is catchable by `php artisan test`**, which runs on SQLite — permissive on
+    both counts, so the suite stays green while the app is broken. `backend/scripts/
+    verify-postgres-portability.sh` drives the running stack instead. Any future MySQL→
+    Postgres-style semantic gap needs the same treatment: a check on the real engine.
+- Local dev's Postgres publishes host port **5442**, not 5432 — another project on the
+  dev machine already holds 5432, the same reason the API is 8010 (see §7).
+
+## 0.1 What changed in v2, then v3, then v4, then v5 (for reference)
 
 **v5** is a responsive/mobile pass plus groundwork for a possible native client:
 - The 480px "reference card" pages (fragrance detail, order-complete, track) now
@@ -119,7 +143,7 @@ asking "Hey, do you have X fragrance? I want a 10ml decant" and usually hear "No
 | Backend framework | Laravel | **13.x** | Zero breaking changes from 12; requires PHP 8.3+ |
 | Admin panel | Filament | **v5.x** | Functionally identical to v4 — v5 exists only to support Livewire v4. Either works; pin v5 for a new build. |
 | Language | PHP | **8.3+** | Laravel 13 floor |
-| Database | MySQL | **8.0+** | |
+| Database | PostgreSQL | **17** | Was MySQL 8 through v5. Heroku has no first-party MySQL, and the paid add-ons that provide it aren't credit-eligible — see §0's v6 note and `12-mysql-to-postgresql-migration.md`. |
 | Frontend framework | Next.js | **16.x** | App Router, Turbopack default, `proxy.ts` not `middleware.ts` |
 | Runtime | Node.js | **24 LTS** | Next.js 16 requires 20.9+ minimum; use the current LTS |
 | Language | TypeScript | **5.x** | |
@@ -268,11 +292,20 @@ client on checkout (see `05-api-layer.md`).
 
 - **Local dev ports are fixed:** API `http://localhost:8010`, storefront
   `http://localhost:3001` — 3000, 3010, 8000, and 8001 belong to other projects
-  running on this dev machine. `docker compose up` at the repo root runs
-  MySQL + both apps on those ports (see `docker-compose.yml`); keep every URL,
-  env example, and doc consistent with them.
-- Laravel: enums via PHP backed enums; money stored as unsigned integers (Kyat);
-  API resources for JSON shaping; eager-load to avoid N+1.
+  running on this dev machine — as does **5432**, which is why the compose Postgres
+  publishes **5442**. `docker compose up` at the repo root runs Postgres + both apps
+  on those ports (see `docker-compose.yml`); keep every URL, env example, and doc
+  consistent with them.
+- Laravel: enums via PHP backed enums; money stored as integer Kyat, never decimals —
+  non-negativity is an **application-layer** guarantee, not a database one. It was a
+  database one under MySQL's unsigned integers; Postgres has no unsigned type, and
+  Laravel's Postgres grammar accepts `unsignedInteger()` while silently dropping the
+  constraint. The migrations still say `unsignedInteger()` (harmless, and it keeps the
+  intent legible), but read it as documentation. Every such column is server-derived or
+  admin-entered — checkout re-derives prices server-side and Filament is the only other
+  write path — so no raw client input reaches one. If that ever stops being true, add
+  `CHECK (column >= 0)` rather than trusting the column type.
+- API resources for JSON shaping; eager-load to avoid N+1.
 - **Checkout-specific:** the server re-derives `unit_price_mmk` and validates
   `is_active`/`in_stock` from the current catalog at submission time — the client
   only ever sends `fragrance_id`, `size_ml`, and `quantity`. Never trust a

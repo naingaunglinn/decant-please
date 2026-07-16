@@ -2,13 +2,13 @@
 # First-run bootstrap + dev server for the compose `backend` service.
 # Runs on every `docker compose up` and is idempotent on purpose: steps that are
 # already done are skipped, so a warm boot is a no-op composer install + migrate
-# + serve. A fresh clone needs no local PHP/Composer/MySQL at all.
+# + serve. A fresh clone needs no local PHP/Composer/Postgres at all.
 set -e
 
 # .env — copied from the example so a fresh clone boots unattended. The DB_*
-# connection is pinned to the compose mysql service by environment overrides in
+# connection is pinned to the compose postgres service by environment overrides in
 # docker-compose.yml (real env beats .env in Laravel), so the copied DB defaults
-# are irrelevant here and the same file keeps working against a host MySQL.
+# are irrelevant here and the same file keeps working against a host Postgres.
 if [ ! -f .env ]; then
     echo "[bootstrap] no backend/.env — creating it from .env.example"
     cp .env.example .env
@@ -32,18 +32,20 @@ if [ ! -e public/storage ]; then
     php artisan storage:link
 fi
 
-# Wait out MySQL's first-boot initialization. The compose healthcheck already gates
+# Wait out Postgres's first-boot initialization. The compose healthcheck already gates
 # `up`, but a plain `docker compose run backend` has no such gate. This probes the
 # connection rather than retrying `migrate`, so a failing migration reports itself
-# instead of being mistaken for 30 attempts' worth of "MySQL isn't up yet".
+# instead of being mistaken for 30 attempts' worth of "Postgres isn't up yet".
 tries=0
 until php artisan db:show >/dev/null 2>&1; do
     tries=$((tries + 1))
     if [ "$tries" -ge 30 ]; then
         echo "[bootstrap] database still unreachable after $tries attempts — giving up" >&2
+        echo "[bootstrap] a .env from before the Postgres switch is the usual cause:" >&2
+        echo "[bootstrap] compose pins DB_CONNECTION=pgsql, so check nothing else overrides it" >&2
         exit 1
     fi
-    echo "[bootstrap] waiting for MySQL (attempt $tries/30)..."
+    echo "[bootstrap] waiting for Postgres (attempt $tries/30)..."
     sleep 2
 done
 
