@@ -31,10 +31,14 @@ class FragranceController extends Controller
         ]);
 
         $query = $this->baseQuery()
+            // whereLike, not where(…, 'like', …): a bare LIKE is case-insensitive on
+            // MySQL but case-sensitive on Postgres, so searching "creed" would stop
+            // matching "Creed". whereLike defaults to caseSensitive: false and lets
+            // each grammar say what it means — ilike on Postgres, like everywhere else.
             ->when($filters['q'] ?? null, fn (Builder $query, string $q) => $query->where(fn (Builder $sub) => $sub
-                ->where('name', 'like', "%{$q}%")
-                ->orWhereHas('brand', fn (Builder $brand) => $brand->where('name', 'like', "%{$q}%"))))
-            ->when($filters['notes'] ?? null, fn (Builder $query, string $notes) => $query->where('notes', 'like', "%{$notes}%"))
+                ->whereLike('name', "%{$q}%")
+                ->orWhereHas('brand', fn (Builder $brand) => $brand->whereLike('name', "%{$q}%"))))
+            ->when($filters['notes'] ?? null, fn (Builder $query, string $notes) => $query->whereLike('notes', "%{$notes}%"))
             ->when($filters['brand'] ?? null, fn (Builder $query, string $slugs) => $query
                 ->whereHas('brand', fn (Builder $brand) => $brand->whereIn('slug', explode(',', $slugs))))
             ->when($filters['type'] ?? null, fn (Builder $query, string $type) => $query
@@ -51,9 +55,14 @@ class FragranceController extends Controller
             )
             ->when($filters['featured'] ?? null, fn (Builder $query) => $query->where('is_featured', true));
 
+        // NULLS LAST rather than the `min_price IS NULL` prefix that did the same job:
+        // min_price is a withMin() select alias, and Postgres resolves an alias in
+        // ORDER BY only as a bare name, never inside an expression — the old form
+        // raised "column min_price does not exist". Out-of-stock rows still sort last
+        // either way; Postgres would otherwise put them first on DESC.
         match ($filters['sort'] ?? 'newest') {
-            'price_asc' => $query->orderByRaw('min_price IS NULL, min_price ASC')->orderBy('name'),
-            'price_desc' => $query->orderByRaw('min_price IS NULL, min_price DESC')->orderBy('name'),
+            'price_asc' => $query->orderByRaw('min_price ASC NULLS LAST')->orderBy('name'),
+            'price_desc' => $query->orderByRaw('min_price DESC NULLS LAST')->orderBy('name'),
             'name' => $query->orderBy('name'),
             default => $query->latest()->orderByDesc('id'),
         };

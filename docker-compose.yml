@@ -1,22 +1,29 @@
-# One-terminal dev runner: `docker compose up` = MySQL + Laravel API (:8010) + Next.js (:3001).
+# One-terminal dev runner: `docker compose up` = Postgres + Laravel API (:8010) + Next.js (:3001).
 # 3001 not 3000/3010: those are held by other local projects that run in parallel.
 # Zero local prerequisites: a fresh clone bootstraps itself on first `up` —
 # backend/docker/dev-entrypoint.sh installs deps, creates .env, migrates, seeds.
 services:
-  mysql:
-    image: mysql:8.4
+  postgres:
+    # 17 to match the major version Heroku defaults new databases to — the host has
+    # no first-party MySQL, which is why this project isn't on MySQL any more.
+    image: postgres:17
     environment:
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_DATABASE: decant_please
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: decant_please
+      POSTGRES_USER: postgres # set explicitly rather than leaning on the image default
     ports:
-      - "3306:3306"
+      # 5442 on the host, not 5432: another project on this dev machine already
+      # publishes Postgres there, the same reason the API is 8010 and the storefront
+      # 3001 (CLAUDE.md §7). Inside the compose network it's still a plain 5432.
+      - "5442:5432"
     volumes:
-      - decant_mysql_data:/var/lib/mysql
+      - decant_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # a real query, not `mysqladmin ping` (which can report alive before auth works);
-      # -h127.0.0.1 forces TCP — first-boot initialization runs a socket-only temp
-      # server that must not count as "ready"
-      test: ["CMD", "mysql", "-h127.0.0.1", "-uroot", "-psecret", "-e", "SELECT 1"]
+      # a real query, not `pg_isready` (which answers before the database is usable);
+      # -h127.0.0.1 forces TCP — first-boot init runs a temp server with
+      # listen_addresses='' that must not count as "ready". PGPASSWORD is required
+      # precisely because that TCP path authenticates, where the local socket is trust.
+      test: ["CMD-SHELL", "PGPASSWORD=secret psql -h127.0.0.1 -U postgres -d decant_please -c 'SELECT 1'"]
       interval: 2s
       timeout: 5s
       retries: 60
@@ -34,17 +41,21 @@ services:
       - ./backend:/var/www/decant-please/backend
     environment:
       HOME: /tmp # composer needs a writable home
-      # the whole DB_* block is pinned to the compose mysql service (real env beats
+      # the whole DB_* block is pinned to the compose postgres service (real env beats
       # .env in Laravel), so `up` works with a fresh auto-copied .env or one
-      # hand-tuned for a host MySQL — nothing else in .env is overridden
-      DB_HOST: mysql
-      DB_PORT: "3306"
+      # hand-tuned for a host Postgres — nothing else in .env is overridden.
+      # DB_CONNECTION included deliberately: a .env predating the Postgres switch still
+      # says mysql, and without this pin Laravel drives a Postgres server with the MySQL
+      # driver and just times out looking unreachable.
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
       DB_DATABASE: decant_please
-      DB_USERNAME: root
+      DB_USERNAME: postgres # Postgres's default superuser is postgres, not root
       DB_PASSWORD: secret
     depends_on:
-      mysql:
-        condition: service_healthy # first boot: wait out MySQL's initialization
+      postgres:
+        condition: service_healthy # first boot: wait out Postgres's initialization
     ports:
       - "8010:8010"
       - "3001:3001" # the frontend's port — it shares this network namespace (see below)
@@ -68,5 +79,8 @@ services:
     command: sh docker/dev-entrypoint.sh
 
 volumes:
-  decant_mysql_data:
-    name: decant_mysql_data # reuse the volume from the README's `docker run` — existing data carries over
+  decant_postgres_data:
+    # a new volume, not a rename of decant_mysql_data — Postgres can't read MySQL's
+    # files. Your old dev data isn't deleted, just no longer used; the next `up`
+    # migrates and seeds a fresh database.
+    name: decant_postgres_data

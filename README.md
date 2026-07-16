@@ -75,7 +75,7 @@ production schedule.
 
 | Layer | Choice |
 |---|---|
-| Backend | Laravel 13 · PHP 8.3+ · MySQL 8 |
+| Backend | Laravel 13 · PHP 8.3+ · PostgreSQL 17 |
 | Admin | Filament v5 |
 | Frontend | Next.js 16 · React · TypeScript 5 |
 | Styling | Tailwind CSS v4 (CSS-first `@theme` tokens) |
@@ -86,14 +86,14 @@ production schedule.
 
 ### Prerequisites
 
-**Docker** (with Compose). That's it — PHP, Composer, Node, and MySQL all run inside
+**Docker** (with Compose). That's it — PHP, Composer, Node, and PostgreSQL all run inside
 the containers, so nobody needs the right local versions of anything. Prefer running
 the toolchains natively? See [Running without Docker](#running-without-docker).
 
 ### Run the whole stack
 
 ```bash
-docker compose up   # MySQL + API on :8010 + storefront on :3001
+docker compose up   # PostgreSQL + API on :8010 + storefront on :3001
 ```
 
 The first run bootstraps everything unattended (give it a few minutes to install
@@ -102,7 +102,7 @@ dependencies):
 - creates `backend/.env` and `frontend/.env.local` from their committed examples
 - `composer install` + `npm install` — into the bind-mounted repo, so your editor
   sees `vendor/` and `node_modules/`, and both apps hot-reload as usual
-- generates `APP_KEY`, links `storage/`, waits for MySQL, runs migrations
+- generates `APP_KEY`, links `storage/`, waits for PostgreSQL, runs migrations
 - on an empty database, seeds the demo catalog and the admin user — a blank
   `ADMIN_PASSWORD` gets a generated one, saved to `backend/.env`
 
@@ -113,17 +113,31 @@ Then:
 | http://localhost:3001 | Storefront |
 | http://localhost:8010/admin | Admin — `admin@decantplease.local` / the `ADMIN_PASSWORD` line in `backend/.env` |
 
-Ports are 8010/3001 because 8000/3000/3010 are taken by other local projects. The
-database lives in the `decant_mysql_data` volume: it survives `docker compose down`,
-and `down -v` wipes it so the next `up` migrates and seeds from scratch. If you have
-the standalone `decant-mysql` container running — from
-[Running without Docker](#running-without-docker) below, or from an earlier version of
-this README — stop/remove it first: it holds port 3306, and the compose `mysql` service
-reuses its volume, so existing data carries over.
+Ports are 8010/3001 because 8000/3000/3010 are taken by other local projects; Postgres
+publishes 5442 for the same reason. The database lives in the `decant_postgres_data`
+volume: it survives `docker compose down`, and `down -v` wipes it so the next `up`
+migrates and seeds from scratch. If you have the standalone `decant-postgres` container
+from [Running without Docker](#running-without-docker) below, stop it first — it holds
+the same port.
 
 An existing `backend/.env` is read as-is, with one exception: the `DB_*` connection
-is pinned to the compose `mysql` service, so the same file keeps working whether the
-stack runs in Docker or against a host MySQL.
+is pinned to the compose `postgres` service, so the same file keeps working whether the
+stack runs in Docker or against a host PostgreSQL.
+
+#### Coming from the MySQL stack?
+
+This project ran on MySQL through v5. Nothing migrates automatically — Postgres can't
+read MySQL's files, so **your local dev data does not carry over** and the next `up`
+seeds a fresh demo catalog. Nothing is deleted: the old `decant_mysql_data` volume is
+left untouched, so anything you need is still recoverable. Two things to do once:
+
+```bash
+docker compose down --remove-orphans   # else the old decant-please-mysql-1 lingers on 3306
+docker compose up --build              # a plain `up` won't rebuild for pdo_pgsql
+```
+
+Uploaded images live in `backend/storage/`, not the database, so they survive — but the
+fragrance rows that referenced them don't, so you'll be re-uploading.
 
 Everything in the containers runs as root, so the same compose file works whether your
 checkout lives in your home directory or somewhere root-owned like `/var/www`. The
@@ -134,14 +148,18 @@ and won't pick up changes to `backend/Dockerfile`.
 
 ### Running without Docker
 
-Prerequisites: PHP 8.3+ and Composer, Node.js 24 LTS, and MySQL 8.0+ — or run just
-the database in Docker:
+Prerequisites: PHP 8.3+ and Composer (with `pdo_pgsql`), Node.js 24 LTS, and
+PostgreSQL 17 — or run just the database in Docker:
 
 ```bash
-docker run -d --name decant-mysql \
-  -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=decant_please \
-  -p 3306:3306 -v decant_mysql_data:/var/lib/mysql mysql:8
+docker run -d --name decant-postgres \
+  -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=decant_please -e POSTGRES_USER=postgres \
+  -p 5442:5432 -v decant_postgres_data:/var/lib/postgresql/data postgres:17
 ```
+
+That publishes 5442, matching `backend/.env.example`'s `DB_PORT` — 5432 is already
+taken on this dev machine. Running a native PostgreSQL on the default port instead?
+Set `DB_PORT=5432`.
 
 **Backend — http://localhost:8010**
 
@@ -227,11 +245,20 @@ cd frontend && npm run build     # type-checks and builds the storefront
 Tests run on an in-memory SQLite database and never touch your dev data.
 N+1 queries throw in dev/test (`Model::preventLazyLoading`), silently allowed in production.
 
+That SQLite/PostgreSQL split is fast and isolated, but it has a real blind spot: SQLite
+tolerates things Postgres rejects, so the suite can stay green over a genuinely broken
+query. It missed two — a case-sensitive `LIKE` and a select alias in `ORDER BY` — during
+the Postgres migration. Anything engine-specific needs a check against the real engine:
+
+```bash
+sh backend/scripts/verify-postgres-portability.sh   # drives the running stack, not SQLite
+```
+
 ## Deployment
 
-See **[DEPLOY.md](DEPLOY.md)** — exact commands for a PHP-FPM + Nginx + MySQL VPS,
+See **[DEPLOY.md](DEPLOY.md)** — exact commands for a PHP-FPM + Nginx + PostgreSQL VPS,
 Vercel setup for the frontend, the production `.env` template, and the nightly
-`mysqldump` backup cron (order history is the decanter's financial record).
+`pg_dump` backup cron (order history is the decanter's financial record).
 
 When the demo data has served its purpose:
 
