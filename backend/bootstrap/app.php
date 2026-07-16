@@ -13,7 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Heroku terminates TLS and forwards over HTTP with X-Forwarded-* headers, and
+        // the dyno is only reachable through that router — so trust it. Without this,
+        // $request->ip() is the router's IP, collapsing every per-IP rate-limit bucket
+        // (AppServiceProvider) into one global bucket, and $request->isSecure() is false,
+        // which can loop Filament login under SESSION_SECURE_COOKIE=true.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
