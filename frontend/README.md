@@ -8,7 +8,9 @@ Project-wide context lives in [`../README.md`](../README.md) (system overview),
 [`../CLAUDE.md`](../CLAUDE.md) (spec / source of truth), and
 [`../DEPLOY.md`](../DEPLOY.md) (production deployment).
 
-**Requirements:** Node.js 24 LTS · a running backend (see its README)
+**Requirements:** Node.js 24 LTS · a running backend (see its README) — or neither:
+`docker compose up` at the repo root runs every step below automatically
+(see the [root README](../README.md#getting-started)).
 
 ## Setup
 

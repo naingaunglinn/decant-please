@@ -1,0 +1,4 @@
+# dev-entrypoint.sh runs inside the Linux backend container straight from the
+# bind-mounted checkout. A Windows clone with core.autocrlf=true would otherwise
+# give it CRLF endings, and `sh` fails on the \r.
+*.sh text eol=lf

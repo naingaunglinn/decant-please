@@ -128,12 +128,16 @@ server block with TLS in front. Same two env vars, in `frontend/.env.local`.
 
 ## 3. Local dev quickstart (two terminals)
 
+Or one terminal and no local toolchains: `docker compose up` at the repo root does all
+of this for you — see the [root README](README.md#getting-started).
+
 ```bash
 # terminal 1 — backend  (MySQL running; see backend/.env for credentials)
 cd backend
 composer install
 cp .env.example .env && php artisan key:generate   # first time only; set ADMIN_PASSWORD
 php artisan migrate --seed                          # first time only
+php artisan storage:link                            # first time only; serves uploaded images
 php artisan serve --port=8010                       # http://localhost:8010, admin at /admin
 
 # terminal 2 — frontend

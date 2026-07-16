@@ -86,9 +86,56 @@ production schedule.
 
 ### Prerequisites
 
-- PHP 8.3+ and Composer
-- Node.js 24 LTS
-- MySQL 8.0+ — or run it in Docker:
+**Docker** (with Compose). That's it — PHP, Composer, Node, and MySQL all run inside
+the containers, so nobody needs the right local versions of anything. Prefer running
+the toolchains natively? See [Running without Docker](#running-without-docker).
+
+### Run the whole stack
+
+```bash
+docker compose up   # MySQL + API on :8010 + storefront on :3001
+```
+
+The first run bootstraps everything unattended (give it a few minutes to install
+dependencies):
+
+- creates `backend/.env` and `frontend/.env.local` from their committed examples
+- `composer install` + `npm install` — into the bind-mounted repo, so your editor
+  sees `vendor/` and `node_modules/`, and both apps hot-reload as usual
+- generates `APP_KEY`, links `storage/`, waits for MySQL, runs migrations
+- on an empty database, seeds the demo catalog and the admin user — a blank
+  `ADMIN_PASSWORD` gets a generated one, saved to `backend/.env`
+
+Then:
+
+| URL | What |
+|---|---|
+| http://localhost:3001 | Storefront |
+| http://localhost:8010/admin | Admin — `admin@decantplease.local` / the `ADMIN_PASSWORD` line in `backend/.env` |
+
+Ports are 8010/3001 because 8000/3000/3010 are taken by other local projects. The
+database lives in the `decant_mysql_data` volume: it survives `docker compose down`,
+and `down -v` wipes it so the next `up` migrates and seeds from scratch. If you have
+the standalone `decant-mysql` container running — from
+[Running without Docker](#running-without-docker) below, or from an earlier version of
+this README — stop/remove it first: it holds port 3306, and the compose `mysql` service
+reuses its volume, so existing data carries over.
+
+An existing `backend/.env` is read as-is, with one exception: the `DB_*` connection
+is pinned to the compose `mysql` service, so the same file keeps working whether the
+stack runs in Docker or against a host MySQL.
+
+Everything in the containers runs as root, so the same compose file works whether your
+checkout lives in your home directory or somewhere root-owned like `/var/www`. The
+`.env` files are handed back to whoever owns the checkout; `vendor/` and `node_modules/`
+stay root-owned, which matters only if you delete them by hand. Ran an older version of
+this stack? `docker compose up --build` once — a plain `up` reuses your existing image
+and won't pick up changes to `backend/Dockerfile`.
+
+### Running without Docker
+
+Prerequisites: PHP 8.3+ and Composer, Node.js 24 LTS, and MySQL 8.0+ — or run just
+the database in Docker:
 
 ```bash
 docker run -d --name decant-mysql \
@@ -96,7 +143,7 @@ docker run -d --name decant-mysql \
   -p 3306:3306 -v decant_mysql_data:/var/lib/mysql mysql:8
 ```
 
-### 1. Backend — http://localhost:8010
+**Backend — http://localhost:8010**
 
 ```bash
 cd backend
@@ -104,13 +151,14 @@ composer install
 cp .env.example .env        # set DB_* and ADMIN_PASSWORD
 php artisan key:generate
 php artisan migrate --seed  # demo catalog + admin user
+php artisan storage:link    # serve uploaded images from /storage
 php artisan serve --port=8010
 ```
 
 Admin: **http://localhost:8010/admin** — `admin@decantplease.local` /
 whatever `ADMIN_PASSWORD` was when you seeded.
 
-### 2. Frontend — http://localhost:3001
+**Frontend — http://localhost:3001**
 
 ```bash
 cd frontend
@@ -118,18 +166,6 @@ npm install
 cp .env.local.example .env.local
 npm run dev -- -p 3001
 ```
-
-### Or: the whole stack in one terminal with Docker
-
-```bash
-docker compose up   # MySQL + API on :8010 + storefront on :3001
-```
-
-Runs on 8010/3001 (8000/3000/3010 are taken by other local projects) and reuses the
-`decant_mysql_data` volume from the `docker run` above, so existing data carries
-over — stop/remove the standalone `decant-mysql` container first, it's replaced
-by the compose `mysql` service. `.env` files are read as-is; only `DB_HOST` is
-overridden to point at that service.
 
 ## Configuration
 
@@ -174,8 +210,17 @@ Guarantees worth knowing:
 
 ## Testing
 
+Inside the Docker stack (no local toolchains needed):
+
 ```bash
-cd backend && php artisan test   # 39 tests — domain, admin (Livewire), full API
+docker compose exec backend php artisan test   # 47 tests — domain, admin (Livewire), full API
+docker compose exec frontend npm run build     # type-checks and builds the storefront
+```
+
+Or with local toolchains:
+
+```bash
+cd backend && php artisan test   # 47 tests — domain, admin (Livewire), full API
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 
