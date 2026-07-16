@@ -52,10 +52,19 @@ Run the standard loop: confirm `main` is current, open the issue, branch,
 implement, PR. "Implement" for this step means:
 
 - `composer require league/flysystem-aws-s3-v3` in `backend/`.
-- Create `backend/Procfile`:
+- Create `backend/Procfile` **and** the nginx include it references. The bare
+  `heroku-php-nginx public/` originally shown here serves real files and `/` only, so
+  every Laravel route (`/api/v1/*`, `/up`, `/admin`) 404s on Heroku — corrected to route
+  through the front controller after the deployed app 404'd everything (found during #24):
   ```
-  web: vendor/bin/heroku-php-nginx public/
+  # backend/Procfile
+  web: vendor/bin/heroku-php-nginx -C conf/nginx/laravel.conf public/
   release: php artisan migrate --force
+  ```
+  ```nginx
+  # backend/conf/nginx/laravel.conf — included in Heroku's nginx server { } block
+  client_max_body_size 10m;                                   # ~2 MB image uploads clear the proxy
+  location / { try_files $uri $uri/ /index.php?$query_string; }
   ```
 - Rewrite `DEPLOY.md`'s deployment section to describe what's actually true now
   — Heroku (Basic dyno + `heroku-postgresql:essential-0`), the monorepo
@@ -122,6 +131,7 @@ heroku config:set -a decant-please-api \
   APP_KEY="base64:$(openssl rand -base64 32)" \
   APP_ENV=production \
   APP_DEBUG=false \
+  DB_CONNECTION=pgsql \
   APP_URL=https://api.cornerarea.me \
   FRONTEND_URL=https://decant-please.cornerarea.me \
   ADMIN_PASSWORD='<choose a strong password, do not reuse one from elsewhere>' \
@@ -134,6 +144,13 @@ heroku config:set -a decant-please-api \
   AWS_USE_PATH_STYLE_ENDPOINT=true \
   AWS_URL=https://images.cornerarea.me
 ```
+
+`DB_CONNECTION=pgsql` above is **required** and was missing from this list originally.
+Without it Laravel uses its `sqlite` default — `DATABASE_URL` only feeds the `pgsql`
+*connection*, not the *default* — so the release-phase `migrate` dies with `could not
+find driver (Connection: sqlite)` (pdo_pgsql is present on Heroku's PHP, pdo_sqlite is
+not). It's the same pin `docker-compose.yml` already carries. Found during #24, after
+the first deploy's release phase failed.
 
 Do **not** set `DATABASE_URL`, `DB_HOST`, or `DB_PORT` — the Postgres add-on
 injects `DATABASE_URL` automatically, and `.env.example`'s `DB_PORT=5442` is a

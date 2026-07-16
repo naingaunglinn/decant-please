@@ -72,6 +72,11 @@ connection in `config/database.php` reads directly. So **do not** set `DATABASE_
 `DB_HOST`, or `DB_PORT` by hand — `.env.example`'s `DB_PORT=5442` is a local-machine port
 workaround with no meaning here.
 
+You **do** still need `DB_CONNECTION=pgsql` (in the config vars below) — easy to conflate
+with the above and skip. `DATABASE_URL` only feeds the `pgsql` *connection*; the *default*
+connection is `env('DB_CONNECTION', 'sqlite')`, so without the pin Laravel uses sqlite and
+the release-phase `migrate` dies with `could not find driver (Connection: sqlite)`.
+
 ### Config vars
 
 ```bash
@@ -79,6 +84,8 @@ heroku config:set -a decant-please-api \
   APP_KEY="base64:$(openssl rand -base64 32)" \
   APP_ENV=production \
   APP_DEBUG=false \
+  DB_CONNECTION=pgsql \
+  SESSION_SECURE_COOKIE=true \
   APP_URL=https://api.cornerarea.me \
   FRONTEND_URL=https://decant-please.cornerarea.me \
   ADMIN_PASSWORD='<strong password, not reused from elsewhere>' \
@@ -113,8 +120,10 @@ automatically after every build — confirm it completes with no errors and the 
 reads **Up**, not Crashed. If it cycles between states the release phase failed even though
 the build succeeded: `heroku logs --tail -a decant-please-api`.
 
-There is no `storage:link`, no Nginx server block, and no `chown` step here — the buildpack
-provides nginx + PHP-FPM, and images live in R2 rather than on the dyno.
+There is no `storage:link` and no `chown` step here — the buildpack provides nginx + PHP-FPM,
+and images live in R2 rather than on the dyno. The Procfile's `-C conf/nginx/laravel.conf`
+supplies the one required nginx tweak: routing Laravel's clean URLs (`/api/v1/*`, `/admin`,
+`/up`) through the front controller, which the bare buildpack config otherwise 404s.
 
 ### Image upload size
 
@@ -124,18 +133,9 @@ the upload transits nginx **and** php-fpm, so both layers need headroom:
 
 - **PHP** is handled in-repo by `backend/public/.user.ini` (`upload_max_filesize=8M`,
   `post_max_size=10M`) — Heroku's php-fpm reads it automatically; it's a no-op locally.
-- **Nginx** — if an upload returns **413** at the proxy, the buildpack's default
-  `client_max_body_size` is too low. Add a config partial and point the web process at it:
-  ```nginx
-  # backend/conf/nginx/uploads.conf
-  client_max_body_size 10m;
-  ```
-  ```procfile
-  # backend/Procfile — web line becomes:
-  web: vendor/bin/heroku-php-nginx -C conf/nginx/uploads.conf public/
-  ```
-  Left out of the default Procfile because the buildpack's default may already clear a 2 MB
-  image; add it only if a real upload 413s, then redeploy.
+- **Nginx** — `backend/conf/nginx/laravel.conf` (the same include that fixes routing, wired
+  via the Procfile's `-C`) sets `client_max_body_size 10m;`, so a 2 MB upload clears the proxy
+  instead of 413-ing before it reaches PHP.
 
 ### Seed the admin login
 
