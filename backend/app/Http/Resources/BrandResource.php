@@ -17,7 +17,7 @@ class BrandResource extends JsonResource
             'slug' => $this->slug,
             'type' => $this->type->value,
             'type_label' => $this->type->label(),
-            'logo_url' => $this->logo_path ? Storage::disk('public')->url($this->logo_path) : null,
+            'logo_url' => $this->logo_path ? Storage::disk(config('filesystems.media_disk'))->url($this->logo_path) : null,
             'fragrances_count' => $this->whenCounted('fragrances'),
         ];
     }

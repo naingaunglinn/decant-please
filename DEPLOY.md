@@ -90,6 +90,7 @@ heroku config:set -a decant-please-api \
   FRONTEND_URL=https://decant-please.cornerarea.me \
   ADMIN_PASSWORD='<strong password, not reused from elsewhere>' \
   FILESYSTEM_DISK=s3 \
+  MEDIA_DISK=s3 \
   AWS_ACCESS_KEY_ID='<R2 Access Key ID>' \
   AWS_SECRET_ACCESS_KEY='<R2 Secret Access Key>' \
   AWS_DEFAULT_REGION=auto \
@@ -99,9 +100,13 @@ heroku config:set -a decant-please-api \
   AWS_URL=https://images.cornerarea.me
 ```
 
-`FILESYSTEM_DISK=s3` points Laravel's default disk at the pre-wired `s3` block in
-`config/filesystems.php`, which reads every `AWS_*` var above; `AWS_URL` is the public R2
-domain baked into image URLs. Verify the whole set landed — `heroku config -a
+`MEDIA_DISK=s3` is what routes uploaded fragrance/brand images to the R2-backed `s3` block in
+`config/filesystems.php` — every image code path reads it (the API resources, the Filament
+FileUpload/ImageColumn components, `decant:fresh-start`). `FILESYSTEM_DISK=s3` sets Laravel's
+default disk; that `s3` block reads every `AWS_*` var above, and `AWS_URL` is the public R2
+domain baked into the image URLs the API returns. The upload itself is pinned to the `local`
+temp disk in code (`AdminPanelProvider`), so the browser posts to Laravel and Laravel writes to
+R2 server-side — **no R2 bucket CORS policy is needed**. Verify the whole set landed — `heroku config -a
 decant-please-api`, or the dashboard's **Settings → Config Vars → Reveal** — before
 deploying. A typo caught now is a five-second fix; the same typo caught mid-release is a
 failed migration on a live app. (If you reveal them in the dashboard, that's real secrets in
@@ -136,6 +141,21 @@ the upload transits nginx **and** php-fpm, so both layers need headroom:
 - **Nginx** — `backend/conf/nginx/laravel.conf` (the same include that fixes routing, wired
   via the Procfile's `-C`) sets `client_max_body_size 10m;`, so a 2 MB upload clears the proxy
   instead of 413-ing before it reaches PHP.
+
+### Admin image uploads
+
+Uploading a fragrance/brand image in `/admin` goes **through** Laravel, not straight to R2.
+Livewire's temporary-upload disk is pinned to `local` in `AdminPanelProvider::boot()`, so the
+browser POSTs the file to Laravel's own endpoint (same origin); Filament then writes the
+finished file to the media disk (`MEDIA_DISK=s3` → R2) server-side. Two consequences:
+
+- **No R2 bucket CORS policy is required.** The earlier symptom — a browser `PUT` to
+  `…r2.cloudflarestorage.com` blocked by CORS — happened only because the temp disk defaulted
+  to `s3`; pinning it to `local` removes that cross-origin request entirely.
+- **Assumes a single web dyno.** The temp file lives on the dyno's ephemeral disk between the
+  upload and the form submit, which is fine when both hit the same dyno. If you scale the web
+  process past one dyno, switch the temp disk to `s3` and add an R2 bucket CORS policy for
+  `https://api.cornerarea.me`, or use shared temp storage.
 
 ### Seed the admin login
 
@@ -222,17 +242,18 @@ replaced image.
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://api.cornerarea.me/api` |
    | `NEXT_PUBLIC_SITE_URL` | `https://decant-please.cornerarea.me` |
+   | `NEXT_PUBLIC_IMAGE_URL` | `https://images.cornerarea.me` |
 
 3. Deploy, then point the storefront domain (`decant-please.cornerarea.me`) at Vercel. Make
    sure the backend's `FRONTEND_URL` config var matches it exactly, scheme included — that's
    the CORS allowlist **and** the admin "View on site" links.
 
-> **Known gap — fragrance images from R2.** `next.config.ts`'s image `remotePatterns` only
-> allows the API host's `/storage/**` path (plus localhost). Once the backend serves images
-> from `images.cornerarea.me` (R2), Next.js's image optimizer will reject them and catalog
-> photos will 400 on the storefront. This is deliberately out of scope for the backend
-> deploy step that introduces R2 — tracked in **#22**. Don't treat storefront images as done
-> until it's fixed.
+> **Fragrance images from R2 (#22).** `next.config.ts` allows images from the host in
+> `NEXT_PUBLIC_IMAGE_URL` (alongside the API host and localhost). Set
+> `NEXT_PUBLIC_IMAGE_URL=https://images.cornerarea.me` on Vercel — without it, the image
+> optimizer rejects R2 URLs and catalog photos 400 on the storefront. It's additive to the
+> API-host pattern, so set it **before** the backend starts emitting R2 URLs and there's no
+> broken window.
 
 **Alternative — Node on a VPS:** `npm ci && npm run build`, then `npm start` (port 3000)
 under systemd or pm2 with an Nginx `proxy_pass` + TLS in front. Same two env vars, in
@@ -263,8 +284,8 @@ npm run dev -- -p 3001                              # http://localhost:3001
 
 Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you seeded.
 
-Locally, images still use the `local`/`public` disk and `storage:link` — R2 is production
-only, selected by `FILESYSTEM_DISK=s3` there and left unset (so `local`) here.
+Locally, images still use the `public` disk and `storage:link` — R2 is production only,
+selected by `MEDIA_DISK=s3` there and left unset (so `public`) here.
 
 ---
 
@@ -291,10 +312,13 @@ from zero.
 - [ ] `ADMIN_PASSWORD` strong; admin login verified at `https://api.cornerarea.me/admin`
 - [ ] API routing works past `/`: `curl -I https://api.cornerarea.me/api/v1/meta` returns
       `200` — a 404 here while `/` serves means the buildpack needs a custom nginx conf (`-C`)
-- [ ] `FILESYSTEM_DISK=s3` + R2 vars set — upload a fragrance image in `/admin` and confirm
-      its URL resolves under `https://images.cornerarea.me/`, not a `local`-disk path (a 413
-      means the upload limits need raising — see "Image upload size")
-- [ ] Storefront image gap (#22) resolved before relying on catalog photos in production
+- [ ] `MEDIA_DISK=s3` (+ `FILESYSTEM_DISK=s3` + R2 vars) set — upload a fragrance image in
+      `/admin`, confirm its URL resolves under `https://images.cornerarea.me/` (not a
+      `local`-disk path), then `heroku ps:restart` and reload it to prove it's served from R2,
+      not the dyno's ephemeral disk (a 413 on upload means the limits need raising — see
+      "Image upload size")
+- [ ] `NEXT_PUBLIC_IMAGE_URL=https://images.cornerarea.me` set on Vercel so the storefront's
+      image optimizer accepts R2 URLs (#22)
 - [ ] `api.cornerarea.me` shows **Cert issued** (`heroku certs:auto`)
 - [ ] Both backup layers working: `heroku pg:backups` produces a capture **and** the
       off-Heroku `pg_dump` cron produces a file
