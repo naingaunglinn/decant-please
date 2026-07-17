@@ -106,7 +106,8 @@ FileUpload/ImageColumn components, `decant:fresh-start`). `FILESYSTEM_DISK=s3` s
 default disk; that `s3` block reads every `AWS_*` var above, and `AWS_URL` is the public R2
 domain baked into the image URLs the API returns. The upload itself is pinned to the `local`
 temp disk in code (`AdminPanelProvider`), so the browser posts to Laravel and Laravel writes to
-R2 server-side — **no R2 bucket CORS policy is needed**. Verify the whole set landed — `heroku config -a
+R2 server-side — **so the upload needs no R2 CORS policy** (admin *previews* of saved images do —
+see "Admin image uploads" below). Verify the whole set landed — `heroku config -a
 decant-please-api`, or the dashboard's **Settings → Config Vars → Reveal** — before
 deploying. A typo caught now is a five-second fix; the same typo caught mid-release is a
 failed migration on a live app. (If you reveal them in the dashboard, that's real secrets in
@@ -149,9 +150,20 @@ Livewire's temporary-upload disk is pinned to `local` in `AdminPanelProvider::bo
 browser POSTs the file to Laravel's own endpoint (same origin); Filament then writes the
 finished file to the media disk (`MEDIA_DISK=s3` → R2) server-side. Two consequences:
 
-- **No R2 bucket CORS policy is required.** The earlier symptom — a browser `PUT` to
-  `…r2.cloudflarestorage.com` blocked by CORS — happened only because the temp disk defaulted
-  to `s3`; pinning it to `local` removes that cross-origin request entirely.
+- **Uploads need no R2 CORS policy** — pinning the temp disk to `local` removes the browser
+  `PUT` to `…r2.cloudflarestorage.com` that a default (`s3`) temp disk would make. **But admin
+  *previews* do:** Filament renders a saved image by having FilePond `GET` it from R2
+  client-side (a cross-origin fetch from `https://api.cornerarea.me`), so R2 must return CORS
+  headers or the browser blocks it with `No 'Access-Control-Allow-Origin' header`.
+  `->fetchFileInformation(false)` does **not** fix it (that only skips server-side size/type
+  calls; the FilePond GET is unconditional). Add this bucket CORS policy in the Cloudflare
+  dashboard (**R2 → decant-please-images → Settings → CORS Policy**) — it can't be set over the
+  S3 API with the object-scoped token used for uploads (`PutBucketCors` → AccessDenied):
+  ```json
+  [{"AllowedOrigins":["https://api.cornerarea.me"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]
+  ```
+  The storefront needs nothing here — `next/image` fetches server-side and `<img>` isn't
+  CORS-gated; scope the origins to the admin.
 - **Assumes a single web dyno.** The temp file lives on the dyno's ephemeral disk between the
   upload and the form submit, which is fine when both hit the same dyno. If you scale the web
   process past one dyno, switch the temp disk to `s3` and add an R2 bucket CORS policy for
