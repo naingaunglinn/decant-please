@@ -35,7 +35,7 @@ class BrandForm
                     ->label('Logo')
                     ->image()
                     ->imageEditor()
-                    ->disk('public')
+                    ->disk(config('filesystems.media_disk'))
                     ->directory('brands')
                     ->maxSize(2048),
                 Toggle::make('is_active')

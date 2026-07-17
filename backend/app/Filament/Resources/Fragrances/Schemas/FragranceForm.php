@@ -55,7 +55,7 @@ class FragranceForm
                             ->image()
                             ->imageEditor()
                             ->imageEditorAspectRatios(['1:1'])
-                            ->disk('public')
+                            ->disk(config('filesystems.media_disk'))
                             ->directory('fragrances')
                             ->maxSize(2048)
                             ->helperText('Square (1:1) images look best on the cards.'),

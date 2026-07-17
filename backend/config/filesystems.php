@@ -17,6 +17,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Media Disk (user-uploaded images)
+    |--------------------------------------------------------------------------
+    |
+    | The disk fragrance/brand images are written to and served from. Kept
+    | separate from the default disk above: locally the default is the private
+    | "local" disk, but uploaded images must live on a publicly-served disk.
+    | Defaults to "public" (local dev, via storage:link); production sets
+    | MEDIA_DISK=s3 to store and serve them from Cloudflare R2. Every image code
+    | path reads this one value — the API resources, the Filament FileUpload /
+    | ImageColumn components, and the decant:fresh-start command.
+    |
+    */
+
+    'media_disk' => env('MEDIA_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

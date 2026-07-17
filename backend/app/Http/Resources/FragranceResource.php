@@ -28,7 +28,7 @@ class FragranceResource extends JsonResource
             'vibes' => $this->vibes,
             'performance' => $this->performance,
             'description' => $this->description,
-            'image_url' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
+            'image_url' => $this->image_path ? Storage::disk(config('filesystems.media_disk'))->url($this->image_path) : null,
             'is_featured' => $this->is_featured,
             'min_price_mmk' => $minPrice,
             'min_price_formatted' => $minPrice !== null ? Money::kyat($minPrice) : null,

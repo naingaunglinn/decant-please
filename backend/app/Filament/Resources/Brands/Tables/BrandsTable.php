@@ -25,7 +25,7 @@ class BrandsTable
             ->columns([
                 ImageColumn::make('logo_path')
                     ->label('Logo')
-                    ->disk('public')
+                    ->disk(config('filesystems.media_disk'))
                     ->circular(),
                 TextColumn::make('name')
                     ->searchable()

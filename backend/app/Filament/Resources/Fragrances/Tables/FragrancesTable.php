@@ -38,7 +38,7 @@ class FragrancesTable
             ->columns([
                 ImageColumn::make('image_path')
                     ->label('Image')
-                    ->disk('public'),
+                    ->disk(config('filesystems.media_disk')),
                 TextColumn::make('brand.name')
                     ->label('Brand')
                     ->searchable()

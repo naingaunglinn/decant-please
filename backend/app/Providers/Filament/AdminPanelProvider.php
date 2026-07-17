@@ -20,6 +20,20 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        // Livewire's temporary-upload disk defaults to the app's default filesystem
+        // disk, which is s3/R2 in production. That makes the browser upload the file
+        // straight to R2 via a presigned PUT — which R2 blocks on CORS. Pin temp
+        // uploads to the local disk so they POST to Livewire's own same-origin
+        // endpoint; Filament then moves the finished file to the media disk (R2)
+        // server-side, no CORS involved. Safe on the single Heroku web dyno: the temp
+        // file is short-lived and the upload + submit hit the same dyno. If the web
+        // process is ever scaled past one dyno, revisit (shared temp storage or R2 +
+        // a bucket CORS policy). See DEPLOY.md "Admin image uploads".
+        config(['livewire.temporary_file_upload.disk' => 'local']);
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel

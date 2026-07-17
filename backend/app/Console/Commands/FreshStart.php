@@ -40,7 +40,7 @@ class FreshStart extends Command
             DecantPrice::query()->delete();
 
             Fragrance::query()->whereNotNull('image_path')->pluck('image_path')
-                ->each(fn (string $path) => Storage::disk('public')->delete($path));
+                ->each(fn (string $path) => Storage::disk(config('filesystems.media_disk'))->delete($path));
             Fragrance::query()->delete();
             PromoCode::query()->delete();
 
