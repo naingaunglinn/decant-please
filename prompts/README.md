@@ -37,6 +37,7 @@ Full history in `00-CLAUDE.md` §0.
    | 12 | `12-mysql-to-postgresql-migration.md` | Swap MySQL 8 for PostgreSQL 17 (Heroku has no first-party MySQL) | built |
    | 13 | `13-production-heroku-cloudflare-setup.md` | Deploy backend to Heroku + Cloudflare R2 image storage | built |
    | 14 | `14-printable-order-invoices.md` | Admin print & download A5 order invoices (single + daily batch PDF) | built |
+   | 16 | `16-cicd-heroku-github.md` | CI/CD — test-gated auto-deploy from GitHub to Heroku | built (CI); Heroku GitHub connect is a one-time dashboard step |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`
