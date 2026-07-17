@@ -34,6 +34,9 @@ Full history in `00-CLAUDE.md` §0.
    | 10 | `10-promo-codes.md` | Promo/discount codes at checkout | built |
    | 9 | `09-burmese-language-toggle.md` | Burmese/English toggle for the customer site | spec ready — do last, translates 08 & 10's new strings too |
    | 11 | `11-responsive-and-mobile-foundations.md` | Responsive pass (wider PDP/receipt pages, 16px inputs, touch targets) + API contract & design tokens | built |
+   | 12 | `12-mysql-to-postgresql-migration.md` | Swap MySQL 8 for PostgreSQL 17 (Heroku has no first-party MySQL) | built |
+   | 13 | `13-production-heroku-cloudflare-setup.md` | Deploy backend to Heroku + Cloudflare R2 image storage | built |
+   | 14 | `14-printable-order-invoices.md` | Admin print & download A5 order invoices (single + daily batch PDF) | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

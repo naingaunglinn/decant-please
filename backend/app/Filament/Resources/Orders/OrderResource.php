@@ -10,6 +10,7 @@ use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\Order;
 use BackedEnum;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -119,6 +120,52 @@ class OrderResource extends Resource
                     ->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /**
+     * Download this order's packing invoice as an A5 PDF — exportCsv's
+     * streamDownload mechanism with PDF bytes instead of CSV rows. Rendered
+     * fresh on every click, never cached, so it always shows the order as-is.
+     * Only fulfillable orders (pending/decanted/delivered) have anything worth
+     * invoicing; neither invoice action changes state, so no refreshEditPage().
+     */
+    public static function downloadInvoiceAction(): Action
+    {
+        return Action::make('downloadInvoice')
+            ->label('Download invoice')
+            ->icon(Heroicon::OutlinedArrowDownTray)
+            ->visible(fn (Order $record): bool => $record->status->isFulfillable())
+            ->action(function (Order $record) {
+                $record->loadMissing('items');
+
+                // Render before streaming: a dompdf failure surfaces as an
+                // action error instead of a corrupt half-downloaded file.
+                $pdf = Pdf::loadView('pdf.invoice', ['order' => $record])->setPaper('a5')->output();
+
+                return response()->streamDownload(
+                    function () use ($pdf): void {
+                        echo $pdf;
+                    },
+                    "invoice-{$record->tracking_code}.pdf",
+                    ['Content-Type' => 'application/pdf'],
+                );
+            });
+    }
+
+    /**
+     * Open the invoice inline in a new tab, ready for Ctrl+P. A plain link to
+     * the panel-authenticated invoice route (see AdminPanelProvider) — the
+     * Livewire action-closure mechanism can't open an inline document in a
+     * new tab, so this one is a URL, not an action closure.
+     */
+    public static function printInvoiceAction(): Action
+    {
+        return Action::make('printInvoice')
+            ->label('Print invoice')
+            ->icon(Heroicon::OutlinedPrinter)
+            ->visible(fn (Order $record): bool => $record->status->isFulfillable())
+            ->url(fn (Order $record): string => route('filament.admin.orders.invoice', $record))
+            ->openUrlInNewTab();
     }
 
     /**
