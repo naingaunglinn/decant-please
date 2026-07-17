@@ -198,14 +198,33 @@ heroku certs:auto -a decant-please-api   # wait until it reads "Cert issued"
 is live. If it's still pending 15–20 minutes after the CNAME went in, re-check the actual DNS
 record in Cloudflare before assuming it'll resolve on its own.
 
-### Later deploys / auto-deploy
+### Later deploys — auto-deploy, gated on CI
 
-`git push heroku main` redeploys manually; the release phase re-runs migrations on its own,
-so there's no separate `migrate` step. To match how every other step in this project ships
-— every merged PR deploying automatically — wire up GitHub auto-deploy once, by hand:
-Heroku dashboard → app → **Deploy** tab → Deployment method → GitHub → connect
-`naingaunglinn/decant-please` → **Enable Automatic Deploys** for `main`. That's an OAuth
-dashboard flow, not a CLI step.
+Every merge to `main` deploys itself once the one-time GitHub connection below is made.
+The gate: `.github/workflows/tests.yml` runs two checks on every push to `main` (and on
+every PR) — `test`, the SQLite suite exactly as `composer test` runs it, and
+`postgres-portability`, which migrates and seeds a real Postgres 17, boots the API, and
+runs `backend/scripts/verify-postgres-portability.sh` against it. The second exists
+because a green SQLite suite structurally can't catch Postgres-only breakage
+(case-sensitive `LIKE`, `ORDER BY` alias resolution) — this project shipped both once.
+Heroku deploys only after both report green.
+
+One-time dashboard setup (an OAuth flow tied to your accounts — not a CLI step):
+
+1. Heroku dashboard → `decant-please-api` → **Deploy** tab → Deployment method →
+   GitHub → connect `naingaunglinn/decant-please`.
+2. **Enable Automatic Deploys** for `main`.
+3. Check **"Wait for CI to pass before deploy"** — per Heroku's docs this watches
+   GitHub's commit-status API, which is exactly where the Actions workflow reports.
+   No Heroku CI add-on, nothing to pay for: the workflow running on `push` is the
+   whole requirement.
+
+Then prove the connection with the same tab's **manual deploy** button once — that also
+ships whatever `main` currently holds. From there, merging a PR *is* the deploy: tests
+run, Heroku sees green, the release phase re-runs migrations on its own.
+
+`git push heroku main` still works and remains the break-glass fallback if GitHub or
+Actions is down — but it bypasses the CI gate, so it's no longer the routine path.
 
 ### Production notes
 

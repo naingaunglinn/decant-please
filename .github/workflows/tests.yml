@@ -1,0 +1,124 @@
+# The CI half of the test-gated auto-deploy (prompts/16, issue #34).
+#
+# Two separate jobs on purpose: each reports its own commit status to GitHub,
+# and Heroku's "Wait for CI to pass before deploy" watches those statuses —
+# two named checks are better signal than one job with two steps.
+#
+# Runs on push to main (that's the status Heroku's deploy gate reads) and on
+# pull requests (so a broken PR is visible before merge, not at deploy time).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # The existing suite exactly as `composer test` runs it locally — in-memory
+  # SQLite, forced by phpunit.xml regardless of surrounding env.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, intl, mbstring, gd, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-test-${{ hashFiles('backend/composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run the suite
+        run: composer test
+
+  # The suite alone can't catch Postgres-only breakage — it runs on SQLite,
+  # which (like MySQL, unlike Postgres) has case-insensitive LIKE and tolerates
+  # a select alias inside an ORDER BY expression. This project already shipped
+  # both of those bugs once (issue #19); scripts/verify-postgres-portability.sh
+  # exists to catch them but until now only ran when someone remembered to.
+  # Here it gates every merge: real Postgres 17 (same major as Heroku), real
+  # HTTP against the running app.
+  postgres-portability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: decant_please
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      # DATABASE_URL, not DB_URL — the pgsql block in config/database.php reads
+      # this name (matching what Heroku injects); a mismatch doesn't error, it
+      # silently falls through to the DB_* defaults. Process env also beats the
+      # .env file copied below, so its local-machine DB_PORT=5442 never applies.
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/decant_please
+      # DatabaseSeeder refuses to seed the admin user without one (RuntimeException).
+      # Any placeholder works — this is CI, nothing here is production.
+      ADMIN_PASSWORD: ci-seed-only-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, pgsql, intl, mbstring, gd, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-pg-${{ hashFiles('backend/composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate
+        run: php artisan migrate --force
+
+      # Seeds the catalog fixtures the portability script probes against —
+      # its case-sensitivity check needs a fragrance matching "Creed".
+      - name: Seed
+        run: php artisan db:seed
+
+      - name: Boot the API and run the portability checks
+        run: |
+          php artisan serve --port=8010 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8010/api/v1/meta > /dev/null && break
+            [ "$i" = "30" ] && { echo "API never became ready"; exit 1; }
+            sleep 1
+          done
+          API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh
