@@ -1,9 +1,31 @@
-# CLAUDE.md — Decant Please! (v6)
+# CLAUDE.md — Decant Please! (v7)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v2, then v3, then v4, then v5, then v6
+## 0. What changed in v7
+
+**v7** adds admin-side **printable A5 order invoices** (Step 14) and nothing else:
+- Two per-order actions (print inline in a new tab, download) plus a bulk
+  "Download invoices (PDF)" that follows the active tab/filters — one A5 page per
+  order. All gated to fulfillable statuses (`pending`/`decanted`/`delivered`);
+  generated fresh on every request, never cached or stored.
+- The PDF library is `barryvdh/laravel-dompdf` — pure PHP, so nothing new on the
+  Heroku buildpack. This is a deliberate contrast with the Step 8 customer receipt,
+  which stays browser-print (`OrderReceipt.tsx`, untouched): the admin document
+  needs an exact physical size and batching; the customer one doesn't.
+- **Burmese free text** (names/addresses) renders via a bundled repo-asset font,
+  `backend/resources/fonts/Padauk-{Regular,Bold}.ttf` — the *only* font-family on
+  the invoice. Padauk, not Noto Sans Myanmar: current Noto Myanmar builds carry no
+  Latin glyphs, so as a sole font they'd tofu every English label. Known accepted
+  limit: dompdf does no complex-script shaping — Myanmar glyphs and above/below
+  stacking are correct, but `ေ`/medial-`ြ` visual reordering isn't; mPDF's OTL
+  engine is the revisit path if that ever stops being acceptable.
+- The inline-print route is registered through the panel's `authenticatedRoutes()`
+  (NOT `routes()`, which Filament registers *outside* auth, next to login) — see
+  `AdminPanelProvider`.
+
+## 0.1 What changed in v2, then v3, then v4, then v5, then v6 (for reference)
 
 **v6** swaps the database engine from MySQL 8 to **PostgreSQL 17**, and nothing else:
 - Heroku is the chosen host and has no first-party MySQL. Its only credit-eligible,
@@ -285,7 +307,10 @@ client on checkout (see `05-api-layer.md`).
    This is the "automatically generate a schedule" requirement from the brief.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
    count, decants due today, top fragrances.
-6. Everything remains notes + financials + fulfillment only — no messaging, no
+6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
+   only) and a bulk PDF for the filtered view, one order per page, with an
+   emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
+7. Everything remains notes + financials + fulfillment only — no messaging, no
    customer portal, no payment processing.
 
 ## 7. Conventions

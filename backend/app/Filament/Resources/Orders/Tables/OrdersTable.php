@@ -3,14 +3,17 @@
 namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderSource;
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
 use App\Support\Money;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
@@ -81,6 +84,8 @@ class OrdersTable
             ->recordActions([
                 OrderResource::acceptAction(),
                 OrderResource::rejectAction(),
+                OrderResource::printInvoiceAction(),
+                OrderResource::downloadInvoiceAction(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])
@@ -116,6 +121,42 @@ class OrdersTable
 
                             fclose($out);
                         }, 'orders-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
+                    }),
+                Action::make('downloadInvoices')
+                    ->label('Download invoices (PDF)')
+                    ->icon(Heroicon::OutlinedDocumentArrowDown)
+                    ->action(function (HasTable $livewire) {
+                        // Same mechanism as exportCsv: honor whatever tab/filters/sort
+                        // is on screen — filter to Today's Deliveries, click, and one
+                        // PDF covers that whole batch, one order per A5 page.
+                        // Defensively keep only fulfillable orders: a bulk export is a
+                        // worse place to discover an edge case than a single-row action.
+                        $orders = $livewire->getFilteredSortedTableQuery()
+                            ->whereIn('status', array_filter(OrderStatus::cases(), fn (OrderStatus $status): bool => $status->isFulfillable()))
+                            ->with('items')
+                            ->get();
+
+                        if ($orders->isEmpty()) {
+                            Notification::make()
+                                ->warning()
+                                ->title('Nothing to invoice in this view')
+                                ->body('Invoices exist for pending, decanted and delivered orders only.')
+                                ->send();
+
+                            return null;
+                        }
+
+                        // Render before streaming — a dompdf failure surfaces as an
+                        // action error instead of a corrupt half-downloaded file.
+                        $pdf = Pdf::loadView('pdf.invoice', ['orders' => $orders])->setPaper('a5')->output();
+
+                        return response()->streamDownload(
+                            function () use ($pdf): void {
+                                echo $pdf;
+                            },
+                            'invoices-'.now()->format('Y-m-d').'.pdf',
+                            ['Content-Type' => 'application/pdf'],
+                        );
                     }),
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

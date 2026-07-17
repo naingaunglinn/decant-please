@@ -15,6 +15,8 @@ class EditOrder extends EditRecord
         return [
             OrderResource::acceptAction(),
             OrderResource::rejectAction(),
+            OrderResource::printInvoiceAction(),
+            OrderResource::downloadInvoiceAction(),
             DeleteAction::make(),
         ];
     }

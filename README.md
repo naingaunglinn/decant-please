@@ -51,6 +51,9 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Dashboard: monthly revenue, orders by status, decants due today, top fragrances
 - CSV export of orders, respecting the current tab/filters/sort
+- Printable A5 packing invoices (PDF) — print or download per order, or one batch PDF for
+  the filtered view (e.g. today's deliveries), with an emphasized balance-due figure and a
+  bundled Myanmar-script font so Burmese names/addresses render
 - "View on site" jump from any fragrance row to its public page
 
 ## Order lifecycle
@@ -231,14 +234,14 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 47 tests — domain, admin (Livewire), full API
+docker compose exec backend php artisan test   # 58 tests — domain, admin (Livewire), invoices, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 
 Or with local toolchains:
 
 ```bash
-cd backend && php artisan test   # 47 tests — domain, admin (Livewire), full API
+cd backend && php artisan test   # 58 tests — domain, admin (Livewire), invoices, full API
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 
