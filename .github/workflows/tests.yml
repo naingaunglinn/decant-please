@@ -4,13 +4,17 @@
 # and Heroku's "Wait for CI to pass before deploy" watches those statuses —
 # two named checks are better signal than one job with two steps.
 #
-# Runs on push to main (that's the status Heroku's deploy gate reads) and on
-# pull requests (so a broken PR is visible before merge, not at deploy time).
+# Runs on push to main (that's the status Heroku's deploy gate reads) and to
+# develop (the integration branch — testing it on every merge is the point of
+# having one), and on pull requests (so a broken PR is visible before merge,
+# not at deploy time). pull_request deliberately has no branches filter: it
+# already covers PRs into any base — main, develop, and the develop -> main
+# promotion PR alike.
 name: tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 jobs:

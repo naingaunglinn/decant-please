@@ -38,6 +38,7 @@ Full history in `00-CLAUDE.md` §0.
    | 13 | `13-production-heroku-cloudflare-setup.md` | Deploy backend to Heroku + Cloudflare R2 image storage | built |
    | 14 | `14-printable-order-invoices.md` | Admin print & download A5 order invoices (single + daily batch PDF) | built |
    | 16 | `16-cicd-heroku-github.md` | CI/CD — test-gated auto-deploy from GitHub to Heroku | built (CI); Heroku GitHub connect is a one-time dashboard step |
+   | 17 | `17-develop-main-branching.md` | `develop`/`main` branch split — feature PRs land on `develop`, production ships via a manual promotion PR | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

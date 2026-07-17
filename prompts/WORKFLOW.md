@@ -7,10 +7,13 @@ retired once 8/9/10 are done, it's the process going forward.
 **Ground rule: one prompt file, one issue, one branch, one PR. Never merged by Claude
 Code — every PR stops and waits for human review.**
 
+Feature work lives on `develop` (branch off it, PR into it). `main` is production —
+it changes only through the promotion PR described at the bottom of this file.
+
 ## Why order matters
 
-Branch every step off `main` **after** the previous step's PR is merged, not off
-whatever `main` happened to be when you started. Two concrete reasons, not just
+Branch every step off `develop` **after** the previous step's PR is merged, not off
+whatever `develop` happened to be when you started. Two concrete reasons, not just
 process for its own sake:
 - A language/i18n step needs to wrap every string that exists by the time it runs —
   if it branches before an earlier step's new UI strings are merged in, it misses
@@ -25,9 +28,9 @@ translate what 08 and 10 add, so it runs last.
 
 ## The loop — repeat once per prompt file
 
-1. **Confirm `main` is current.**
+1. **Confirm `develop` is current.**
    ```
-   git checkout main && git pull
+   git checkout develop && git pull
    ```
 
 2. **Create the issue.** Title = a concise, professional description of the work —
@@ -51,8 +54,8 @@ translate what 08 and 10 add, so it runs last.
    Note the issue number it returns — you need it for the branch name next, and
    again in steps 4 and 7.
 
-3. **Branch**, name starting with the issue number from step 2, off the `main` you
-   just pulled:
+3. **Branch**, name starting with the issue number from step 2, off the `develop`
+   you just pulled:
    ```
    git checkout -b 12-order-confirmation-and-polish
    ```
@@ -79,7 +82,7 @@ translate what 08 and 10 add, so it runs last.
 
 7. **Open the PR for this issue and branch:**
    ```
-   gh pr create --base main --title "Rebuild order confirmation as a real, printable receipt" --body "Closes #12
+   gh pr create --base develop --title "Rebuild order confirmation as a real, printable receipt" --body "Closes #12
 
    <short summary of what's in this PR, notable decisions, anything that needs a close look>"
    ```
@@ -90,6 +93,19 @@ translate what 08 and 10 add, so it runs last.
 9. Once the human has reviewed and merged: go back to step 1 for the next prompt
    file. If they instead asked for changes, address them on the same branch and push
    again — the PR updates in place, no new issue or branch needed for a review round.
+
+## Promoting `develop` to production (`main`)
+
+Separate from the loop above, and not automatic after every merge into `develop`.
+The decanter decides when `develop` is ready to ship, then:
+
+```
+gh pr create --base main --head develop --title "Promote develop to production" --body "<summary of what's shipping — the merged PRs since the last promotion>"
+```
+
+Same rule as every other PR in this project: **never merged by Claude Code.** If
+anything this one matters more, since it's what actually reaches production
+traffic once Heroku's auto-deploy picks it up.
 
 ## First run of this loop
 
