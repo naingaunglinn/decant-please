@@ -220,8 +220,11 @@ One-time dashboard setup (an OAuth flow tied to your accounts — not a CLI step
    whole requirement.
 
 Then prove the connection with the same tab's **manual deploy** button once — that also
-ships whatever `main` currently holds. From there, merging a PR *is* the deploy: tests
-run, Heroku sees green, the release phase re-runs migrations on its own.
+ships whatever `main` currently holds. From there, merging the `develop` → `main`
+**promotion PR** *is* the deploy: tests run, Heroku sees green, the release phase re-runs
+migrations on its own. Day-to-day feature PRs merge into `develop` and deploy nothing —
+`main` only moves when the decanter deliberately promotes (see `prompts/WORKFLOW.md`,
+"Promoting `develop` to production").
 
 `git push heroku main` still works and remains the break-glass fallback if GitHub or
 Actions is down — but it bypasses the CI gate, so it's no longer the routine path.
