@@ -52,9 +52,16 @@ export async function Footer() {
           )}
         </nav>
 
-        <p className="max-w-xs text-xs leading-relaxed text-muted">
-          No online payment — we confirm every order first, then arrange bank transfer,
-          mobile banking or cash on delivery.
+        <p>© {new Date().getFullYear()} Decant Please!
+          fully developed by{" "}
+          <Link
+            href="https://nightace-studio.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-colors hover:text-pine text-gray-800"
+          >
+            nightace-studio
+          </Link>
         </p>
       </div>
     </footer>
