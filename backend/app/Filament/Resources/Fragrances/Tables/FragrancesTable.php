@@ -33,7 +33,7 @@ class FragrancesTable
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
-                ->with('decantPrices')
+                ->with(['decantPrices', 'activeBottle'])
                 ->withMin(['decantPrices as min_in_stock_price' => fn (Builder $q) => $q->where('in_stock', true)], 'price_mmk'))
             ->columns([
                 ImageColumn::make('image_path')
@@ -61,6 +61,14 @@ class FragrancesTable
                     ->state(fn (Fragrance $record): string => $record->min_in_stock_price !== null
                         ? 'From '.Money::kyat((int) $record->min_in_stock_price)
                         : 'Out of stock'),
+                TextColumn::make('bottle_stock')
+                    ->label('Bottle')
+                    // "Not tracked yet" is deliberately visible, not blank — the gap
+                    // between tracked and untracked fragrances should be obvious here.
+                    ->state(fn (Fragrance $record): string => $record->activeBottle
+                        ? "{$record->activeBottle->remaining_ml} / {$record->activeBottle->total_ml} ml"
+                        : 'No bottle logged')
+                    ->color(fn (Fragrance $record): ?string => $record->activeBottle ? null : 'gray'),
                 TextColumn::make('sizes')
                     ->state(fn (Fragrance $record): string => $record->decantPrices
                         ->map(fn ($price) => "{$price->size_ml}ml")

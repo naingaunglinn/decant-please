@@ -24,6 +24,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use UnitEnum;
 
@@ -75,7 +76,20 @@ class OrderResource extends Resource
                     ->afterOrEqual('decant_date'),
             ])
             ->action(function (Order $record, array $data): void {
-                $record->accept(Carbon::parse($data['decant_date']), Carbon::parse($data['delivery_date']));
+                try {
+                    $record->accept(Carbon::parse($data['decant_date']), Carbon::parse($data['delivery_date']));
+                } catch (ValidationException $exception) {
+                    // The bottle-stock guard. Its message is keyed to 'items', which has
+                    // no field in this modal to render on — surface it as a notification.
+                    Notification::make()
+                        ->danger()
+                        ->title('Not enough left in the bottle')
+                        ->body(collect($exception->errors())->flatten()->implode(' '))
+                        ->persistent()
+                        ->send();
+
+                    return;
+                }
 
                 Notification::make()
                     ->success()

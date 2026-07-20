@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['brand_id', 'name', 'slug', 'concentration', 'gender', 'notes', 'vibes', 'performance', 'description', 'image_path', 'is_active', 'is_featured'])]
 class Fragrance extends Model
@@ -24,6 +25,36 @@ class Fragrance extends Model
     public function decantPrices(): HasMany
     {
         return $this->hasMany(DecantPrice::class)->orderBy('size_ml');
+    }
+
+    public function bottles(): HasMany
+    {
+        return $this->hasMany(Bottle::class);
+    }
+
+    /** The bottle currently being poured from — Bottle::logFor keeps this unique. */
+    public function activeBottle(): HasOne
+    {
+        return $this->hasOne(Bottle::class)->where('is_active', true);
+    }
+
+    /**
+     * Recompute every size's in_stock from what's physically left in the active
+     * bottle. A fragrance with *no* active bottle is left completely alone —
+     * "not tracked yet" is a different state from "0ml remaining", and the manual
+     * in_stock flags keep working exactly as they did before bottles existed.
+     */
+    public function syncStockFromBottle(): void
+    {
+        $bottle = $this->activeBottle()->first();
+
+        if (! $bottle) {
+            return;
+        }
+
+        $this->decantPrices()->get()->each(fn (DecantPrice $price) => $price->update([
+            'in_stock' => $bottle->remaining_ml >= $price->size_ml,
+        ]));
     }
 
     public function scopeActive(Builder $query): Builder

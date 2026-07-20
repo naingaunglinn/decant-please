@@ -127,10 +127,63 @@ class Order extends Model
             throw new LogicException('Only orders awaiting confirmation can be accepted.');
         }
 
-        $this->decant_date = $decantDate;
-        $this->delivery_date = $deliveryDate;
-        $this->status = OrderStatus::Pending;
-        $this->save();
+        DB::transaction(function () use ($decantDate, $deliveryDate) {
+            $this->pourFromBottles();
+
+            $this->decant_date = $decantDate;
+            $this->delivery_date = $deliveryDate;
+            $this->status = OrderStatus::Pending;
+            $this->save();
+        });
+    }
+
+    /**
+     * Deduct this order's volume from each fragrance's active bottle. All-or-nothing:
+     * every bottle is locked and checked before any is decremented, so failing on one
+     * item never leaves another half-applied. Fragrances with no active bottle are
+     * skipped — bottle tracking is opt-in per fragrance, and accepting an untracked
+     * one behaves exactly as it did before bottles existed. Must run inside accept()'s
+     * transaction (lockForUpdate needs one — same guard PromoCode::evaluate uses
+     * against double-spending a limited-use code).
+     */
+    protected function pourFromBottles(): void
+    {
+        // One order can hold several sizes of the same fragrance; they all pour
+        // from the same bottle, so sum the need per fragrance first.
+        $needs = $this->items()->get()
+            ->groupBy('fragrance_id')
+            ->map(fn ($items) => [
+                'ml' => $items->sum(fn (OrderItem $item) => $item->size_ml * $item->quantity),
+                'name' => $items->first()->fragrance_name_snapshot,
+            ]);
+
+        $pours = [];
+
+        foreach ($needs as $fragranceId => $need) {
+            $bottle = Bottle::query()
+                ->where('fragrance_id', $fragranceId)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $bottle) {
+                continue;
+            }
+
+            if ($bottle->remaining_ml < $need['ml']) {
+                throw ValidationException::withMessages([
+                    'items' => "Not enough {$need['name']} left: the open bottle has "
+                        ."{$bottle->remaining_ml}ml, this order needs {$need['ml']}ml.",
+                ]);
+            }
+
+            $pours[] = [$bottle, $need['ml']];
+        }
+
+        foreach ($pours as [$bottle, $ml]) {
+            $bottle->update(['remaining_ml' => $bottle->remaining_ml - $ml]);
+            $bottle->loadMissing('fragrance')->fragrance->syncStockFromBottle();
+        }
     }
 
     public function reject(string $reason): void
