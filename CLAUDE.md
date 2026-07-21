@@ -27,7 +27,11 @@
   flagged trade-off, not an oversight (see `18-decant-bottle-stock.md`).
 - Admin: a Bottles relation manager on the fragrance edit page ("Log new bottle"),
   and a "Bottle" column on the fragrance list ("42 / 100 ml", or "No bottle
-  logged" so the untracked gap is visible, not silent).
+  logged" so the untracked gap is visible, not silent). After review: logging
+  refuses a bottle smaller than the fragrance's smallest decant size, a spent
+  bottle is flagged "Fully decanted" / "Too little for any size" on both tables
+  (`Fragrance::hasSpentBottle()`), and the accept that drains a bottle warns the
+  decanter to log a new one. Pouring a bottle exactly dry is a valid accept.
 - Rollout is gradual by design: existing fragrances have no bottles and behave
   unchanged until the decanter logs each one's real current volume by hand.
 

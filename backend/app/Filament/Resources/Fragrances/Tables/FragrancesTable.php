@@ -68,7 +68,16 @@ class FragrancesTable
                     ->state(fn (Fragrance $record): string => $record->activeBottle
                         ? "{$record->activeBottle->remaining_ml} / {$record->activeBottle->total_ml} ml"
                         : 'No bottle logged')
-                    ->color(fn (Fragrance $record): ?string => $record->activeBottle ? null : 'gray'),
+                    ->description(fn (Fragrance $record): ?string => match (true) {
+                        ! $record->hasSpentBottle() => null,
+                        $record->activeBottle->remaining_ml === 0 => 'Fully decanted — log a new bottle',
+                        default => 'Too little for any size — log a new bottle',
+                    })
+                    ->color(fn (Fragrance $record): ?string => match (true) {
+                        ! $record->activeBottle => 'gray',
+                        $record->hasSpentBottle() => 'danger',
+                        default => null,
+                    }),
                 TextColumn::make('sizes')
                     ->state(fn (Fragrance $record): string => $record->decantPrices
                         ->map(fn ($price) => "{$price->size_ml}ml")

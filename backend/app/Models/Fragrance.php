@@ -57,6 +57,26 @@ class Fragrance extends Model
         ]));
     }
 
+    /**
+     * True once the active bottle can no longer fill even the smallest decant
+     * size this fragrance sells — "fully decanted" in the decanter's terms,
+     * even when a few unsellable ml remain. Untracked fragrances are never
+     * spent: no bottle means "not tracked yet", not "empty".
+     */
+    public function hasSpentBottle(): bool
+    {
+        $this->loadMissing(['activeBottle', 'decantPrices']);
+
+        if (! $this->activeBottle) {
+            return false;
+        }
+
+        $smallest = $this->decantPrices->min('size_ml');
+
+        return $this->activeBottle->remaining_ml === 0
+            || ($smallest !== null && $this->activeBottle->remaining_ml < $smallest);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

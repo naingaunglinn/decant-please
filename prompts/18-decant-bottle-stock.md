@@ -114,6 +114,22 @@ even though a single-admin panel makes a real race unlikely today.
   active bottle, and a clear "No bottle logged" state for one without, so the
   gap from §2 is visible to the admin, not silent.
 
+**(Amended after the decanter's review:)** three hardenings, all prompted by
+testing the first build against a deliberately-nonsense 3ml bottle:
+
+- "Log new bottle" refuses a volume smaller than the fragrance's smallest decant
+  size (dynamic `minValue`, message names the size) — a bottle that can't fill a
+  single decant would put every size out of stock the moment it's logged.
+- A *spent* bottle — `remaining_ml` of 0, or dregs smaller than the smallest
+  size (reachable only by pouring, never by logging now) — is flagged in danger
+  on both tables: "Fully decanted" / "Too little for any size — log a new
+  bottle". `Fragrance::hasSpentBottle()` owns the definition; a fragrance with
+  no bottle is never spent (§2's rule again).
+- The accept that drains a bottle fires a persistent warning notification
+  naming the fragrance and what's left, so the decanter hears about it at pour
+  time, not days later when every size reads out of stock. Pouring the bottle
+  *exactly* dry is a valid accept, not an error — only going over is refused.
+
 ## 5. Human step after this deploys — not automatable
 
 Every existing fragrance has no bottle at all. Someone has to walk the real
@@ -132,7 +148,9 @@ usable at all.
   Flagging as a trade-off, not an oversight.
 - **Low-stock alerts** (a dashboard widget or notification when a bottle drops
   below some threshold) — a natural complement to this, but a separate, smaller
-  step once this lands and the numbers are actually flowing.
+  step once this lands and the numbers are actually flowing. *(The empty case
+  is covered post-review: the accept that drains a bottle warns immediately.
+  A configurable threshold above "spent" remains future work.)*
 - **Cross-checking the Production Schedule page against bottle stock** (warning
   if today's scheduled decants exceed what's physically on hand) — valuable, but
   its own step; this one is scoped to making the number correct and automatic, not

@@ -247,6 +247,91 @@ class BottleStockTest extends TestCase
         );
     }
 
+    public function test_pouring_the_bottle_exactly_dry_is_allowed(): void
+    {
+        $fragrance = $this->fragrance();
+        Bottle::logFor($fragrance, 15, today()->toDateString());
+
+        // 5 + 10 = exactly the 15ml in the bottle — equal is a valid pour;
+        // only going *over* what's left is refused.
+        $this->checkoutOrder($fragrance, [[5, 1], [10, 1]])->accept(today()->addDay());
+
+        $this->assertSame(0, $fragrance->activeBottle()->first()->remaining_ml);
+        $this->assertTrue($fragrance->hasSpentBottle());
+        $this->assertSame(
+            [5 => false, 10 => false, 30 => false],
+            $fragrance->decantPrices()->pluck('in_stock', 'size_ml')->all()
+        );
+    }
+
+    public function test_the_accept_that_drains_the_bottle_warns_the_decanter(): void
+    {
+        $fragrance = $this->fragrance();
+        Bottle::logFor($fragrance, 12, today()->toDateString());
+        $order = $this->checkoutOrder($fragrance, [[10, 1]]);
+
+        Livewire::test(ListOrders::class)
+            ->callTableAction('accept', $order, data: [
+                'decant_date' => today()->addDay()->toDateString(),
+                'delivery_date' => today()->addDays(2)->toDateString(),
+            ])
+            // One assertNotified only: it pulls every queued notification from
+            // the session, so a second call would always find an empty stack.
+            // The success half of the pair is proven by the status flip below.
+            ->assertNotified('Bottle now fully decanted');
+
+        $this->assertSame(OrderStatus::Pending, $order->refresh()->status);
+        // 2ml of dregs count as spent — they can't fill even a 5ml decant.
+        $this->assertSame(2, $fragrance->activeBottle()->first()->remaining_ml);
+        $this->assertTrue($fragrance->hasSpentBottle());
+    }
+
+    public function test_a_bottle_smaller_than_the_smallest_decant_size_is_refused(): void
+    {
+        $fragrance = $this->fragrance(); // smallest size sold: 5ml
+
+        Livewire::test(BottlesRelationManager::class, [
+            'ownerRecord' => $fragrance,
+            'pageClass' => EditFragrance::class,
+        ])
+            ->callTableAction('logNewBottle', data: [
+                'total_ml' => 3,
+                'opened_at' => today()->toDateString(),
+            ])
+            ->assertHasTableActionErrors(['total_ml']);
+
+        $this->assertSame(0, Bottle::count(),
+            'A 3ml bottle cannot fill a single 5ml decant — it must not enter the system.');
+
+        // The boundary is the smallest size itself: exactly 5ml is a valid (tiny) bottle.
+        Livewire::test(BottlesRelationManager::class, [
+            'ownerRecord' => $fragrance,
+            'pageClass' => EditFragrance::class,
+        ])
+            ->callTableAction('logNewBottle', data: [
+                'total_ml' => 5,
+                'opened_at' => today()->toDateString(),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(
+            [5 => true, 10 => false, 30 => false],
+            $fragrance->decantPrices()->pluck('in_stock', 'size_ml')->all()
+        );
+    }
+
+    public function test_fragrances_table_flags_a_fully_decanted_bottle(): void
+    {
+        $fragrance = $this->fragrance();
+        Bottle::logFor($fragrance, 10, today()->toDateString());
+        $this->checkoutOrder($fragrance, [[10, 1]])->accept(today()->addDay());
+
+        Livewire::test(ListFragrances::class)
+            ->assertOk()
+            ->assertSee('0 / 10 ml')
+            ->assertSee('Fully decanted — log a new bottle');
+    }
+
     /** Chanel fragrance with the standard 5/10/30 sizes, all in stock. */
     private function fragrance(string $name = 'Allure Homme Sport'): Fragrance
     {

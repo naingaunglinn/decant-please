@@ -8,6 +8,7 @@ use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
+use App\Models\Fragrance;
 use App\Models\Order;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -95,8 +96,38 @@ class OrderResource extends Resource
                     ->success()
                     ->title('Order accepted — added to the decant schedule.')
                     ->send();
+
+                self::warnAboutSpentBottles($record);
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /**
+     * The accept that empties a bottle is the moment the decanter should hear
+     * about it — not days later when every size reads out of stock. Only a
+     * bottle this order just poured from can be newly spent: an already-spent
+     * bottle can't cover any item, so accept() would have refused above.
+     */
+    protected static function warnAboutSpentBottles(Order $record): void
+    {
+        $spent = Fragrance::query()
+            ->whereIn('id', $record->items()->pluck('fragrance_id'))
+            ->with(['activeBottle', 'decantPrices'])
+            ->get()
+            ->filter(fn (Fragrance $fragrance): bool => $fragrance->hasSpentBottle());
+
+        if ($spent->isEmpty()) {
+            return;
+        }
+
+        Notification::make()
+            ->warning()
+            ->title('Bottle now fully decanted')
+            ->body($spent->map(fn (Fragrance $fragrance): string => "{$fragrance->name}: "
+                ."{$fragrance->activeBottle->remaining_ml}ml left — not enough for any size. "
+                .'Log a new bottle to keep selling it.')->implode(' '))
+            ->persistent()
+            ->send();
     }
 
     /**
