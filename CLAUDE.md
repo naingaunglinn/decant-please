@@ -1,9 +1,41 @@
-# CLAUDE.md — Decant Please! (v7)
+# CLAUDE.md — Decant Please! (v8)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v7
+## 0. What changed in v8
+
+**v8** adds real-time decant stock tracked per physical bottle (Step 18), backend only:
+- New `bottles` table: `fragrance_id`, `total_ml`, `remaining_ml`, `opened_at`,
+  `is_active`. One active bottle per fragrance, enforced in application logic —
+  `Bottle::logFor()` is the only way a bottle enters the system; it deactivates the
+  previous active bottle and starts the new one full. Leftovers never carry over.
+- For a fragrance with an active bottle, `in_stock` is **computed, not manual**:
+  every `remaining_ml` change recomputes each size's flag
+  (`remaining_ml >= size_ml`) via `Fragrance::syncStockFromBottle()`. The form
+  toggle stays but is disabled once a bottle is tracked. A fragrance with **no**
+  bottle logged keeps the manual toggle working exactly as before — "not tracked
+  yet" is a different state from "0ml left", never conflate them.
+- `Order::accept()` now pours: per-fragrance need (summed across sizes) is checked
+  against every active bottle first — locked with `lockForUpdate`, all-or-nothing —
+  then decremented and resynced, inside one transaction. A shortfall raises a
+  specific message ("the open bottle has 15ml, this order needs 20ml") that the
+  accept modal surfaces as a danger notification. Untracked fragrances skip stock
+  handling entirely, so accepting them behaves exactly as pre-v8.
+- `accept()` is deliberately the **only** pour point: manual order entry (starts at
+  `pending`) and the edit form's raw status select never decrement — a known,
+  flagged trade-off, not an oversight (see `18-decant-bottle-stock.md`).
+- Admin: a Bottles relation manager on the fragrance edit page ("Log new bottle"),
+  and a "Bottle" column on the fragrance list ("42 / 100 ml", or "No bottle
+  logged" so the untracked gap is visible, not silent). After review: logging
+  refuses a bottle smaller than the fragrance's smallest decant size, a spent
+  bottle is flagged "Fully decanted" / "Too little for any size" on both tables
+  (`Fragrance::hasSpentBottle()`), and the accept that drains a bottle warns the
+  decanter to log a new one. Pouring a bottle exactly dry is a valid accept.
+- Rollout is gradual by design: existing fragrances have no bottles and behave
+  unchanged until the decanter logs each one's real current volume by hand.
+
+## 0.1 What changed in v7 (for reference)
 
 **v7** adds admin-side **printable A5 order invoices** (Step 14) and nothing else:
 - Two per-order actions (print inline in a new tab, download) plus a bulk
@@ -236,8 +268,17 @@ sparingly (never as a large fill except buttons and the vial-fill status track).
 - `gender`: `male` \| `female` \| `unisex`
 - `notes`, `vibes`, `performance`, `description`, `image`, `is_active`, `is_featured`
 
-### DecantPrice — unchanged from v1
+### DecantPrice — `in_stock` semantics changed in v8
 - `fragrance_id`, `size_ml` (5, 10, 30, or custom), `price_mmk`, `in_stock`
+- **v8:** `in_stock` is computed from the active bottle's `remaining_ml` whenever
+  the fragrance has one (manual toggle disabled); still manual when it doesn't.
+
+### Bottle — new in v8
+- `fragrance_id`, `total_ml`, `remaining_ml`, `opened_at`, `is_active`
+- One active bottle per fragrance (application-enforced). Created only via
+  `Bottle::logFor()`, which retires the previous active bottle and syncs stock.
+- `remaining_ml` drops by `size_ml × quantity` when an order is accepted — never
+  at checkout, never on manual entry.
 
 ### Order — **changed in v2**
 - `customer_name`, `phone`, `address`
@@ -310,7 +351,11 @@ client on checkout (see `05-api-layer.md`).
 6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
    only) and a bulk PDF for the filtered view, one order per page, with an
    emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
-7. Everything remains notes + financials + fulfillment only — no messaging, no
+7. **Bottle stock tracking (v8)** — log the physical bottle per fragrance; accepting
+   an order pours from it and recomputes each size's `in_stock` automatically.
+   Accept can now legitimately fail (clear message) when the bottle can't cover the
+   order. Fragrances without a logged bottle keep the manual toggle.
+8. Everything remains notes + financials + fulfillment only — no messaging, no
    customer portal, no payment processing.
 
 ## 7. Conventions

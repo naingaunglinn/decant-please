@@ -110,7 +110,15 @@ class FragranceForm
                                     ->required(),
                                 Toggle::make('in_stock')
                                     ->default(true)
-                                    ->inline(false),
+                                    ->inline(false)
+                                    // Once a bottle is logged, in_stock is computed from its
+                                    // remaining_ml — a manual flip here would just be silently
+                                    // overwritten on the next pour, so lock the toggle instead.
+                                    // Untracked fragrances keep the manual toggle as before.
+                                    ->disabled(fn ($livewire): bool => $livewire->getRecord()?->activeBottle()->exists() ?? false)
+                                    ->helperText(fn ($livewire): ?string => ($livewire->getRecord()?->activeBottle()->exists() ?? false)
+                                        ? 'Managed automatically from the active bottle.'
+                                        : null),
                             ]),
                     ]),
             ]);

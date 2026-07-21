@@ -1,0 +1,32 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * The physical bottles decants are poured from. One active bottle per
+     * fragrance at a time — enforced in application logic (Bottle::logFor
+     * deactivates the previous one), not a DB constraint: a partial unique
+     * index would be Postgres-specific syntax for marginal benefit here.
+     */
+    public function up(): void
+    {
+        Schema::create('bottles', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('fragrance_id')->constrained()->cascadeOnDelete();
+            $table->unsignedInteger('total_ml');
+            $table->unsignedInteger('remaining_ml');
+            $table->date('opened_at');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('bottles');
+    }
+};

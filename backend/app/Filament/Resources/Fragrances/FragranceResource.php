@@ -82,7 +82,7 @@ class FragranceResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\BottlesRelationManager::class,
         ];
     }
 
