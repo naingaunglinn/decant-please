@@ -1,7 +1,47 @@
-# CLAUDE.md — Decant Please! (v7)
+# CLAUDE.md — Decant Please! (v8)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
+
+## 0. What changed in v8
+
+**v8** adds admin-side **decant stock tracking by total millilitres**, and nothing
+else. This is a deliberate, *scoped* reversal of one §8 exclusion — bottle-volume
+inventory — chosen after weighing it against the simplicity the tool is built on:
+
+- **Total ml, not per-bottle.** Each fragrance gets a single running `stock_ml` on
+  the `fragrances` table (plus `low_stock_threshold_ml`). Same-fragrance juice is
+  fungible for decanting, so one total is stock-accurate; a `bottles` table would
+  add rows and UX for information the decanter doesn't need to act on. ("Add bottle"
+  in the form is just a `+ml` convenience on the total, not a stored entity.)
+- **Opt-in per fragrance.** `stock_ml` is nullable and null on every existing row.
+  Null means "not tracked" — such fragrances are skipped by the drawdown and never
+  appear in the low-stock panel, so nothing in the seeded/real catalog changes
+  behaviour the moment this lands.
+- **Warn-only, never blocking.** The drawdown clamps at 0 and surfaces a shortfall on
+  a new **Low stock** dashboard widget (and a Stock column on the fragrance table);
+  it does **not** flip the customer-facing `in_stock` toggles, which stay manual. A
+  decant that exceeds stock still goes through — the decanter reorders, they don't
+  get blocked mid-fulfilment.
+- **Drawn down at `→ decanted`, not at accept.** Stock drops when the vials are
+  physically filled (the Order status transition into `Decanted`), matching the
+  real act, via an `updated` model event → `Order::drawDownDecantStock()` →
+  `Fragrance::drawDownStock()`. Logic lives in the domain layer, not Filament or the
+  client, so a future Flutter admin reuses it (the v5 constraint).
+- Known accepted limits: a manual order *created* directly at `decanted`/`delivered`
+  isn't drawn down (real manual orders start `pending`); and moving an order out of
+  and back into `decanted` pours twice (a rare admin correction, left un-guarded to
+  avoid a "already decremented" flag). Both are fine for a single-decanter tool.
+
+There is a separate, fuller **per-bottle** implementation on branch
+`40-decant-bottle-stock` (its own `bottles` table, auto-`in_stock`, drawdown at
+accept-time). v8 deliberately did **not** use it — it reverses the three choices
+above. If per-bottle tracking, batch identity, or cost/margin ever become real needs,
+that branch is the reference, not this.
+
+Files new/changed in v8: this section and §6/§8 below; migration
+`…add_stock_to_fragrances_table`; `Fragrance` + `Order` models; `FragranceForm`,
+`FragrancesTable`, and a new `LowStock` widget; `DecantStockTest`.
 
 ## 0. What changed in v7
 
@@ -306,7 +346,10 @@ client on checkout (see `05-api-layer.md`).
    quantity, aggregated across all non-cancelled/non-rejected orders due that day.
    This is the "automatically generate a schedule" requirement from the brief.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
-   count, decants due today, top fragrances.
+   count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
+   **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —
+   drawn down when an order is decanted, surfaced on the fragrance table + low-stock
+   widget, never touching the manual `in_stock` toggle. See §0.
 6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
    only) and a bulk PDF for the filtered view, one order per page, with an
    emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
@@ -357,7 +400,11 @@ client on checkout (see `05-api-layer.md`).
 - Customer accounts / login on the customer side
 - Chat/messaging features
 - Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)
-- Inventory tracking of bottle volumes (only the `in_stock` flag)
+- Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
+  stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
+  reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
+  cost/margin accounting. The customer-facing `in_stock` flag stays manual — v8's
+  stock warns, it never flips it.
 - Email notifications (nothing in the brief asks for them; tracking is code + phone
   only). Flag it if you want order-confirmation emails or SMS later — that's a
   clean addition on top of this schema, not a redesign of it.
