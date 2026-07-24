@@ -1,9 +1,44 @@
-# CLAUDE.md — Decant Please! (v7)
+# CLAUDE.md — Decant Please! (v9)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v7
+## 0. What changed in v9
+
+**v9** adds admin-side **bulk catalog CSV import** (Step 19) and nothing else.
+(v8 is the total-ml decant stock feature, developed on its own branch — the two
+are numbered around each other so either can merge first.)
+
+- **Why:** onboarding. A decanter switching from DMs has 100–300 fragrances;
+  hand-entering them one Filament form at a time is the wall between "interested"
+  and "live". The CSV is the price list they already keep.
+- **Shape:** one row per fragrance; `brand`, `brand_type`, `name`,
+  `concentration`, `gender`, the four text fields, and any number of
+  `price_{N}ml` columns (any N — a blank cell means that size isn't offered).
+  Enum cells match case-insensitively; prices tolerate `30,000` digit grouping;
+  UTF-8 Burmese text and Excel's BOM both survive.
+- **Idempotent by default:** brands match by name (case-insensitive, `whereLike`
+  per the v6 Postgres rule, wildcards escaped) or are created; fragrances match
+  by (brand, name) and existing ones are **skipped**, so re-uploading a fixed
+  file never duplicates what already landed. An opt-in **update mode** overwrites
+  fields from non-blank cells only (a blank cell can't erase hand-written text)
+  and upserts prices per size — it never deletes a size.
+- **Failure model:** each row commits in its own transaction and fails alone
+  with a specific reason; the failed rows come back as a **failures CSV** —
+  original columns plus an `error` column (unknown headers are ignored on
+  import, so the fixed file re-uploads as-is). A structurally unusable file
+  (missing required columns, no `price_*` column) is rejected whole.
+- **Deliberately NOT Filament's `ImportAction`:** that drags in queue/notification
+  infrastructure tables and a per-model importer that fights this three-model row
+  (brand + fragrance + N prices). The repo's own idiom is custom CSV actions
+  (`exportCsv`); import follows it — `App\Support\CatalogImport` (a plain,
+  synchronous, testable service) + two toolbar actions on Fragrances:
+  **Import CSV** and **CSV template** (the template ships a Burmese sample row
+  and is pinned by a test that imports it).
+- **Images are out of scope** — a CSV can't carry them; they're uploaded per
+  fragrance afterwards, exactly as today.
+
+## 0.1 What changed in v7 (for reference)
 
 **v7** adds admin-side **printable A5 order invoices** (Step 14) and nothing else:
 - Two per-order actions (print inline in a new tab, download) plus a bulk
