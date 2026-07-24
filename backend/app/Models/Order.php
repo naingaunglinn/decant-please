@@ -31,6 +31,19 @@ class Order extends Model
         static::creating(function (self $order) {
             $order->tracking_code ??= self::generateTrackingCode();
         });
+
+        // Stock is drawn down when the vials are physically filled — i.e. the
+        // moment the order becomes Decanted, not when it's accepted. Warn-only:
+        // this never blocks the transition (a shortfall just clamps to 0 and
+        // shows on the low-stock panel), and it leaves the manual in_stock
+        // toggle alone. wasChanged() means it fires once, on the actual
+        // transition into Decanted — a plain re-save of an already-decanted
+        // order won't pour twice.
+        static::updated(function (self $order) {
+            if ($order->wasChanged('status') && $order->status === OrderStatus::Decanted) {
+                $order->drawDownDecantStock();
+            }
+        });
     }
 
     public function items(): HasMany
@@ -156,6 +169,35 @@ class Order extends Model
 
         $this->status = OrderStatus::Cancelled;
         $this->save();
+    }
+
+    /**
+     * Pour every item's volume off its fragrance's running stock total, once
+     * per fragrance (a 5ml + a 10ml of the same juice draws 15ml in one write).
+     * Untracked fragrances are skipped inside Fragrance::drawDownStock. Called
+     * from the → Decanted transition in booted().
+     */
+    protected function drawDownDecantStock(): void
+    {
+        $this->loadMissing('items');
+
+        $mlByFragrance = [];
+        foreach ($this->items as $item) {
+            if ($item->fragrance_id === null) {
+                continue;
+            }
+
+            $mlByFragrance[$item->fragrance_id] = ($mlByFragrance[$item->fragrance_id] ?? 0)
+                + $item->size_ml * $item->quantity;
+        }
+
+        if ($mlByFragrance === []) {
+            return;
+        }
+
+        Fragrance::whereIn('id', array_keys($mlByFragrance))
+            ->get()
+            ->each(fn (Fragrance $fragrance) => $fragrance->drawDownStock($mlByFragrance[$fragrance->id]));
     }
 
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */

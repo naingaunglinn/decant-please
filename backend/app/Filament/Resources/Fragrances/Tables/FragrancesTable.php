@@ -69,6 +69,21 @@ class FragrancesTable
                     ->state(fn (Fragrance $record): string => $record->decantPrices
                         ->map(fn ($price) => "{$price->size_ml}ml")
                         ->implode(' · ')),
+                TextColumn::make('stock_ml')
+                    ->label('Stock')
+                    ->badge()
+                    ->state(fn (Fragrance $record): string => $record->isStockTracked()
+                        ? "{$record->stock_ml}ml"
+                        : '—')
+                    ->color(fn (Fragrance $record): string => match (true) {
+                        ! $record->isStockTracked() => 'gray',
+                        $record->isLowStock() => 'danger',
+                        default => 'success',
+                    })
+                    ->tooltip(fn (Fragrance $record): ?string => $record->isLowStock()
+                        ? "Low — reorder at {$record->low_stock_threshold_ml}ml"
+                        : null)
+                    ->sortable(),
                 ToggleColumn::make('is_active'),
                 IconColumn::make('is_featured')
                     ->label('Featured')
