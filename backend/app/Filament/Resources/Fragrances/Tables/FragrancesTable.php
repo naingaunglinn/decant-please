@@ -7,6 +7,7 @@ use App\Enums\Concentration;
 use App\Enums\Gender;
 use App\Filament\Resources\Fragrances\FragranceResource;
 use App\Models\Fragrance;
+use App\Support\CatalogImport;
 use App\Support\Money;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -14,8 +15,11 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ReplicateAction;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use InvalidArgumentException;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -127,6 +131,76 @@ class FragrancesTable
                 FragranceResource::safeDeleteAction(),
             ])
             ->toolbarActions([
+                Action::make('importCsv')
+                    ->label('Import CSV')
+                    ->icon(Heroicon::OutlinedArrowUpTray)
+                    ->modalHeading('Import fragrances from CSV')
+                    ->modalDescription('One row per fragrance; price_5ml / price_10ml / price_30ml columns for the sizes (blank = not offered). Rows that already exist are skipped, so re-uploading is always safe. Images are added per fragrance afterwards.')
+                    ->schema([
+                        FileUpload::make('file')
+                            ->label('Price-list CSV')
+                            ->acceptedFileTypes(['text/csv', 'text/plain', 'application/vnd.ms-excel'])
+                            ->storeFiles(false)
+                            ->required(),
+                        Toggle::make('update_existing')
+                            ->label('Update existing fragrances')
+                            ->helperText('Off: rows matching an existing fragrance are skipped. On: their fields and prices are updated from the file (blank cells keep current values; sizes are never deleted).'),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $import = CatalogImport::run($data['file']->get(), (bool) ($data['update_existing'] ?? false));
+                        } catch (InvalidArgumentException $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Nothing imported')
+                                ->body($e->getMessage())
+                                ->send();
+
+                            return null;
+                        }
+
+                        $summary = collect([
+                            "{$import->created} created",
+                            $import->updated ? "{$import->updated} updated" : null,
+                            $import->skipped ? "{$import->skipped} skipped (already exist)" : null,
+                            $import->failures ? count($import->failures).' failed' : null,
+                        ])->filter()->implode(', ');
+
+                        if ($import->failures === []) {
+                            Notification::make()->success()->title('Import finished')->body($summary)->send();
+
+                            return null;
+                        }
+
+                        // The failed rows come back as a CSV to fix and re-upload —
+                        // safe, because everything that landed is skipped next time.
+                        Notification::make()
+                            ->warning()
+                            ->title('Import finished — some rows failed')
+                            ->body("{$summary}. The failed rows are downloading now; fix the error column and re-upload.")
+                            ->persistent()
+                            ->send();
+
+                        $failures = $import->failuresCsv();
+
+                        return response()->streamDownload(
+                            function () use ($failures): void {
+                                echo $failures;
+                            },
+                            'catalog-import-failures.csv',
+                            ['Content-Type' => 'text/csv'],
+                        );
+                    }),
+                Action::make('downloadCsvTemplate')
+                    ->label('CSV template')
+                    ->icon(Heroicon::OutlinedArrowDownTray)
+                    ->action(fn () => response()->streamDownload(
+                        function (): void {
+                            echo CatalogImport::template();
+                        },
+                        'catalog-template.csv',
+                        ['Content-Type' => 'text/csv'],
+                    )),
                 BulkActionGroup::make([
                     BulkAction::make('activate')
                         ->icon(Heroicon::OutlinedEye)
