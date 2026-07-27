@@ -31,9 +31,12 @@ It just makes that flow legible inside the system instead of scattered across DM
   **Unpaid orders** dashboard stat with the outstanding total, and Payment + Balance-due
   columns in the CSV export. The tracking receipt gained `payment_status` and
   `balance_due_mmk`.
-- **This step is backend only.** The customer-facing checkout instructions + upload
-  widget (Next.js) are a clean follow-on that consumes `/meta` and the upload endpoint —
-  logic lives in the Laravel API per the v5 rule, so a future Flutter client reuses it.
+- **Storefront (Part B, included).** The receipt (order-complete + tracking) gained a
+  `PaymentPanel`: it shows the balance and the configured transfer details from `/meta`,
+  takes the customer's screenshot via the upload endpoint, and reflects paid/unpaid —
+  live view only, never printed (a printed receipt keeps just a one-line payment state).
+  All rules stay in the Laravel API (v5 rule); the storefront only renders — so a future
+  Flutter client reuses the same endpoints.
 
 ## 0.1 What changed in v8
 

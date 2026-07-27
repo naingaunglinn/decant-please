@@ -69,8 +69,13 @@ upload happy path stays unpaid, wrong code+phone → 404, non-image rejected, re
 replaces file, receipt reports status + balance); admin (mark paid/unpaid, payment
 filter, unpaid dashboard stat). Cross-checked on live Postgres (enum + scope round-trip).
 
-## 7. Follow-on (not this step)
+## 7. Storefront (Part B — included)
 
-Customer-facing Next.js: show the `/meta` payment details at checkout / on the receipt,
-and an upload widget that POSTs to `/orders/payment-proof`. All logic already lives in
-the API.
+`PaymentPanel` (`components/checkout/PaymentPanel.tsx`) renders on the receipt
+(order-complete + tracking, via `OrderReceipt`): payment-status pill, balance due, the
+`/meta` transfer details (KBZPay/Wave numbers + QR + instructions, each hidden if
+unset), and a screenshot uploader posting to `/orders/payment-proof` (`uploadPaymentProof`
+in `lib/api.ts`, multipart). A successful upload swaps the receipt to the returned state
+in place; uploading never marks paid. The panel is live-view only — the printed receipt
+keeps just a one-line payment state in the summary. Types extended: `CatalogMeta.payment`,
+`PaymentInfo`, and the payment fields on `OrderStatusResponse`.

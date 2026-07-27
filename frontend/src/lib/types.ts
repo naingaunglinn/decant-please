@@ -47,6 +47,17 @@ export interface Paginated<T> {
   meta: PaginationMeta;
 }
 
+/** Static offline-transfer details the decanter configures — any field may be
+ *  absent, and the whole object is null when nothing is set. Not a gateway. */
+export interface PaymentInfo {
+  kbzpay_name?: string;
+  kbzpay_number?: string;
+  wave_name?: string;
+  wave_number?: string;
+  qr_url?: string;
+  instructions?: string;
+}
+
 export interface CatalogMeta {
   brand_types: { value: string; label: string }[];
   genders: { value: string; label: string }[];
@@ -55,6 +66,7 @@ export interface CatalogMeta {
   price: { min: number | null; max: number | null };
   sorts: string[];
   social: { tiktok_url: string | null; facebook_url: string | null };
+  payment: PaymentInfo | null;
 }
 
 export interface FragranceFilters {
@@ -112,6 +124,8 @@ export type OrderStatus =
   | "cancelled"
   | "rejected";
 
+export type PaymentStatus = "unpaid" | "paid";
+
 export interface OrderStatusResponse {
   tracking_code: string;
   order_number: string;
@@ -138,6 +152,11 @@ export interface OrderStatusResponse {
   deposit_mmk: number;
   total_mmk: number;
   total_formatted: string;
+  balance_due_mmk: number;
+  payment_status: PaymentStatus;
+  payment_status_label: string;
+  has_payment_proof: boolean;
+  paid_at: string | null;
 }
 
 /** A cart line as stored client-side. Prices here are previews only —
