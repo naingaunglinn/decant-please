@@ -1,9 +1,35 @@
-# CLAUDE.md — Decant Please! (v8)
+# CLAUDE.md — Decant Please! (v11)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v8
+## 0. What changed in v11
+
+**v11** adds **Telegram order alerts to the decanter** (Step 21) — the first
+notification channel, admin-side only. (v9 = catalog CSV import, v10 = payment
+confirmation; sibling feature branches, all landing on `develop`.)
+
+- **Admin only, by design.** A website checkout pushes a Telegram message to the
+  decanter's phone. Customer-facing alerts are deliberately out of scope: a bot can
+  only message a chat that pressed Start on it, so cold-messaging a customer by phone
+  is impossible — that would need SMS (paid) or a per-customer opt-in. The admin is
+  one person who presses Start once, so it's free and automatic. The tracking page
+  remains the customer's channel.
+- **An event layer, not hardcoded calls.** Checkout dispatches an `OrderPlaced`
+  event; a `NotifyAdminOfNewOrder` listener turns it into a message via a
+  `TelegramNotifier` service. Adding SMS/Viber later = another listener on the same
+  event, no checkout changes. Dispatched only on the website checkout path (manual
+  admin orders don't self-notify); the honeypot path never dispatches.
+- **Dependency-free.** One `Http::post` to the Bot API — no composer package on the
+  Heroku buildpack. Config is `services.telegram` (`TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_ADMIN_CHAT_ID`); both blank = feature off (no-op).
+- **Never breaks checkout.** `TelegramNotifier` is bounded (5s timeout) and swallows
+  every error to a log — a slow or failing Telegram can't delay or fail a customer's
+  order. Runs synchronously (queue is `sync`); a queue worker would make it truly
+  async later. `php artisan telegram:test` verifies a shop's bot setup during
+  onboarding.
+
+## 0.1 What changed in v8
 
 **v8** adds admin-side **decant stock tracking by total millilitres**, and nothing
 else. This is a deliberate, *scoped* reversal of one §8 exclusion — bottle-volume

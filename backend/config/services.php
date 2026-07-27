@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // Order alerts to the decanter's own Telegram. Both blank = alerts off (no-op).
+    // The chat id is the decanter's — the bot can only message someone who has
+    // pressed Start on it first (Telegram's anti-spam rule); see prompts/21.
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
+    ],
+
 ];
