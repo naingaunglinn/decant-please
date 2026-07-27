@@ -4,11 +4,13 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Models\DecantPrice;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Support\Money;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -168,6 +170,29 @@ class OrderForm
                             ->rows(2)
                             ->columnSpanFull(),
                     ]),
+                self::paymentSection(),
+            ]);
+    }
+
+    protected static function paymentSection(): Section
+    {
+        return Section::make('Payment')
+            ->description('Payment is offline — KBZPay/Wave/bank transfer. Confirm here once it lands; this is separate from the deposit figure above.')
+            ->columnSpanFull()
+            ->columns(2)
+            ->schema([
+                Select::make('payment_status')
+                    ->options(PaymentStatus::class)
+                    ->default(PaymentStatus::Unpaid->value)
+                    ->required()
+                    ->helperText('Setting this to Paid stamps the confirmation time automatically.'),
+                FileUpload::make('payment_proof_path')
+                    ->label('Payment proof')
+                    ->image()
+                    ->disk(config('filesystems.media_disk'))
+                    ->directory('payment-proofs')
+                    ->maxSize(4096)
+                    ->helperText("The customer's transfer screenshot — sent by them at checkout, or attach one they DMed you."),
             ]);
     }
 

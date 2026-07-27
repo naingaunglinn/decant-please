@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
 use App\Support\Money;
@@ -64,6 +65,9 @@ class OrdersTable
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge(),
+                TextColumn::make('payment_status')
+                    ->label('Payment')
+                    ->badge(),
                 TextColumn::make('total_mmk')
                     ->label('Total')
                     ->formatStateUsing(fn (int $state): string => Money::kyat($state))
@@ -80,10 +84,15 @@ class OrdersTable
                 SelectFilter::make('order_from')
                     ->label('Source')
                     ->options(OrderSource::class),
+                SelectFilter::make('payment_status')
+                    ->label('Payment')
+                    ->options(PaymentStatus::class),
             ])
             ->recordActions([
                 OrderResource::acceptAction(),
                 OrderResource::rejectAction(),
+                OrderResource::markPaidAction(),
+                OrderResource::markUnpaidAction(),
                 OrderResource::printInvoiceAction(),
                 OrderResource::downloadInvoiceAction(),
                 EditAction::make(),
@@ -101,7 +110,7 @@ class OrdersTable
 
                         return response()->streamDownload(function () use ($orders): void {
                             $out = fopen('php://output', 'w');
-                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', 'Decant date', 'Delivery date', 'Status', 'Total (Ks)']);
+                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', 'Decant date', 'Delivery date', 'Status', 'Payment', 'Total (Ks)', 'Balance due (Ks)']);
 
                             foreach ($orders as $order) {
                                 fputcsv($out, [
@@ -115,7 +124,9 @@ class OrdersTable
                                     $order->decant_date?->format('Y-m-d'),
                                     $order->delivery_date?->format('Y-m-d'),
                                     $order->status->label(),
+                                    $order->payment_status->label(),
                                     $order->total_mmk,
+                                    $order->balanceDue(),
                                 ]);
                             }
 
