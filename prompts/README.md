@@ -41,6 +41,7 @@ Full history in `00-CLAUDE.md` §0.
    | 17 | `17-develop-main-branching.md` | `develop`/`main` branch split — feature PRs land on `develop`, production ships via a manual promotion PR | built |
    | 19 | `19-catalog-csv-import.md` | Bulk catalog onboarding — price-list CSV import + template on the Fragrances page | built |
    | 20 | `20-payment-proof.md` | Payment confirmation — paid/unpaid status, transfer-screenshot upload, configurable KBZPay/Wave details (backend + storefront) | built |
+   | 21 | `21-telegram-order-alerts.md` | Telegram alert to the decanter on each website order (event layer, admin-only, free) | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`
