@@ -4,17 +4,20 @@ namespace App\Models;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'paid_at', 'payment_proof_path'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -43,6 +46,22 @@ class Order extends Model
             if ($order->wasChanged('status') && $order->status === OrderStatus::Decanted) {
                 $order->drawDownDecantStock();
             }
+        });
+
+        // Keep paid_at consistent with payment_status however it's changed — the
+        // admin form's status select, the Mark paid/unpaid actions, or code. Paid
+        // stamps the time (preserving an existing one); Unpaid clears it.
+        static::saving(function (self $order) {
+            if ($order->isDirty('payment_status')) {
+                $order->paid_at = $order->payment_status === PaymentStatus::Paid
+                    ? ($order->paid_at ?? now())
+                    : null;
+            }
+        });
+
+        // Don't orphan the payment-proof screenshot when an order is deleted.
+        static::deleting(function (self $order) {
+            $order->deletePaymentProofFile();
         });
     }
 
@@ -200,6 +219,52 @@ class Order extends Model
             ->each(fn (Fragrance $fragrance) => $fragrance->drawDownStock($mlByFragrance[$fragrance->id]));
     }
 
+    /**
+     * The decanter confirms an offline transfer landed. Payment is manual and
+     * out-of-band (KBZPay/Wave/bank); this only records the confirmation.
+     */
+    public function markPaid(): void
+    {
+        $this->payment_status = PaymentStatus::Paid;
+        $this->paid_at = now();
+        $this->save();
+    }
+
+    /** Undo a confirmation — a mistaken "paid", or a bounced transfer. */
+    public function markUnpaid(): void
+    {
+        $this->payment_status = PaymentStatus::Unpaid;
+        $this->paid_at = null;
+        $this->save();
+    }
+
+    /** Store the customer's transfer screenshot; does NOT mark paid — the
+     *  decanter still eyeballs it and confirms. */
+    public function attachPaymentProof(string $path): void
+    {
+        $this->payment_proof_path = $path;
+        $this->save();
+    }
+
+    /** Remove the stored screenshot file (on replace, or when the order is deleted). */
+    public function deletePaymentProofFile(): void
+    {
+        if ($this->payment_proof_path) {
+            Storage::disk(config('filesystems.media_disk'))->delete($this->payment_proof_path);
+        }
+    }
+
+    public function scopeUnpaid(Builder $query): Builder
+    {
+        return $query->where('payment_status', PaymentStatus::Unpaid);
+    }
+
+    /** Money still owed after any partial deposit — the figure the receipt emphasises. */
+    public function balanceDue(): int
+    {
+        return max(0, $this->total_mmk - $this->deposit_mmk);
+    }
+
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */
     public static function findByTracking(string $code, string $phone): ?self
     {
@@ -255,8 +320,10 @@ class Order extends Model
         return [
             'order_from' => OrderSource::class,
             'status' => OrderStatus::class,
+            'payment_status' => PaymentStatus::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
+            'paid_at' => 'datetime',
             'deposit_mmk' => 'integer',
             'delivery_fee_mmk' => 'integer',
             'discount_mmk' => 'integer',

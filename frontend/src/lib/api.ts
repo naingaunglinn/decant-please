@@ -118,6 +118,37 @@ export async function trackOrder(
   return response.json();
 }
 
+/** Uploads the customer's transfer screenshot. Multipart, so Content-Type is left
+ *  to the browser (it sets the boundary). Same generic-404 contract as trackOrder;
+ *  a 422 (wrong file type/size) throws ApiValidationError. Does NOT mark the order
+ *  paid — the decanter confirms that separately. */
+export async function uploadPaymentProof(
+  trackingCode: string,
+  phone: string,
+  file: File,
+): Promise<OrderStatusResponse | null> {
+  const form = new FormData();
+  form.append("tracking_code", trackingCode);
+  form.append("phone", phone);
+  form.append("proof", file);
+
+  const response = await fetch(`${BASE}/orders/payment-proof`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body: form,
+    cache: "no-store",
+  });
+
+  if (response.status === 404) return null;
+  if (response.status === 422) {
+    const body = await response.json();
+    throw new ApiValidationError(body.message ?? "Validation failed.", body.errors ?? {});
+  }
+  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+
+  return response.json();
+}
+
 /** Thrown when a cancel arrives too late — the order is already being prepared. */
 export class ApiConflictError extends Error {
   constructor(message: string) {

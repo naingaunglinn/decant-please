@@ -41,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(10)->by('checkout|'.$request->ip()));
         RateLimiter::for('tracking', fn (Request $request) => Limit::perMinute(20)->by('tracking|'.$request->ip()));
         RateLimiter::for('cancel', fn (Request $request) => Limit::perMinute(10)->by('cancel|'.$request->ip()));
+        RateLimiter::for('payment-proof', fn (Request $request) => Limit::perMinute(10)->by('payment-proof|'.$request->ip()));
         RateLimiter::for('promo', fn (Request $request) => Limit::perMinute(10)->by('promo|'.$request->ip()));
 
         // Order alerts. Registered explicitly rather than relying on listener

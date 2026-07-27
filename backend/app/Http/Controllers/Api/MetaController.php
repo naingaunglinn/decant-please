@@ -41,6 +41,7 @@ class MetaController extends Controller
                     'tiktok_url' => config('app.social.tiktok') ?: null,
                     'facebook_url' => config('app.social.facebook') ?: null,
                 ],
+                'payment' => self::payment(),
             ];
         }));
     }
@@ -52,5 +53,26 @@ class MetaController extends Controller
     protected function options(array $cases): array
     {
         return array_map(fn ($case) => ['value' => $case->value, 'label' => $case->label()], $cases);
+    }
+
+    /**
+     * Offline payment details for the checkout / receipt. Only configured fields
+     * are exposed; the whole block is null when nothing is set, so the storefront
+     * can hide payment instructions entirely for a decanter who hasn't added any.
+     *
+     * @return array<string, string>|null
+     */
+    protected static function payment(): ?array
+    {
+        $fields = array_filter([
+            'kbzpay_name' => config('app.payment.kbzpay_name'),
+            'kbzpay_number' => config('app.payment.kbzpay_number'),
+            'wave_name' => config('app.payment.wave_name'),
+            'wave_number' => config('app.payment.wave_number'),
+            'qr_url' => config('app.payment.qr_url'),
+            'instructions' => config('app.payment.instructions'),
+        ], fn ($value) => filled($value));
+
+        return $fields === [] ? null : $fields;
     }
 }
