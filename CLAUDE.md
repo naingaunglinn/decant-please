@@ -1,9 +1,43 @@
-# CLAUDE.md — Decant Please! (v9)
+# CLAUDE.md — Decant Please! (v10)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v9
+## 0. What changed in v10
+
+**v10** adds **payment confirmation + proof** (Step 20). Payment is still the manual,
+offline Myanmar flow — this is emphatically **not** a payment gateway (§8 still holds).
+It just makes that flow legible inside the system instead of scattered across DMs.
+(v9 is the catalog CSV import, a sibling feature branch; both land on `develop`.)
+
+- **Paid/unpaid on every order.** A `payment_status` (unpaid → paid) + `paid_at` on
+  `orders`, defaulting unpaid (so existing orders read accurately — none were tracked
+  before). A model `saving` hook keeps `paid_at` in sync however the status changes —
+  the admin form's select, the Mark paid/unpaid actions, or the API. This is separate
+  from the pre-existing `deposit_mmk` (a partial-amount figure); payment_status is the
+  yes/no the decanter actually reconciles, and `balanceDue()` = total − deposit.
+- **Static payment details, config-driven.** KBZPay/Wave name+number, an optional QR
+  URL, and free-text instructions live in `.env` (an `app.payment` block, mirroring
+  `app.social`) and surface through `/api/v1/meta` — only non-blank fields, the whole
+  block null if none set. A *static* number to transfer to, no merchant account.
+- **Customer proof upload.** `POST /api/v1/orders/payment-proof` takes the transfer
+  screenshot, gated by the same exact `tracking_code` + `phone` pair as tracking/cancel
+  (same generic 404 on mismatch — no guessing oracle) and its own throttle bucket.
+  Uploading does **not** mark paid — the decanter still eyeballs it and confirms. Files
+  live on the media disk (`payment-proofs/`, public locally / R2 in prod), replaced on
+  re-upload and deleted with the order.
+- **Admin.** A Payment section on the order form (status select + proof view/upload),
+  a payment badge column + filter, per-row **Mark paid / Mark unpaid** actions, an
+  **Unpaid orders** dashboard stat with the outstanding total, and Payment + Balance-due
+  columns in the CSV export. The tracking receipt gained `payment_status` and
+  `balance_due_mmk`.
+- **Storefront (Part B, included).** The receipt (order-complete + tracking) gained a
+  `PaymentPanel`: it shows the balance and the configured transfer details from `/meta`,
+  takes the customer's screenshot via the upload endpoint, and reflects paid/unpaid —
+  live view only, never printed (a printed receipt keeps just a one-line payment state).
+  All rules stay in the Laravel API (v5 rule); the storefront only renders — so a future
+  Flutter client reuses the same endpoints.
+## 0.1 What changed in v9
 
 **v9** adds admin-side **bulk catalog CSV import** (Step 19) and nothing else.
 (v8, below, is the separately-built total-ml decant stock feature; both are now
@@ -431,7 +465,9 @@ client on checkout (see `05-api-layer.md`).
 ## 8. Out of scope (do NOT build unless explicitly asked)
 
 - Online payment gateway / card processing (KBZPay, WavePay, Stripe, etc.) — payment
-  confirmation stays a manual, offline step for the decanter
+  confirmation stays a manual, offline step for the decanter. **v10** formalises that
+  manual step (paid/unpaid status, a transfer-screenshot upload, configurable transfer
+  details) but adds **no** gateway: money still moves outside the system.
 - Customer accounts / login on the customer side
 - Chat/messaging features
 - Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)

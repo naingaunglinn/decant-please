@@ -61,6 +61,18 @@ return [
         'facebook' => env('SOCIAL_FACEBOOK_URL'),
     ],
 
+    // Offline payment details shown to the customer at checkout / on the receipt.
+    // Static info only — a number to transfer to, not a payment gateway. Any blank
+    // value is hidden (see MetaController); the whole block hidden if all blank.
+    'payment' => [
+        'kbzpay_name' => env('PAYMENT_KBZPAY_NAME'),
+        'kbzpay_number' => env('PAYMENT_KBZPAY_NUMBER'),
+        'wave_name' => env('PAYMENT_WAVE_NAME'),
+        'wave_number' => env('PAYMENT_WAVE_NUMBER'),
+        'qr_url' => env('PAYMENT_QR_URL'),
+        'instructions' => env('PAYMENT_INSTRUCTIONS'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Orders;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\Pages\CreateOrder;
 use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
@@ -118,6 +119,49 @@ class OrderResource extends Resource
                     ->success()
                     ->title('Order rejected.')
                     ->send();
+            })
+            ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /**
+     * Confirm an offline transfer landed. Visible only while the order is unpaid.
+     * markPaid() stamps paid_at; payment itself happens outside the system.
+     */
+    public static function markPaidAction(): Action
+    {
+        return Action::make('markPaid')
+            ->label('Mark paid')
+            ->icon(Heroicon::OutlinedBanknotes)
+            ->color('success')
+            ->visible(fn (Order $record): bool => $record->payment_status === PaymentStatus::Unpaid)
+            ->requiresConfirmation()
+            ->modalHeading('Mark order paid')
+            ->modalDescription('Confirms the offline transfer landed and records the time.')
+            ->modalSubmitActionLabel('Mark paid')
+            ->action(function (Order $record): void {
+                $record->markPaid();
+
+                Notification::make()->success()->title('Marked paid.')->send();
+            })
+            ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /** Undo a payment confirmation — a mistaken click, or a bounced transfer. */
+    public static function markUnpaidAction(): Action
+    {
+        return Action::make('markUnpaid')
+            ->label('Mark unpaid')
+            ->icon(Heroicon::OutlinedArrowUturnLeft)
+            ->color('gray')
+            ->visible(fn (Order $record): bool => $record->payment_status === PaymentStatus::Paid)
+            ->requiresConfirmation()
+            ->modalHeading('Mark order unpaid')
+            ->modalDescription('Clears the payment confirmation and its timestamp.')
+            ->modalSubmitActionLabel('Mark unpaid')
+            ->action(function (Order $record): void {
+                $record->markUnpaid();
+
+                Notification::make()->success()->title('Marked unpaid.')->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
     }
