@@ -59,6 +59,19 @@ class Order extends Model
             }
         });
 
+        // A replaced or cleared screenshot must not linger as an orphan on the
+        // private proofs disk, whichever write path changed it — the customer's
+        // re-upload or the admin form. In `updated`, getOriginal() still holds
+        // the pre-save path; the truthiness guard matters: on a first upload it
+        // is null, and passing null would delete the file just stored.
+        static::updated(function (self $order) {
+            $previous = $order->getOriginal('payment_proof_path');
+
+            if ($order->wasChanged('payment_proof_path') && $previous) {
+                $order->deletePaymentProofFile($previous);
+            }
+        });
+
         // Don't orphan the payment-proof screenshot when an order is deleted.
         static::deleting(function (self $order) {
             $order->deletePaymentProofFile();
@@ -246,11 +259,14 @@ class Order extends Model
         $this->save();
     }
 
-    /** Remove the stored screenshot file (on replace, or when the order is deleted). */
-    public function deletePaymentProofFile(): void
+    /** Remove a stored screenshot object — the current one by default, or the
+     *  pre-save one when a replacement landed — from the private proofs disk. */
+    public function deletePaymentProofFile(?string $path = null): void
     {
-        if ($this->payment_proof_path) {
-            Storage::disk(config('filesystems.media_disk'))->delete($this->payment_proof_path);
+        $path ??= $this->payment_proof_path;
+
+        if ($path) {
+            Storage::disk(config('filesystems.proofs_disk'))->delete($path);
         }
     }
 

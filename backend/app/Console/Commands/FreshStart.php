@@ -21,7 +21,7 @@ class FreshStart extends Command
     public function handle(): int
     {
         if (! $this->option('force') && ! $this->confirm(
-            'This permanently deletes ALL orders, ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?'
+            'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?'
         )) {
             $this->info('Nothing deleted.');
 
@@ -36,6 +36,10 @@ class FreshStart extends Command
 
             // order_items FK-protects fragrances (restrictOnDelete), so items go first
             OrderItem::query()->delete();
+            // Bulk delete fires no model events, so the per-order deleting hook
+            // that removes proof objects never runs here — and every order is
+            // going anyway, so wipe the whole directory on the proofs disk.
+            Storage::disk(config('filesystems.proofs_disk'))->deleteDirectory('payment-proofs');
             Order::query()->delete();
             DecantPrice::query()->delete();
 

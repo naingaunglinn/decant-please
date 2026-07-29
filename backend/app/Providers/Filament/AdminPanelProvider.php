@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Http\Controllers\OrderInvoiceController;
+use App\Http\Controllers\PaymentProofViewController;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -65,10 +66,15 @@ class AdminPanelProvider extends PanelProvider
             // authenticatedRoutes(), NOT routes(): Filament registers routes()
             // closures alongside login/password-reset — outside the panel's auth
             // middleware — while authenticatedRoutes() closures sit inside it
-            // (vendor routes/web.php). An invoice URL must never render for a
-            // logged-out visitor. Named filament.admin.orders.invoice.
-            ->authenticatedRoutes(fn () => Route::get('/orders/{order}/invoice', OrderInvoiceController::class)
-                ->name('orders.invoice'))
+            // (vendor routes/web.php). An invoice or a payment proof must never
+            // render for a logged-out visitor. Named filament.admin.orders.invoice
+            // and filament.admin.orders.payment-proof.
+            ->authenticatedRoutes(function (): void {
+                Route::get('/orders/{order}/invoice', OrderInvoiceController::class)
+                    ->name('orders.invoice');
+                Route::get('/orders/{order}/payment-proof', PaymentProofViewController::class)
+                    ->name('orders.payment-proof');
+            })
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
