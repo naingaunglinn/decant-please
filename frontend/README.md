@@ -28,12 +28,13 @@ npm run dev -- -p 3001      # http://localhost:3001 (3000/3010 are taken by othe
 
 ## Environment variables
 
-Both are inlined at **build time** — changing them requires a rebuild.
+All are inlined at **build time** — changing them requires a rebuild.
 
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` — every fetch and the allowed image host derive from it |
 | `NEXT_PUBLIC_SITE_URL` | This site's public URL — canonical/OG metadata |
+| `NEXT_PUBLIC_IMAGE_URL` | Production only — the Cloudflare R2 public image host, added to the image-optimizer allow-list; leave unset locally (dev images come from the API host) |
 
 The backend's `FRONTEND_URL` must match this site's origin exactly, or browser-side
 checkout/tracking calls fail CORS.
@@ -75,7 +76,7 @@ frontend/
 │   │   ├── catalog/                        # FragranceCard/Grid, filters, Pagination, RecentlyViewed
 │   │   ├── product/                        # SizeSelector, PurchasePanel (add to cart)
 │   │   ├── cart/                           # CartDrawer, CartItemRow
-│   │   ├── checkout/                       # CheckoutForm/Client, OrderSummaryCard, OrderCompleteClient
+│   │   ├── checkout/                       # CheckoutForm/Client, OrderSummaryCard, OrderCompleteClient, PaymentPanel (balance due + transfer details + proof upload)
 │   │   ├── tracking/                       # TrackingForm, TrackClient, OrderReceipt (printable), StatusTimeline
 │   │   └── home/                           # Hero (GSAP), ScrollReveal, FeaturedRail
 │   ├── lib/
@@ -84,8 +85,8 @@ frontend/
 │   │   ├── types.ts                        # TypeScript mirrors of the API resources
 │   │   └── format.ts                       # formatKyat
 │   └── hooks/useCart.ts
-├── next.config.ts                          # ← allowed image hosts follow NEXT_PUBLIC_API_URL automatically
-├── .env.local.example                      # ← template: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_URL
+├── next.config.ts                          # ← allowed image hosts: the NEXT_PUBLIC_API_URL host + NEXT_PUBLIC_IMAGE_URL (R2) in production
+├── .env.local.example                      # ← template: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_IMAGE_URL
 └── package.json                            # Node 24 LTS, Next.js 16, Tailwind v4, GSAP, Motion
 ```
 
@@ -105,5 +106,7 @@ frontend/
 ## Deployment
 
 Vercel with root directory `frontend/`, or `npm run build && npm start` behind Nginx on a
-VPS — exact steps in [`../DEPLOY.md`](../DEPLOY.md). Set both env vars for the production
-hosts; remote fragrance images are allowed automatically for the `NEXT_PUBLIC_API_URL` host.
+VPS — exact steps in [`../DEPLOY.md`](../DEPLOY.md). Set all three env vars for the
+production hosts: fragrance images are allowed for the `NEXT_PUBLIC_API_URL` host
+automatically, and `NEXT_PUBLIC_IMAGE_URL` extends that allow-list to the R2 image domain
+(without it, the image optimizer rejects R2 URLs and catalog photos 400).
