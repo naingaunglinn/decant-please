@@ -32,12 +32,9 @@ class PaymentProofController extends Controller
             return TrackOrderController::notFoundResponse();
         }
 
-        // Replace any earlier upload for this order rather than accumulating files.
-        if ($order->payment_proof_path) {
-            $order->deletePaymentProofFile();
-        }
-
-        $path = $request->file('proof')->store('payment-proofs', config('filesystems.media_disk'));
+        // The private proofs disk, never the public media disk. Replacing an
+        // earlier upload cleans up the old object via the model's updated hook.
+        $path = $request->file('proof')->store('payment-proofs', config('filesystems.proofs_disk'));
 
         $order->attachPaymentProof($path);
 

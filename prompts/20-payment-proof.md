@@ -16,7 +16,9 @@ money still moves offline (KBZPay/Wave/bank), exactly as §8 requires.
 - `payment_status` — string, default `'unpaid'`, indexed. Enum `PaymentStatus`
   (`Unpaid`/`Paid`) with Filament label+color, mirroring `OrderStatus`.
 - `paid_at` — nullable timestamp; when the decanter confirmed.
-- `payment_proof_path` — nullable; the customer's transfer screenshot on the media disk.
+- `payment_proof_path` — nullable; the customer's transfer screenshot. *(Amended by
+  #47/v12: stored on the private `proofs_disk`, not the media disk as originally built —
+  a public-bucket prefix was the wrong home for financial screenshots.)*
 
 Default `unpaid` is deliberate: existing orders read accurately, since none were tracked
 before. This is separate from `deposit_mmk` — that's a partial amount; `payment_status`

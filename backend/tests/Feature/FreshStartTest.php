@@ -38,7 +38,7 @@ class FreshStartTest extends TestCase
 
         $this->artisan('decant:fresh-start')
             ->expectsConfirmation(
-                'This permanently deletes ALL orders, ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?',
+                'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?',
                 'no'
             )
             ->assertSuccessful();

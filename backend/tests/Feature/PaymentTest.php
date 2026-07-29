@@ -60,14 +60,32 @@ class PaymentTest extends TestCase
 
     public function test_deleting_an_order_removes_its_proof_file(): void
     {
-        Storage::fake('public');
+        $disk = $this->fakeProofsDisk();
         $order = $this->order();
-        $path = UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', 'public');
+        $path = UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk);
         $order->attachPaymentProof($path);
-        Storage::disk('public')->assertExists($path);
+        Storage::disk($disk)->assertExists($path);
 
         $order->delete();
-        Storage::disk('public')->assertMissing($path);
+        Storage::disk($disk)->assertMissing($path);
+    }
+
+    public function test_replacing_the_proof_directly_deletes_the_old_object(): void
+    {
+        // The admin form writes payment_proof_path itself (no controller in the
+        // loop) — the model's updated hook must clean up the replaced object.
+        $disk = $this->fakeProofsDisk();
+        $order = $this->order();
+
+        $first = UploadedFile::fake()->image('first.jpg')->store('payment-proofs', $disk);
+        $order->update(['payment_proof_path' => $first]);
+        Storage::disk($disk)->assertExists($first); // first upload deletes nothing
+
+        $second = UploadedFile::fake()->image('second.jpg')->store('payment-proofs', $disk);
+        $order->update(['payment_proof_path' => $second]);
+
+        Storage::disk($disk)->assertMissing($first);
+        Storage::disk($disk)->assertExists($second);
     }
 
     // ---- Public API --------------------------------------------------------
@@ -100,7 +118,8 @@ class PaymentTest extends TestCase
 
     public function test_customer_uploads_payment_proof_with_matching_code_and_phone(): void
     {
-        Storage::fake('public');
+        $disk = $this->fakeProofsDisk();
+        Storage::fake(config('filesystems.media_disk'));
         $order = $this->order();
 
         $this->postJson('/api/v1/orders/payment-proof', [
@@ -114,14 +133,41 @@ class PaymentTest extends TestCase
 
         $order->refresh();
         $this->assertNotNull($order->payment_proof_path);
-        Storage::disk('public')->assertExists($order->payment_proof_path);
+        // the private proofs disk — and never the public media disk (#47)
+        Storage::disk($disk)->assertExists($order->payment_proof_path);
+        Storage::disk(config('filesystems.media_disk'))->assertMissing($order->payment_proof_path);
         // still unpaid — the decanter confirms separately
         $this->assertSame(PaymentStatus::Unpaid, $order->payment_status);
     }
 
+    public function test_stored_proof_path_never_appears_in_public_api_responses(): void
+    {
+        $this->fakeProofsDisk();
+        $order = $this->order();
+
+        $upload = $this->postJson('/api/v1/orders/payment-proof', [
+            'tracking_code' => $order->tracking_code,
+            'phone' => $order->phone,
+            'proof' => UploadedFile::fake()->image('transfer.jpg'),
+        ])->assertOk();
+
+        $track = $this->getJson('/api/v1/orders/track?'.http_build_query([
+            'tracking_code' => $order->tracking_code,
+            'phone' => $order->phone,
+        ]))->assertOk()->assertJsonPath('has_payment_proof', true);
+
+        // The receipt says a proof exists — never where it lives. basename() is
+        // the random stored filename, immune to JSON slash-escaping of the path.
+        $filename = basename($order->refresh()->payment_proof_path);
+        $upload->assertDontSee($filename);
+        $track->assertDontSee($filename);
+        $upload->assertDontSee('payment_proof_path');
+        $track->assertDontSee('payment_proof_path');
+    }
+
     public function test_payment_proof_requires_the_exact_code_and_phone_pair(): void
     {
-        Storage::fake('public');
+        $this->fakeProofsDisk();
         $order = $this->order();
 
         $this->postJson('/api/v1/orders/payment-proof', [
@@ -135,7 +181,7 @@ class PaymentTest extends TestCase
 
     public function test_payment_proof_rejects_a_non_image(): void
     {
-        Storage::fake('public');
+        $this->fakeProofsDisk();
         $order = $this->order();
 
         $this->postJson('/api/v1/orders/payment-proof', [
@@ -147,7 +193,7 @@ class PaymentTest extends TestCase
 
     public function test_reuploading_replaces_the_previous_screenshot(): void
     {
-        Storage::fake('public');
+        $disk = $this->fakeProofsDisk();
         $order = $this->order();
 
         $this->postJson('/api/v1/orders/payment-proof', [
@@ -163,8 +209,8 @@ class PaymentTest extends TestCase
         $second = $order->fresh()->payment_proof_path;
 
         $this->assertNotSame($first, $second);
-        Storage::disk('public')->assertMissing($first);
-        Storage::disk('public')->assertExists($second);
+        Storage::disk($disk)->assertMissing($first);
+        Storage::disk($disk)->assertExists($second);
     }
 
     public function test_tracking_receipt_reports_payment_status_and_balance_due(): void
@@ -179,6 +225,60 @@ class PaymentTest extends TestCase
             ->assertOk()
             ->assertJsonPath('payment_status', 'paid')
             ->assertJsonPath('balance_due_mmk', 50000);
+    }
+
+    // ---- Admin proof route (private disk, #47) -----------------------------
+
+    public function test_payment_proof_route_redirects_guests_to_login(): void
+    {
+        $disk = $this->fakeProofsDisk();
+        $order = $this->order();
+        $order->attachPaymentProof(UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk));
+
+        $response = $this->get(route('filament.admin.orders.payment-proof', $order));
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('/admin/login', $response->headers->get('Location'));
+    }
+
+    public function test_admin_streams_the_proof_from_the_private_disk(): void
+    {
+        $this->actingAsAdmin();
+        $disk = $this->fakeProofsDisk();
+        $order = $this->order();
+        $path = UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk);
+        $order->attachPaymentProof($path);
+
+        $response = $this->get(route('filament.admin.orders.payment-proof', $order));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('image/', $response->headers->get('Content-Type'));
+        $this->assertSame(Storage::disk($disk)->get($path), $response->streamedContent());
+    }
+
+    public function test_payment_proof_route_404s_when_the_order_has_no_proof(): void
+    {
+        $this->actingAsAdmin();
+        $this->fakeProofsDisk();
+
+        $this->get(route('filament.admin.orders.payment-proof', $this->order()))
+            ->assertNotFound();
+    }
+
+    public function test_fresh_start_deletes_proof_objects(): void
+    {
+        // decant:fresh-start bulk-deletes orders (no model events), so it must
+        // wipe the proofs directory itself.
+        $disk = $this->fakeProofsDisk();
+        Storage::fake(config('filesystems.media_disk'));
+        $order = $this->order();
+        $path = UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk);
+        $order->attachPaymentProof($path);
+
+        $this->artisan('decant:fresh-start', ['--force' => true])->assertSuccessful();
+
+        $this->assertSame(0, Order::count());
+        Storage::disk($disk)->assertMissing($path);
     }
 
     // ---- Admin -------------------------------------------------------------
@@ -226,6 +326,15 @@ class PaymentTest extends TestCase
     }
 
     // ---- helpers -----------------------------------------------------------
+
+    /** Fake the private proofs disk and return its name ("local" under test). */
+    private function fakeProofsDisk(): string
+    {
+        $disk = config('filesystems.proofs_disk');
+        Storage::fake($disk);
+
+        return $disk;
+    }
 
     private function order(
         OrderStatus $status = OrderStatus::AwaitingConfirmation,

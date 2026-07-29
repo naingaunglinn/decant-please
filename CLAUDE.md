@@ -1,9 +1,38 @@
-# CLAUDE.md — Decant Please! (v11)
+# CLAUDE.md — Decant Please! (v12)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v11
+## 0. What changed in v12
+
+**v12** moves payment-proof screenshots off the public image bucket (issue #47) — an
+infra correction to v10, no feature change and no API change.
+
+- **A private proofs disk, never the media disk.** Proofs write to
+  `config('filesystems.proofs_disk')` (`PROOFS_DISK`): locally the stock `local` disk
+  (`storage/app/private` — its serve route demands a signed URL nothing generates), in
+  production `s3-proofs`, a **second R2 bucket with no custom domain, no url, no public
+  access, and no CORS policy**. v10 had put proofs on the media disk, where the
+  `images.cornerarea.me` domain made every prefix public — unguessable filenames, but a
+  transfer screenshot (names, numbers, amounts) shouldn't be one leaked URL from public.
+- **Served to the admin only, streamed.** The one way a proof is ever served is
+  `/admin/orders/{order}/payment-proof` — registered through the panel's
+  `authenticatedRoutes()` (the v7 invoice idiom, so it follows the panel path) and
+  streamed by `PaymentProofViewController`. The order form's upload preview and its
+  "Open full size" hint action both point at that route via `getUploadedFileUsing` —
+  overridden deliberately, because Filament's default preview mints a *presigned
+  temporary URL* for a private s3 disk, and no presigned or public proof URL may exist.
+- **Customer contract unchanged.** `POST /api/v1/orders/payment-proof` is identical
+  from the client's side; public responses still expose only `has_payment_proof`,
+  never the stored path (now pinned by a test).
+- **No orphans.** Replacing or clearing a proof deletes the old object via a model
+  `updated` hook (covers the admin form, which writes the column without a controller);
+  order deletion already cleaned up; `decant:fresh-start` now wipes `payment-proofs/`
+  itself, since its bulk delete fires no model events.
+- Local files under `storage/app/public/payment-proofs` from before this change are
+  not migrated — production never had any (v10/v11 hadn't been promoted).
+
+## 0.1 What changed in v11
 
 **v11** adds **Telegram order alerts to the decanter** (Step 21) — the first
 notification channel, admin-side only. (v9 = catalog CSV import, v10 = payment
@@ -50,7 +79,8 @@ It just makes that flow legible inside the system instead of scattered across DM
   (same generic 404 on mismatch — no guessing oracle) and its own throttle bucket.
   Uploading does **not** mark paid — the decanter still eyeballs it and confirms. Files
   live on the media disk (`payment-proofs/`, public locally / R2 in prod), replaced on
-  re-upload and deleted with the order.
+  re-upload and deleted with the order. **Superseded in v12:** proofs now live on a
+  private proofs disk, never the media disk — see §0.
 - **Admin.** A Payment section on the order form (status select + proof view/upload),
   a payment badge column + filter, per-row **Mark paid / Mark unpaid** actions, an
   **Unpaid orders** dashboard stat with the outstanding total, and Payment + Balance-due
