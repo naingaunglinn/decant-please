@@ -4,11 +4,14 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Models\DecantPrice;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -18,6 +21,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class OrderForm
 {
@@ -168,6 +172,59 @@ class OrderForm
                             ->rows(2)
                             ->columnSpanFull(),
                     ]),
+                self::paymentSection(),
+            ]);
+    }
+
+    protected static function paymentSection(): Section
+    {
+        return Section::make('Payment')
+            ->description('Payment is offline — KBZPay/Wave/bank transfer. Confirm here once it lands; this is separate from the deposit figure above.')
+            ->columnSpanFull()
+            ->columns(2)
+            ->schema([
+                Select::make('payment_status')
+                    ->options(PaymentStatus::class)
+                    ->default(PaymentStatus::Unpaid->value)
+                    ->required()
+                    ->helperText('Setting this to Paid stamps the confirmation time automatically.'),
+                FileUpload::make('payment_proof_path')
+                    ->label('Payment proof')
+                    ->image()
+                    ->disk(config('filesystems.proofs_disk'))
+                    ->directory('payment-proofs')
+                    ->visibility('private')
+                    ->maxSize(4096)
+                    // The proofs disk has no public URL, and Filament's default
+                    // preview would mint a presigned temporary URL for a private
+                    // s3 disk — never that (see #47). The preview instead loads
+                    // through the panel's authenticated streaming route: same
+                    // origin, session-auth'd, the only way a proof is served.
+                    ->getUploadedFileUsing(static function (FileUpload $component, string $file): ?array {
+                        $record = $component->getRecord();
+
+                        if (! $record instanceof Order) {
+                            return null;
+                        }
+
+                        return [
+                            'name' => basename($file),
+                            'size' => 0,
+                            'type' => null,
+                            'url' => route('filament.admin.orders.payment-proof', $record),
+                        ];
+                    })
+                    ->hintAction(
+                        Action::make('viewProof')
+                            ->label('Open full size')
+                            ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
+                            ->url(fn (?Order $record): ?string => $record?->payment_proof_path
+                                ? route('filament.admin.orders.payment-proof', $record)
+                                : null)
+                            ->openUrlInNewTab()
+                            ->visible(fn (?Order $record): bool => $record?->payment_proof_path !== null),
+                    )
+                    ->helperText("The customer's transfer screenshot — sent by them at checkout, or attach one they DMed you."),
             ]);
     }
 

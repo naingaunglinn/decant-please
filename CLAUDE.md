@@ -1,9 +1,173 @@
-# CLAUDE.md — Decant Please! (v7)
+# CLAUDE.md — Decant Please! (v12)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v7
+## 0. What changed in v12
+
+**v12** moves payment-proof screenshots off the public image bucket (issue #47) — an
+infra correction to v10, no feature change and no API change.
+
+- **A private proofs disk, never the media disk.** Proofs write to
+  `config('filesystems.proofs_disk')` (`PROOFS_DISK`): locally the stock `local` disk
+  (`storage/app/private` — its serve route demands a signed URL nothing generates), in
+  production `s3-proofs`, a **second R2 bucket with no custom domain, no url, no public
+  access, and no CORS policy**. v10 had put proofs on the media disk, where the
+  `images.cornerarea.me` domain made every prefix public — unguessable filenames, but a
+  transfer screenshot (names, numbers, amounts) shouldn't be one leaked URL from public.
+- **Served to the admin only, streamed.** The one way a proof is ever served is
+  `/admin/orders/{order}/payment-proof` — registered through the panel's
+  `authenticatedRoutes()` (the v7 invoice idiom, so it follows the panel path) and
+  streamed by `PaymentProofViewController`. The order form's upload preview and its
+  "Open full size" hint action both point at that route via `getUploadedFileUsing` —
+  overridden deliberately, because Filament's default preview mints a *presigned
+  temporary URL* for a private s3 disk, and no presigned or public proof URL may exist.
+- **Customer contract unchanged.** `POST /api/v1/orders/payment-proof` is identical
+  from the client's side; public responses still expose only `has_payment_proof`,
+  never the stored path (now pinned by a test).
+- **No orphans.** Replacing or clearing a proof deletes the old object via a model
+  `updated` hook (covers the admin form, which writes the column without a controller);
+  order deletion already cleaned up; `decant:fresh-start` now wipes `payment-proofs/`
+  itself, since its bulk delete fires no model events.
+- Local files under `storage/app/public/payment-proofs` from before this change are
+  not migrated — production never had any (v10/v11 hadn't been promoted).
+
+## 0.1 What changed in v11
+
+**v11** adds **Telegram order alerts to the decanter** (Step 21) — the first
+notification channel, admin-side only. (v9 = catalog CSV import, v10 = payment
+confirmation; sibling feature branches, all landing on `develop`.)
+
+- **Admin only, by design.** A website checkout pushes a Telegram message to the
+  decanter's phone. Customer-facing alerts are deliberately out of scope: a bot can
+  only message a chat that pressed Start on it, so cold-messaging a customer by phone
+  is impossible — that would need SMS (paid) or a per-customer opt-in. The admin is
+  one person who presses Start once, so it's free and automatic. The tracking page
+  remains the customer's channel.
+- **An event layer, not hardcoded calls.** Checkout dispatches an `OrderPlaced`
+  event; a `NotifyAdminOfNewOrder` listener turns it into a message via a
+  `TelegramNotifier` service. Adding SMS/Viber later = another listener on the same
+  event, no checkout changes. Dispatched only on the website checkout path (manual
+  admin orders don't self-notify); the honeypot path never dispatches.
+- **Dependency-free.** One `Http::post` to the Bot API — no composer package on the
+  Heroku buildpack. Config is `services.telegram` (`TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_ADMIN_CHAT_ID`); both blank = feature off (no-op).
+- **Never breaks checkout.** `TelegramNotifier` is bounded (5s timeout) and swallows
+  every error to a log — a slow or failing Telegram can't delay or fail a customer's
+  order. Runs synchronously (queue is `sync`); a queue worker would make it truly
+  async later. `php artisan telegram:test` verifies a shop's bot setup during
+  onboarding.
+## 0.1 What changed in v10
+
+**v10** adds **payment confirmation + proof** (Step 20). Payment is still the manual,
+offline Myanmar flow — this is emphatically **not** a payment gateway (§8 still holds).
+It just makes that flow legible inside the system instead of scattered across DMs.
+(v9 is the catalog CSV import, a sibling feature branch; both land on `develop`.)
+
+- **Paid/unpaid on every order.** A `payment_status` (unpaid → paid) + `paid_at` on
+  `orders`, defaulting unpaid (so existing orders read accurately — none were tracked
+  before). A model `saving` hook keeps `paid_at` in sync however the status changes —
+  the admin form's select, the Mark paid/unpaid actions, or the API. This is separate
+  from the pre-existing `deposit_mmk` (a partial-amount figure); payment_status is the
+  yes/no the decanter actually reconciles, and `balanceDue()` = total − deposit.
+- **Static payment details, config-driven.** KBZPay/Wave name+number, an optional QR
+  URL, and free-text instructions live in `.env` (an `app.payment` block, mirroring
+  `app.social`) and surface through `/api/v1/meta` — only non-blank fields, the whole
+  block null if none set. A *static* number to transfer to, no merchant account.
+- **Customer proof upload.** `POST /api/v1/orders/payment-proof` takes the transfer
+  screenshot, gated by the same exact `tracking_code` + `phone` pair as tracking/cancel
+  (same generic 404 on mismatch — no guessing oracle) and its own throttle bucket.
+  Uploading does **not** mark paid — the decanter still eyeballs it and confirms. Files
+  live on the media disk (`payment-proofs/`, public locally / R2 in prod), replaced on
+  re-upload and deleted with the order. **Superseded in v12:** proofs now live on a
+  private proofs disk, never the media disk — see §0.
+- **Admin.** A Payment section on the order form (status select + proof view/upload),
+  a payment badge column + filter, per-row **Mark paid / Mark unpaid** actions, an
+  **Unpaid orders** dashboard stat with the outstanding total, and Payment + Balance-due
+  columns in the CSV export. The tracking receipt gained `payment_status` and
+  `balance_due_mmk`.
+- **Storefront (Part B, included).** The receipt (order-complete + tracking) gained a
+  `PaymentPanel`: it shows the balance and the configured transfer details from `/meta`,
+  takes the customer's screenshot via the upload endpoint, and reflects paid/unpaid —
+  live view only, never printed (a printed receipt keeps just a one-line payment state).
+  All rules stay in the Laravel API (v5 rule); the storefront only renders — so a future
+  Flutter client reuses the same endpoints.
+## 0.1 What changed in v9
+
+**v9** adds admin-side **bulk catalog CSV import** (Step 19) and nothing else.
+(v8, below, is the separately-built total-ml decant stock feature; both are now
+on `develop`.)
+
+- **Why:** onboarding. A decanter switching from DMs has 100–300 fragrances;
+  hand-entering them one Filament form at a time is the wall between "interested"
+  and "live". The CSV is the price list they already keep.
+- **Shape:** one row per fragrance; `brand`, `brand_type`, `name`,
+  `concentration`, `gender`, the four text fields, and any number of
+  `price_{N}ml` columns (any N — a blank cell means that size isn't offered).
+  Enum cells match case-insensitively; prices tolerate `30,000` digit grouping;
+  UTF-8 Burmese text and Excel's BOM both survive.
+- **Idempotent by default:** brands match by name (case-insensitive, `whereLike`
+  per the v6 Postgres rule, wildcards escaped) or are created; fragrances match
+  by (brand, name) and existing ones are **skipped**, so re-uploading a fixed
+  file never duplicates what already landed. An opt-in **update mode** overwrites
+  fields from non-blank cells only (a blank cell can't erase hand-written text)
+  and upserts prices per size — it never deletes a size.
+- **Failure model:** each row commits in its own transaction and fails alone
+  with a specific reason; the failed rows come back as a **failures CSV** —
+  original columns plus an `error` column (unknown headers are ignored on
+  import, so the fixed file re-uploads as-is). A structurally unusable file
+  (missing required columns, no `price_*` column) is rejected whole.
+- **Deliberately NOT Filament's `ImportAction`:** that drags in queue/notification
+  infrastructure tables and a per-model importer that fights this three-model row
+  (brand + fragrance + N prices). The repo's own idiom is custom CSV actions
+  (`exportCsv`); import follows it — `App\Support\CatalogImport` (a plain,
+  synchronous, testable service) + two toolbar actions on Fragrances:
+  **Import CSV** and **CSV template** (the template ships a Burmese sample row
+  and is pinned by a test that imports it).
+- **Images are out of scope** — a CSV can't carry them; they're uploaded per
+  fragrance afterwards, exactly as today.
+
+## 0.1 What changed in v8
+
+**v8** adds admin-side **decant stock tracking by total millilitres**, and nothing
+else. This is a deliberate, *scoped* reversal of one §8 exclusion — bottle-volume
+inventory — chosen after weighing it against the simplicity the tool is built on:
+
+- **Total ml, not per-bottle.** Each fragrance gets a single running `stock_ml` on
+  the `fragrances` table (plus `low_stock_threshold_ml`). Same-fragrance juice is
+  fungible for decanting, so one total is stock-accurate; a `bottles` table would
+  add rows and UX for information the decanter doesn't need to act on. ("Add bottle"
+  in the form is just a `+ml` convenience on the total, not a stored entity.)
+- **Opt-in per fragrance.** `stock_ml` is nullable and null on every existing row.
+  Null means "not tracked" — such fragrances are skipped by the drawdown and never
+  appear in the low-stock panel, so nothing in the seeded/real catalog changes
+  behaviour the moment this lands.
+- **Warn-only, never blocking.** The drawdown clamps at 0 and surfaces a shortfall on
+  a new **Low stock** dashboard widget (and a Stock column on the fragrance table);
+  it does **not** flip the customer-facing `in_stock` toggles, which stay manual. A
+  decant that exceeds stock still goes through — the decanter reorders, they don't
+  get blocked mid-fulfilment.
+- **Drawn down at `→ decanted`, not at accept.** Stock drops when the vials are
+  physically filled (the Order status transition into `Decanted`), matching the
+  real act, via an `updated` model event → `Order::drawDownDecantStock()` →
+  `Fragrance::drawDownStock()`. Logic lives in the domain layer, not Filament or the
+  client, so a future Flutter admin reuses it (the v5 constraint).
+- Known accepted limits: a manual order *created* directly at `decanted`/`delivered`
+  isn't drawn down (real manual orders start `pending`); and moving an order out of
+  and back into `decanted` pours twice (a rare admin correction, left un-guarded to
+  avoid a "already decremented" flag). Both are fine for a single-decanter tool.
+
+There is a separate, fuller **per-bottle** implementation on branch
+`40-decant-bottle-stock` (its own `bottles` table, auto-`in_stock`, drawdown at
+accept-time). v8 deliberately did **not** use it — it reverses the three choices
+above. If per-bottle tracking, batch identity, or cost/margin ever become real needs,
+that branch is the reference, not this.
+
+Files new/changed in v8: this section and §6/§8 below; migration
+`…add_stock_to_fragrances_table`; `Fragrance` + `Order` models; `FragranceForm`,
+`FragrancesTable`, and a new `LowStock` widget; `DecantStockTest`.
+
+## 0.1 What changed in v7 (for reference)
 
 **v7** adds admin-side **printable A5 order invoices** (Step 14) and nothing else:
 - Two per-order actions (print inline in a new tab, download) plus a bulk
@@ -306,7 +470,10 @@ client on checkout (see `05-api-layer.md`).
    quantity, aggregated across all non-cancelled/non-rejected orders due that day.
    This is the "automatically generate a schedule" requirement from the brief.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
-   count, decants due today, top fragrances.
+   count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
+   **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —
+   drawn down when an order is decanted, surfaced on the fragrance table + low-stock
+   widget, never touching the manual `in_stock` toggle. See §0.
 6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
    only) and a bulk PDF for the filtered view, one order per page, with an
    emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
@@ -353,11 +520,17 @@ client on checkout (see `05-api-layer.md`).
 ## 8. Out of scope (do NOT build unless explicitly asked)
 
 - Online payment gateway / card processing (KBZPay, WavePay, Stripe, etc.) — payment
-  confirmation stays a manual, offline step for the decanter
+  confirmation stays a manual, offline step for the decanter. **v10** formalises that
+  manual step (paid/unpaid status, a transfer-screenshot upload, configurable transfer
+  details) but adds **no** gateway: money still moves outside the system.
 - Customer accounts / login on the customer side
 - Chat/messaging features
 - Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)
-- Inventory tracking of bottle volumes (only the `in_stock` flag)
+- Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
+  stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
+  reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
+  cost/margin accounting. The customer-facing `in_stock` flag stays manual — v8's
+  stock warns, it never flips it.
 - Email notifications (nothing in the brief asks for them; tracking is code + phone
   only). Flag it if you want order-confirmation emails or SMS later — that's a
   clean addition on top of this schema, not a redesign of it.

@@ -36,18 +36,28 @@ app's **Resources** tab, not just from the plan names.
 
 ### One-time: Cloudflare R2 (dashboard only — cannot be scripted from the CLI)
 
-Uploaded images live in an R2 bucket served over a custom domain. From the Cloudflare
-dashboard, collect four values before touching Heroku:
+Uploaded images live in an R2 bucket served over a custom domain; payment-proof
+screenshots live in a **second, fully private bucket** (no custom domain — see "Payment
+proofs" below). From the Cloudflare dashboard, collect six values before touching Heroku:
 
 1. R2 Object Storage → Create bucket → **`decant-please-images`**.
-2. Bucket → Settings → note the **S3 API endpoint**.
+2. Bucket → Settings → note the **S3 API endpoint** (account-level — the same endpoint
+   serves both buckets).
 3. R2 → Manage API Tokens → Create Token → **Object Read & Write**, scoped to this bucket
    only → copy the **Access Key ID** and **Secret Access Key** (R2 shows the secret once).
 4. Bucket → Settings → Public access → Custom Domains → Connect Domain →
    **`images.cornerarea.me`**; wait until it reads **Active**, not just Initializing.
+5. R2 Object Storage → Create bucket → **`decant-please-payment-proofs`** — payment-proof
+   screenshots. Do **not** connect a custom domain and do **not** enable public access:
+   a transfer screenshot carries names, numbers, and amounts, and Laravel streams these
+   objects to the admin itself.
+6. R2 → Manage API Tokens → Create Token → **Object Read & Write**, scoped to
+   `decant-please-payment-proofs` only → copy its **Access Key ID** and **Secret Access Key**.
+   (A second token, not a reuse: the images token from step 3 is scoped to its own
+   bucket and can't reach this one — which is the least-privilege setup we want.)
 
 Guessing or stubbing these produces a backend that deploys clean and then silently can't
-store an image — don't proceed to config vars without all four.
+store an image — don't proceed to config vars without all six.
 
 ### Create the app and add-ons
 
@@ -97,7 +107,11 @@ heroku config:set -a decant-please-api \
   AWS_BUCKET=decant-please-images \
   AWS_ENDPOINT='<R2 S3 API endpoint>' \
   AWS_USE_PATH_STYLE_ENDPOINT=true \
-  AWS_URL=https://images.cornerarea.me
+  AWS_URL=https://images.cornerarea.me \
+  PROOFS_DISK=s3-proofs \
+  PROOFS_AWS_BUCKET=decant-please-payment-proofs \
+  PROOFS_AWS_ACCESS_KEY_ID='<proofs-token Access Key ID>' \
+  PROOFS_AWS_SECRET_ACCESS_KEY='<proofs-token Secret Access Key>'
 ```
 
 `MEDIA_DISK=s3` is what routes uploaded fragrance/brand images to the R2-backed `s3` block in
@@ -107,7 +121,12 @@ default disk; that `s3` block reads every `AWS_*` var above, and `AWS_URL` is th
 domain baked into the image URLs the API returns. The upload itself is pinned to the `local`
 temp disk in code (`AdminPanelProvider`), so the browser posts to Laravel and Laravel writes to
 R2 server-side — **so the upload needs no R2 CORS policy** (admin *previews* of saved images do —
-see "Admin image uploads" below). Verify the whole set landed — `heroku config -a
+see "Admin image uploads" below). `PROOFS_DISK=s3-proofs` does the same routing job for
+payment-proof screenshots, pointing them at the second, **private** bucket: the `s3-proofs`
+disk reads the `PROOFS_AWS_*` vars (endpoint and region fall back to the shared `AWS_*`
+values — R2's S3 endpoint is account-level) and deliberately has no URL var at all —
+proofs are only ever served by the panel's authenticated streaming route (see "Payment
+proofs" below). Verify the whole set landed — `heroku config -a
 decant-please-api`, or the dashboard's **Settings → Config Vars → Reveal** — before
 deploying. A typo caught now is a five-second fix; the same typo caught mid-release is a
 failed migration on a live app. (If you reveal them in the dashboard, that's real secrets in
@@ -168,6 +187,27 @@ finished file to the media disk (`MEDIA_DISK=s3` → R2) server-side. Two conseq
   upload and the form submit, which is fine when both hit the same dyno. If you scale the web
   process past one dyno, switch the temp disk to `s3` and add an R2 bucket CORS policy for
   `https://api.cornerarea.me`, or use shared temp storage.
+
+### Payment proofs — private bucket, no CORS policy
+
+Payment-proof screenshots live in `decant-please-payment-proofs` (`PROOFS_DISK=s3-proofs`), which —
+unlike the images bucket — needs **no CORS policy at all**, because the browser never talks
+to it in either direction:
+
+- **Customer upload** POSTs the screenshot to the Laravel API (`/api/v1/orders/payment-proof`),
+  and Laravel writes it to R2 server-side.
+- **Admin upload** rides the same `local` temp-disk flow as images (see "Admin image
+  uploads" above); the finished file is written to the proofs bucket server-side.
+- **Admin viewing** — the order form's preview thumbnail and its "Open full size" link —
+  fetches `/admin/orders/{id}/payment-proof`, an authenticated route inside the Filament
+  panel that streams the object from R2 server-side. Same origin, guarded by the panel's
+  own session auth. This is what forces a CORS policy on the *images* bucket (FilePond
+  GETs saved images from R2 directly) and is exactly the hop the proofs bucket never makes.
+
+Nothing generates a presigned or public URL for a proof, the bucket has no custom domain,
+and the stored path never appears in any public API response — the tracking receipt only
+carries a `has_payment_proof` boolean. Losing a URL therefore leaks nothing: without an
+admin session every path 404s or redirects to the panel login.
 
 ### Seed the admin login
 
@@ -351,6 +391,10 @@ from zero.
       `local`-disk path), then `heroku ps:restart` and reload it to prove it's served from R2,
       not the dyno's ephemeral disk (a 413 on upload means the limits need raising — see
       "Image upload size")
+- [ ] Proofs bucket private: `PROOFS_DISK=s3-proofs` + `PROOFS_AWS_*` vars set — upload a
+      payment proof from the tracking page, open it on the order in `/admin` (it streams
+      from `/admin/orders/{id}/payment-proof`), and confirm in Cloudflare that
+      `decant-please-payment-proofs` has **no** custom domain and public access reads **Disabled**
 - [ ] `NEXT_PUBLIC_IMAGE_URL=https://images.cornerarea.me` set on Vercel so the storefront's
       image optimizer accepts R2 URLs (#22)
 - [ ] `api.cornerarea.me` shows **Cert issued** (`heroku certs:auto`)

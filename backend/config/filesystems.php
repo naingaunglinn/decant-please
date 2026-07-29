@@ -34,6 +34,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Proofs Disk (customer payment screenshots)
+    |--------------------------------------------------------------------------
+    |
+    | The disk payment-proof screenshots are written to — PRIVATE, the opposite
+    | of the media disk above: a transfer screenshot carries names, numbers,
+    | and amounts, so it must never sit under a public domain, however
+    | unguessable the filename. Defaults to the stock "local" disk
+    | (storage/app/private — its serve route demands a signed URL nothing here
+    | generates); production sets PROOFS_DISK=s3-proofs, a second R2 bucket
+    | with no custom domain and no url. The only way a proof is ever served is
+    | the panel's authenticated streaming route (PaymentProofViewController).
+    |
+    */
+
+    'proofs_disk' => env('PROOFS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -72,6 +90,24 @@ return [
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Payment proofs in production (PROOFS_DISK=s3-proofs): a separate,
+        // fully private R2 bucket. Deliberately no 'url' key — no public
+        // domain serves this bucket; Laravel streams objects to the admin
+        // itself. Its own key pair (R2 tokens are scoped per bucket); the
+        // endpoint and region are account-level on R2, so they fall back to
+        // the main AWS_* values.
+        's3-proofs' => [
+            'driver' => 's3',
+            'key' => env('PROOFS_AWS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('PROOFS_AWS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('PROOFS_AWS_BUCKET'),
+            'endpoint' => env('PROOFS_AWS_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,

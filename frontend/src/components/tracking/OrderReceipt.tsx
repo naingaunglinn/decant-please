@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
 import { StatusTimeline } from "./StatusTimeline";
+import { PaymentPanel } from "@/components/checkout/PaymentPanel";
 import { cancelOrder, ApiConflictError } from "@/lib/api";
 import { formatKyat } from "@/lib/format";
 import type { OrderStatusResponse } from "@/lib/types";
@@ -98,6 +99,14 @@ function ReceiptBody({ order, note }: { order: OrderStatusResponse; note: string
             <SummaryRow label="Deposit received" amount={formatKyat(order.deposit_mmk)} />
           )}
           <SummaryRow label="Total" amount={order.total_formatted} strong />
+          {/* payment state — the one line the printed receipt keeps of it */}
+          {order.payment_status === "paid" ? (
+            <SummaryRow label="Payment" amount="Paid" />
+          ) : (
+            order.deposit_mmk !== 0 && (
+              <SummaryRow label="Balance due" amount={formatKyat(order.balance_due_mmk)} strong />
+            )
+          )}
         </div>
 
         <p className="mt-4 border-t border-rule pt-4 text-xs leading-relaxed text-muted">
@@ -213,6 +222,10 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
             note="No online payment — we confirm every order first, then arrange bank transfer, mobile banking or cash on delivery."
           />
         </div>
+
+        {/* offline payment: where to send it, upload proof, see confirmation.
+            Hidden once an order is cancelled/rejected — there's nothing to pay. */}
+        {!negative && <PaymentPanel order={order} onOrderUpdate={setOrder} />}
 
         {deliveryLine && <p className="mt-6 text-sm text-muted">{deliveryLine}</p>}
 

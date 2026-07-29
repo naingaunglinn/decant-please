@@ -68,6 +68,11 @@ class TrackOrderController extends Controller
             'deposit_mmk' => $order->deposit_mmk,
             'total_mmk' => $order->total_mmk,
             'total_formatted' => Money::kyat($order->total_mmk),
+            'balance_due_mmk' => $order->balanceDue(),
+            'payment_status' => $order->payment_status->value,
+            'payment_status_label' => $order->payment_status->label(),
+            'has_payment_proof' => $order->payment_proof_path !== null,
+            'paid_at' => $order->paid_at?->toIso8601String(),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\OrderPlaced;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Support\Money;
@@ -46,6 +47,10 @@ class OrderController extends Controller
             'promo_code' => $data['promo_code'] ?? null,
             'items' => $data['items'],
         ]);
+
+        // After the order commits (newFromCheckout's transaction has returned) —
+        // notification channels hang off this, never off the checkout code.
+        OrderPlaced::dispatch($order);
 
         return response()->json([
             'tracking_code' => $order->tracking_code,
