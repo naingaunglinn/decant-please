@@ -81,6 +81,20 @@ class TelegramAlertTest extends TestCase
             && str_contains($request['text'], '10ml × 2'));
     }
 
+    public function test_one_checkout_sends_exactly_one_alert(): void
+    {
+        // The listener is wired once, explicitly, in AppServiceProvider; event
+        // auto-discovery is off (bootstrap/app.php) so it can't register a second
+        // copy. With both active, one checkout alerted the admin twice (#52).
+        $this->configureTelegram();
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true], 200)]);
+        $price = $this->inStockPrice();
+
+        $this->checkout($price)->assertCreated();
+
+        Http::assertSentCount(1);
+    }
+
     public function test_honeypot_checkout_sends_no_alert(): void
     {
         $this->configureTelegram();

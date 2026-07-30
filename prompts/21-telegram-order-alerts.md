@@ -25,7 +25,12 @@ someone by phone number. So:
 **after** `newFromCheckout` commits (website path only; the honeypot returns before
 any order exists, so it never dispatches). A `NotifyAdminOfNewOrder` listener builds
 the message and hands it to a `TelegramNotifier` service. Registered explicitly in
-`AppServiceProvider` (`Event::listen`) so the wiring is greppable.
+`AppServiceProvider` (`Event::listen`) so the wiring is greppable. *(Amended by #52:
+Laravel's event auto-discovery also scans `app/Listeners/`, so the explicit wiring
+registered the listener twice and every order alerted the admin twice. Discovery is
+now disabled — `->withEvents(discover: false)` in `bootstrap/app.php`; note `false`,
+not `[]`, which falls back to the default scan path. Consequence: every future
+listener must be wired explicitly in `AppServiceProvider`, or it won't run.)*
 
 Adding SMS/Viber later is another listener on the same event — no checkout changes.
 This matches the v5 rule: the trigger lives in the API, reusable by a future client.

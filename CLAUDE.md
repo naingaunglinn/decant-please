@@ -1,9 +1,27 @@
-# CLAUDE.md — Decant Please! (v12)
+# CLAUDE.md — Decant Please! (v13)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v12
+## 0. What changed in v13
+
+**v13** is a docs-only alignment (issue #50) — no code, config, or behavior changes.
+
+- **§8 amended, deliberately.** Like v6's change to §2's "fixed" stack table and
+  v8's scoped stock reversal, this edits a section that exists to say "do NOT
+  build": §8's blanket "email notifications out of scope" predated step 21, which
+  shipped **admin-side Telegram order alerts** (v11, `prompts/21`). §8 now draws
+  the boundary where Telegram's own constraint puts it — admin alerts in scope and
+  shipped; customer-facing notifications still out, because a bot can only message
+  a chat that has pressed Start on it, so reaching customers would need a
+  per-customer opt-in tap or a paid channel. The tracking page remains the
+  customer's channel.
+- The root, backend, and frontend READMEs caught up with v7–v12: the
+  Heroku/Vercel/R2 deployment reality (they still described a bare-VPS DEPLOY.md),
+  the payment/stock/CSV-import/Telegram features, the payment-proof endpoint, the
+  full env-var tables, and the real test count.
+
+## 0.1 What changed in v12
 
 **v12** moves payment-proof screenshots off the public image bucket (issue #47) — an
 infra correction to v10, no feature change and no API change.
@@ -49,6 +67,11 @@ confirmation; sibling feature branches, all landing on `develop`.)
   `TelegramNotifier` service. Adding SMS/Viber later = another listener on the same
   event, no checkout changes. Dispatched only on the website checkout path (manual
   admin orders don't self-notify); the honeypot path never dispatches.
+  **Amended by #52:** event auto-discovery is disabled
+  (`->withEvents(discover: false)` in `bootstrap/app.php`) — it had registered the
+  explicitly-wired listener a second time, double-sending every alert. All listeners
+  are wired explicitly in `AppServiceProvider` (`Event::listen`); a listener class
+  that isn't wired there does not run.
 - **Dependency-free.** One `Http::post` to the Bot API — no composer package on the
   Heroku buildpack. Config is `services.telegram` (`TELEGRAM_BOT_TOKEN`,
   `TELEGRAM_ADMIN_CHAT_ID`); both blank = feature off (no-op).
@@ -531,6 +554,13 @@ client on checkout (see `05-api-layer.md`).
   reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
   cost/margin accounting. The customer-facing `in_stock` flag stays manual — v8's
   stock warns, it never flips it.
-- Email notifications (nothing in the brief asks for them; tracking is code + phone
-  only). Flag it if you want order-confirmation emails or SMS later — that's a
-  clean addition on top of this schema, not a redesign of it.
+- **Customer-facing** notifications — email, SMS, or messaging apps. *Amended in
+  v13: admin-side alerts are no longer excluded — v11 (step 21, `prompts/21`)
+  shipped Telegram order alerts to the decanter.* The boundary sits where
+  Telegram's constraint puts it: a bot can only message a chat that has pressed
+  **Start** on it, so alerting the one decanter is free and automatic, while
+  alerting customers would need a per-customer opt-in tap or a paid channel
+  (SMS/Viber). Customer-facing notifications stay out; the tracking page
+  (code + phone) remains the customer's channel. Further admin-side alerts
+  (accepted/decanted/delivered) are clean additions on the v11 event layer, not
+  redesigns.

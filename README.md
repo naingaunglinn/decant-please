@@ -20,7 +20,7 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 | `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` — [README](backend/README.md) with routes & file structure |
 | `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
 | `CLAUDE.md` | Project spec and source of truth for every product/design decision |
-| `DEPLOY.md` | Production deployment guide (VPS backend + Vercel frontend, backups) |
+| `DEPLOY.md` | Production deployment guide (Heroku backend + Vercel frontend + Cloudflare R2 storage, backups) |
 | `prompts/` | The step-by-step build prompts this project was built from |
 
 ## Features
@@ -38,6 +38,9 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Customer self-cancellation while an order is still awaiting confirmation
 - Promo codes at checkout — live preview before committing, re-validated atomically at
   submission, named on the receipt
+- Offline-payment panel on the receipt — balance due, the decanter's configured
+  KBZPay/Wave transfer details and optional QR, and a transfer-screenshot upload;
+  flips to "paid" once the decanter confirms (no gateway — see below)
 - Related fragrances on every detail page, a recently-viewed rail, and a generated sitemap
 
 **Admin panel (`/admin`, login required)**
@@ -48,9 +51,21 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Manual order entry for customers who still order by DM
 - **Production schedule** — per-day, aggregated view of which fragrances/sizes to decant
   and how many vials, across all upcoming orders
+- Payment tracking — mark orders paid/unpaid (confirmation time auto-stamped), payment
+  badge + filter, the customer's transfer screenshot attached to the order (stored in a
+  private bucket, served only through an authenticated admin route)
+- Decant stock by total ml — opt-in per fragrance, drawn down automatically when an
+  order is decanted; warn-only (a shortfall never blocks an order)
+- Bulk catalog CSV import — the decanter's existing price list, one row per fragrance;
+  idempotent re-uploads, opt-in update mode, failed rows returned as a fixable CSV,
+  downloadable template
+- Telegram alert to the decanter's phone the moment a website order lands (off until a
+  bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
-- Dashboard: monthly revenue, orders by status, decants due today, top fragrances
-- CSV export of orders, respecting the current tab/filters/sort
+- Dashboard: monthly revenue, orders by status, unpaid orders + outstanding total,
+  decants due today, top fragrances, and a low-stock reorder panel
+- CSV export of orders, respecting the current tab/filters/sort (incl. payment +
+  balance-due columns)
 - Printable A5 packing invoices (PDF) — print or download per order, or one batch PDF for
   the filtered view (e.g. today's deliveries), with an emphasized balance-due figure and a
   bundled Myanmar-script font so Burmese names/addresses render
@@ -197,6 +212,10 @@ npm run dev -- -p 3001
 | `FRONTEND_URL` | Storefront origin — CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by the seeder for the admin login |
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Shown as storefront footer links; blank = hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details shown at checkout / on the receipt via `/api/v1/meta`; blank fields are hidden |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram; both blank = alerts off |
+| `MEDIA_DISK` | Disk for uploaded images — `public` locally (via `storage:link`), `s3` (Cloudflare R2) in production |
+| `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a second no-public-domain R2 bucket in production |
 
 **Frontend `.env.local`**
 
@@ -204,6 +223,7 @@ npm run dev -- -p 3001
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` |
 | `NEXT_PUBLIC_SITE_URL` | Public site URL — canonical/OG metadata |
+| `NEXT_PUBLIC_IMAGE_URL` | Production only — the R2 public image host, allow-listed for the image optimizer; unset locally |
 
 ## Public API
 
@@ -214,10 +234,11 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 | GET | `/fragrances` | Filterable catalog | 120/min |
 | GET | `/fragrances/{slug}` | Fragrance detail | 120/min |
 | GET | `/brands` | Active brands | 120/min |
-| GET | `/meta` | Filter options, price bounds, social links | 120/min |
+| GET | `/meta` | Filter options, price bounds, social links, payment details | 120/min |
 | POST | `/orders` | Guest checkout | 10/min |
 | GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/orders/cancel` | Customer cancel while awaiting confirmation | 10/min |
+| POST | `/orders/payment-proof` | Upload a transfer screenshot (code + phone gated) | 10/min |
 | POST | `/orders/validate-promo` | Preview a promo code against the cart | 10/min |
 
 Guarantees worth knowing:
@@ -234,14 +255,14 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 58 tests — domain, admin (Livewire), invoices, full API
+docker compose exec backend php artisan test   # 104 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 
 Or with local toolchains:
 
 ```bash
-cd backend && php artisan test   # 58 tests — domain, admin (Livewire), invoices, full API
+cd backend && php artisan test   # same 104 tests, using your local toolchain
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 
@@ -259,9 +280,11 @@ sh backend/scripts/verify-postgres-portability.sh   # drives the running stack, 
 
 ## Deployment
 
-See **[DEPLOY.md](DEPLOY.md)** — exact commands for a PHP-FPM + Nginx + PostgreSQL VPS,
-Vercel setup for the frontend, the production `.env` template, and the nightly
-`pg_dump` backup cron (order history is the decanter's financial record).
+See **[DEPLOY.md](DEPLOY.md)** — Heroku for the backend (Basic dyno + Heroku Postgres,
+config vars, CI-gated auto-deploy from `main`), Vercel for the frontend, Cloudflare R2
+for uploaded images (public bucket) and payment proofs (private bucket), and both
+backup layers: `heroku pg:backups` plus an off-Heroku nightly `pg_dump` cron (order
+history is the decanter's financial record).
 
 When the demo data has served its purpose:
 
@@ -279,5 +302,9 @@ motion moment is the tracking timeline filling like a vial. Tokens live in
 
 ## Deliberately out of scope
 
-Online payments, customer accounts, chat, multi-decanter marketplace, bottle-volume
-inventory, email/SMS notifications. See `CLAUDE.md` §8 before adding any of these.
+Online payment gateways, customer accounts, chat, multi-decanter marketplace,
+per-bottle inventory (total-ml decant stock *is* in, since v8), and **customer-facing**
+notifications — admin-side Telegram alerts shipped in step 21, but a bot can't message
+a customer who never pressed Start, so reaching them would need per-customer opt-in or
+a paid channel; the tracking page stays the customer's channel. See `CLAUDE.md` §8
+before adding any of these.

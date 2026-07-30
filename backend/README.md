@@ -36,10 +36,14 @@ Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
 | `FRONTEND_URL` | Storefront origin — the CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/meta` for the storefront footer; blank = hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details exposed via `/api/v1/meta`; blank fields hidden, whole block null when none set |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram (`php artisan telegram:test` verifies); both blank = off |
+| `MEDIA_DISK` | Disk for uploaded images — `public` locally via `storage:link`, `s3` (Cloudflare R2) in production |
+| `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a separate no-public-domain R2 bucket in production |
 | `DB_*` | PostgreSQL connection. `DATABASE_URL` (not `DB_URL`) overrides them all — that's the name Heroku injects |
 
-Production values and hardening (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE`, config
-caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
+Production values and hardening (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE`, forced
+HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DEPLOY.md).
 
 ## Routes
 
@@ -50,10 +54,11 @@ caching) are covered in [`../DEPLOY.md`](../DEPLOY.md).
 | GET | `/api/v1/fragrances` | Filterable, paginated catalog | 120/min |
 | GET | `/api/v1/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
 | GET | `/api/v1/brands` | Active brands | 120/min |
-| GET | `/api/v1/meta` | Filter options, price bounds, social links | 120/min |
+| GET | `/api/v1/meta` | Filter options, price bounds, social links, payment details | 120/min |
 | POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
 | GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
+| POST | `/api/v1/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |
 | POST | `/api/v1/orders/validate-promo` | Preview a promo code — nothing persisted; checkout re-validates | 10/min |
 
 Each limit is its own per-IP bucket (named limiters in `AppServiceProvider`), so heavy
@@ -76,7 +81,8 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 | Route | What it is |
 |---|---|
 | `/up` | Health check — point uptime monitors / load-balancer probes here |
-| `/storage/{path}` | Uploaded images — requires `php artisan storage:link` on every deploy target |
+| `/storage/{path}` | Uploaded images in local dev (`php artisan storage:link`) — production serves images from Cloudflare R2 instead |
+| `/admin/orders/{id}/payment-proof` | Streams the order's payment screenshot from the private proofs disk — panel-auth only, the one way a proof is ever served |
 | `/` | Plain Laravel welcome page; the real storefront is the frontend app |
 
 ## File structure
@@ -86,33 +92,35 @@ Trimmed to the files you'd look for first. Deployment-relevant paths are marked 
 ```text
 backend/
 ├── app/
-│   ├── Console/Commands/FreshStart.php     # php artisan decant:fresh-start (handover wipe)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PromoType
+│   ├── Console/Commands/                   # FreshStart (decant:fresh-start handover wipe), TelegramTest (telegram:test)
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentStatus, PromoType
+│   ├── Events/ + Listeners/                # OrderPlaced (website checkout) → NotifyAdminOfNewOrder (Telegram)
 │   ├── Filament/
 │   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ Blade view in resources/)
 │   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
-│   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants
+│   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
-│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder
+│   │   ├── Controllers/                    # OrderInvoiceController (A5 PDFs), PaymentProofViewController (streams proofs) — panel-auth'd
+│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder, ValidatePromo, PaymentProof
 │   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
 │   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem, PromoCode (+ Concerns/HasSlug)
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
-│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
+│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard, explicit event wiring (auto-discovery is off)
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
-│   └── Support/Money.php                   # the one Kyat formatter — all money display goes through it
-├── bootstrap/app.php                       # routing + middleware wiring (api: routes/api.php)
+│   └── Support/                            # Money (the one Kyat formatter), CatalogImport (CSV import engine), TelegramNotifier
+├── bootstrap/app.php                       # routing + middleware wiring; event auto-discovery disabled (#52)
 ├── config/cors.php                         # allowlist = FRONTEND_URL           ← must match storefront origin
 ├── database/
-│   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items
+│   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
-├── public/                                 # ← web root — point Nginx/PHP-FPM here, never at the repo root
+├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
 ├── resources/views/filament/               # production schedule Blade view
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
-├── storage/                                # ← must be writable (www-data); app/public = uploaded images (back this up)
-├── tests/Feature/                          # 47 tests: domain, admin catalog, admin orders, public API, promo codes, fresh-start
-├── .env.example                            # ← template for the production .env
+├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
+├── tests/Feature/                          # 104 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices
+├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
 
@@ -140,7 +148,7 @@ backend/
 php artisan test
 ```
 
-47 tests / 329 assertions on an in-memory SQLite database — your dev Postgres data is
+104 tests / 529 assertions on an in-memory SQLite database — your dev Postgres data is
 never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`
@@ -151,8 +159,9 @@ those against the running stack — reach for it whenever a change is engine-spe
 ## Useful artisan commands
 
 ```bash
-php artisan decant:fresh-start   # wipe demo fragrances + orders; keep brands and admin user
+php artisan decant:fresh-start   # wipe demo fragrances + orders (and their payment proofs); keep brands and admin user
 php artisan db:seed              # reseed demo data (idempotent admin user)
+php artisan telegram:test        # confirm the configured bot token + chat id actually reach Telegram
 php artisan cache:clear          # /api/v1 responses are cached for 10 minutes
 ```
 
