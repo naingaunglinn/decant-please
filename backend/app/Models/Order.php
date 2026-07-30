@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'paid_at', 'payment_proof_path'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -99,6 +100,7 @@ class Order extends Model
                 'notes' => $data['notes'] ?? null,
                 'order_from' => OrderSource::Website,
                 'status' => OrderStatus::AwaitingConfirmation,
+                'payment_method' => $data['payment_method'] ?? PaymentMethod::Cod->value,
             ]);
 
             foreach ($data['items'] as $i => $item) {
@@ -337,6 +339,7 @@ class Order extends Model
             'order_from' => OrderSource::class,
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
+            'payment_method' => PaymentMethod::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
             'paid_at' => 'datetime',

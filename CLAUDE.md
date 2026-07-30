@@ -1,9 +1,36 @@
-# CLAUDE.md — Decant Please! (v13)
+# CLAUDE.md — Decant Please! (v14)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v13
+## 0. What changed in v14
+
+**v14** adds a **payment-method choice at checkout** (COD vs online prepay) and a
+**decanter-managed MMQR/payment settings** admin page (Step 22). Still no gateway —
+payment stays offline; this just lets the customer *choose* to prepay and gives the
+decanter a place to put their QR. Builds on v10's payment-proof + v12's private-proof
+bucket (#47).
+
+- **The method, chosen at ordering time.** A `payment_method` enum (`cod` | `online`)
+  on `orders`, defaulting `cod` (existing + manual/DM orders read as cash-on-delivery).
+  Checkout takes it (`in:cod,online`, defaults cod); the receipt/tracking response
+  returns it so the storefront knows which UI to show.
+- **Online = prepay before confirm.** The customer picks Online at checkout, then on
+  the order-complete page pays via the MMQR + uploads their slip (the existing
+  PaymentPanel), *before* the decanter confirms. The admin's **Needs-review** tab shows
+  the method + a "slip uploaded / awaiting slip" line, and the **Accept** modal softly
+  reminds (never blocks) if an online order is still Unpaid — check the slip, Mark paid,
+  then Accept. COD orders skip all that: a calm "pay cash on delivery" note, confirm as
+  normal. **Delivery fee is out of the online payment** — paid in cash to the courier
+  separately (the deliberate "Option B" simplification), so online = the item subtotal.
+- **MMQR/payment settings in the admin, not .env.** A single-row `ShopSetting` model +
+  a Filament **Payment settings** page (Settings nav group) where the decanter uploads
+  their **MMQR** (public media disk) and sets KBZPay/Wave numbers + instructions.
+  `/api/v1/meta` now reads these from the DB, **falling back to the `PAYMENT_*` env**
+  so existing deployments keep working; saving busts the meta cache. The page mirrors
+  Filament's own `EditProfile` form-page pattern (`content()` embeds the `form` schema).
+
+## 0.1 What changed in v13
 
 **v13** is a docs-only alignment (issue #50) — no code, config, or behavior changes.
 

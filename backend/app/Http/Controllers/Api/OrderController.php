@@ -20,6 +20,7 @@ class OrderController extends Controller
             'address' => ['required', 'string', 'max:1000'],
             'note' => ['nullable', 'string', 'max:1000'],
             'promo_code' => ['nullable', 'string', 'max:64'],
+            'payment_method' => ['nullable', 'string', 'in:cod,online'], // defaults to cod
             'website' => ['nullable', 'string', 'max:255'], // honeypot — real customers never see it
             'items' => ['required', 'array', 'min:1', 'max:20'],
             'items.*.fragrance_id' => ['required', 'integer'],
@@ -45,6 +46,7 @@ class OrderController extends Controller
             'address' => $data['address'],
             'notes' => $data['note'] ?? null,
             'promo_code' => $data['promo_code'] ?? null,
+            'payment_method' => $data['payment_method'] ?? null,
             'items' => $data['items'],
         ]);
 

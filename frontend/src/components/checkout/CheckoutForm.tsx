@@ -3,11 +3,14 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 
+export type PaymentMethod = "cod" | "online";
+
 export interface ContactFields {
   customer_name: string;
   phone: string;
   address: string;
   note?: string;
+  payment_method: PaymentMethod;
 }
 
 interface CheckoutFormProps {
@@ -18,6 +21,7 @@ interface CheckoutFormProps {
 
 export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutFormProps) {
   const [honeypot, setHoneypot] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("cod");
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -28,6 +32,7 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
         phone: String(data.get("phone") ?? "").trim(),
         address: String(data.get("address") ?? "").trim(),
         note: String(data.get("note") ?? "").trim() || undefined,
+        payment_method: method,
       },
       honeypot,
     );
@@ -93,15 +98,67 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors }: CheckoutForm
         </label>
       </div>
 
-      <p className="text-xs leading-relaxed text-muted">
-        No payment now — we review your order first, then arrange bank transfer, mobile
-        banking or cash on delivery.
-      </p>
+      <div>
+        <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
+          How you&apos;ll pay
+        </span>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <MethodOption
+            value="cod"
+            current={method}
+            onSelect={setMethod}
+            title="Cash on delivery"
+            desc="Pay the delivery person when it arrives."
+          />
+          <MethodOption
+            value="online"
+            current={method}
+            onSelect={setMethod}
+            title="Online transfer"
+            desc="Scan our QR to pay, then upload your slip."
+          />
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          {method === "online"
+            ? "After you place the order, you'll see our QR — pay the total and upload your transfer slip so we can confirm. Delivery is paid separately in cash."
+            : "No payment now — we confirm your order first, and you pay cash when it's delivered."}
+        </p>
+      </div>
 
       <Button type="submit" disabled={submitting} className="self-start">
         {submitting ? "Placing order…" : "Place order"}
       </Button>
     </form>
+  );
+}
+
+function MethodOption({
+  value,
+  current,
+  onSelect,
+  title,
+  desc,
+}: {
+  value: PaymentMethod;
+  current: PaymentMethod;
+  onSelect: (value: PaymentMethod) => void;
+  title: string;
+  desc: string;
+}) {
+  const selected = current === value;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={() => onSelect(value)}
+      className={`rounded-2xl border px-5 py-4 text-left transition-colors ${
+        selected ? "border-pine bg-pine-soft" : "border-rule hover:bg-pine-soft/40"
+      }`}
+    >
+      <span className="block text-sm font-medium text-ink-strong">{title}</span>
+      <span className="mt-1 block text-xs leading-relaxed text-muted">{desc}</span>
+    </button>
   );
 }
 

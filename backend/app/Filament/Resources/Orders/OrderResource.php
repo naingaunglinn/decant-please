@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Orders;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\Pages\CreateOrder;
 use App\Filament\Resources\Orders\Pages\EditOrder;
@@ -58,7 +59,12 @@ class OrderResource extends Resource
             ->visible(fn (Order $record): bool => $record->status === OrderStatus::AwaitingConfirmation)
             ->requiresConfirmation()
             ->modalHeading('Accept order')
-            ->modalDescription('Sets the decant schedule and moves the order to Pending.')
+            // Soft reminder only — never a hard block. For an online order still
+            // marked Unpaid, nudge the decanter to check the slip first.
+            ->modalDescription(fn (Order $record): string => $record->payment_method === PaymentMethod::Online
+                && $record->payment_status === PaymentStatus::Unpaid
+                    ? 'Heads up: this is an ONLINE order still marked Unpaid — check the payment slip and Mark paid if the transfer landed. You can still accept now and mark paid later.'
+                    : 'Sets the decant schedule and moves the order to Pending.')
             ->modalSubmitActionLabel('Accept order')
             ->schema([
                 DatePicker::make('decant_date')
