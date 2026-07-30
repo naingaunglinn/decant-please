@@ -94,6 +94,11 @@ confirmation; sibling feature branches, all landing on `develop`.)
   `TelegramNotifier` service. Adding SMS/Viber later = another listener on the same
   event, no checkout changes. Dispatched only on the website checkout path (manual
   admin orders don't self-notify); the honeypot path never dispatches.
+  **Amended by #52:** event auto-discovery is disabled
+  (`->withEvents(discover: false)` in `bootstrap/app.php`) — it had registered the
+  explicitly-wired listener a second time, double-sending every alert. All listeners
+  are wired explicitly in `AppServiceProvider` (`Event::listen`); a listener class
+  that isn't wired there does not run.
 - **Dependency-free.** One `Http::post` to the Bot API — no composer package on the
   Heroku buildpack. Config is `services.telegram` (`TELEGRAM_BOT_TOKEN`,
   `TELEGRAM_ADMIN_CHAT_ID`); both blank = feature off (no-op).
