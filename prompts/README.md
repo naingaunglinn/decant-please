@@ -42,6 +42,7 @@ Full history in `00-CLAUDE.md` §0.
    | 19 | `19-catalog-csv-import.md` | Bulk catalog onboarding — price-list CSV import + template on the Fragrances page | built |
    | 20 | `20-payment-proof.md` | Payment confirmation — paid/unpaid status, transfer-screenshot upload, configurable KBZPay/Wave details (backend + storefront) | built |
    | 21 | `21-telegram-order-alerts.md` | Telegram alert to the decanter on each website order (event layer, admin-only, free) | built |
+   | 22 | `22-online-payment-method.md` | Checkout COD/online choice + online prepay-before-confirm + admin MMQR/payment settings page | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

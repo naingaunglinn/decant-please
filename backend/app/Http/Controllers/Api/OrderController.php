@@ -9,6 +9,7 @@ use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -20,6 +21,12 @@ class OrderController extends Controller
             'address' => ['required', 'string', 'max:1000'],
             'note' => ['nullable', 'string', 'max:1000'],
             'promo_code' => ['nullable', 'string', 'max:64'],
+            'payment_method' => ['nullable', 'string', 'in:cod,online'], // defaults to cod
+            // Online orders prepay + attach their transfer slip up front; COD doesn't.
+            'proof' => [
+                Rule::requiredIf(fn (): bool => $request->input('payment_method') === 'online'),
+                'image', 'mimes:jpeg,jpg,png,webp', 'max:4096',
+            ],
             'website' => ['nullable', 'string', 'max:255'], // honeypot — real customers never see it
             'items' => ['required', 'array', 'min:1', 'max:20'],
             'items.*.fragrance_id' => ['required', 'integer'],
@@ -45,8 +52,17 @@ class OrderController extends Controller
             'address' => $data['address'],
             'notes' => $data['note'] ?? null,
             'promo_code' => $data['promo_code'] ?? null,
+            'payment_method' => $data['payment_method'] ?? null,
             'items' => $data['items'],
         ]);
+
+        // Online prepay: the transfer slip rides in with the checkout, so the order
+        // is born with its proof on the private disk (never the public media disk).
+        if ($request->hasFile('proof')) {
+            $order->attachPaymentProof(
+                $request->file('proof')->store('payment-proofs', config('filesystems.proofs_disk')),
+            );
+        }
 
         // After the order commits (newFromCheckout's transaction has returned) —
         // notification channels hang off this, never off the checkout code.

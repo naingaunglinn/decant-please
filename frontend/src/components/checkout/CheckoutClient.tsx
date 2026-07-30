@@ -17,7 +17,7 @@ export interface CheckoutErrors {
 const NO_ERRORS: CheckoutErrors = { fields: {}, lines: {}, general: null };
 
 export function CheckoutClient() {
-  const { lines, hydrated, clear } = useCart();
+  const { lines, subtotal, hydrated, clear } = useCart();
   const router = useRouter();
   const [errors, setErrors] = useState<CheckoutErrors>(NO_ERRORS);
   const [submitting, setSubmitting] = useState(false);
@@ -38,21 +38,24 @@ export function CheckoutClient() {
     );
   }
 
-  const placeOrder = async (contact: ContactFields, honeypot: string) => {
+  const placeOrder = async (contact: ContactFields, honeypot: string, proof: File | null) => {
     setSubmitting(true);
     setErrors(NO_ERRORS);
 
     try {
-      const order = await createOrder({
-        ...contact,
-        website: honeypot,
-        promo_code: promoCode ?? undefined,
-        items: lines.map((line) => ({
-          fragrance_id: line.fragranceId,
-          size_ml: line.sizeMl,
-          quantity: line.quantity,
-        })),
-      });
+      const order = await createOrder(
+        {
+          ...contact,
+          website: honeypot,
+          promo_code: promoCode ?? undefined,
+          items: lines.map((line) => ({
+            fragrance_id: line.fragranceId,
+            size_ml: line.sizeMl,
+            quantity: line.quantity,
+          })),
+        },
+        proof,
+      );
 
       try {
         // just the lookup pair — the complete page fetches the real receipt.
@@ -104,7 +107,12 @@ export function CheckoutClient() {
             {errors.general}
           </p>
         )}
-        <CheckoutForm onSubmit={placeOrder} submitting={submitting} fieldErrors={errors.fields} />
+        <CheckoutForm
+          onSubmit={placeOrder}
+          submitting={submitting}
+          fieldErrors={errors.fields}
+          subtotal={subtotal}
+        />
       </div>
 
       <div className="order-1 md:order-2">

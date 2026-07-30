@@ -96,6 +96,7 @@ export interface CheckoutPayload {
   address: string;
   note?: string;
   promo_code?: string;
+  payment_method?: PaymentMethod; // defaults to cod server-side
   website?: string; // honeypot — always empty for humans
   items: CheckoutItem[];
 }
@@ -126,6 +127,8 @@ export type OrderStatus =
 
 export type PaymentStatus = "unpaid" | "paid";
 
+export type PaymentMethod = "cod" | "online";
+
 export interface OrderStatusResponse {
   tracking_code: string;
   order_number: string;
@@ -155,6 +158,8 @@ export interface OrderStatusResponse {
   balance_due_mmk: number;
   payment_status: PaymentStatus;
   payment_status_label: string;
+  payment_method: PaymentMethod;
+  payment_method_label: string;
   has_payment_proof: boolean;
   paid_at: string | null;
 }

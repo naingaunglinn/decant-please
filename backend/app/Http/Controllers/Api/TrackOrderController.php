@@ -71,6 +71,8 @@ class TrackOrderController extends Controller
             'balance_due_mmk' => $order->balanceDue(),
             'payment_status' => $order->payment_status->value,
             'payment_status_label' => $order->payment_status->label(),
+            'payment_method' => $order->payment_method->value,
+            'payment_method_label' => $order->payment_method->label(),
             'has_payment_proof' => $order->payment_proof_path !== null,
             'paid_at' => $order->paid_at?->toIso8601String(),
         ];

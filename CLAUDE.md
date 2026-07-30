@@ -1,9 +1,44 @@
-# CLAUDE.md — Decant Please! (v13)
+# CLAUDE.md — Decant Please! (v14)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v13
+## 0. What changed in v14
+
+**v14** adds a **payment-method choice at checkout** (COD vs online prepay) and a
+**decanter-managed MMQR/payment settings** admin page (Step 22). Still no gateway —
+payment stays offline; this just lets the customer *choose* to prepay and gives the
+decanter a place to put their QR. Builds on v10's payment-proof + v12's private-proof
+bucket (#47).
+
+- **The method, chosen at ordering time.** A `payment_method` enum (`cod` | `online`)
+  on `orders`, defaulting `cod` (existing + manual/DM orders read as cash-on-delivery).
+  Checkout takes it (`in:cod,online`, defaults cod); the receipt/tracking response
+  returns it so the storefront knows which UI to show.
+- **Online = pay + attach slip *at checkout*.** The customer picks Online, sees the
+  **MMQR + amount (cart subtotal) on the checkout page**, pays, and **uploads their slip
+  to place the order** — the slip is required, so `POST /orders` becomes multipart and
+  the order is *born with its proof* on the private disk. This is deliberate (chosen
+  over "pay on the order-complete page"): it means **an online order can never be
+  unpaid-with-no-slip** — no ghost orders, no auto-expire needed. The admin's
+  **Needs-review** shows the method + a "slip uploaded" line; the decanter checks the
+  slip → **Mark paid** → **Accept**. COD skips all this: one-tap place order, a calm
+  "pay cash on delivery" note. If the shop has no payment settings configured, the
+  Online option is unavailable (COD only). **Delivery fee stays cash-to-courier**, off
+  the online amount (the "Option B" simplification), so online = the item subtotal.
+- **A stock check surfaces at Accept.** `Order::stockShortfalls()` compares each tracked
+  fragrance's `stock_ml` against what the order needs; the **Accept** modal shows any
+  shortfall (*"needs 10ml but only 8ml in stock"*) alongside the unpaid-online reminder —
+  soft warnings, **never a block**. So a shortfall is caught before the decant bench (and
+  before a prepaid order is committed), not discovered at the pour.
+- **MMQR/payment settings in the admin, not .env.** A single-row `ShopSetting` model +
+  a Filament **Payment settings** page (Settings nav group) where the decanter uploads
+  their **MMQR** (public media disk) and sets KBZPay/Wave numbers + instructions.
+  `/api/v1/meta` now reads these from the DB, **falling back to the `PAYMENT_*` env**
+  so existing deployments keep working; saving busts the meta cache. The page mirrors
+  Filament's own `EditProfile` form-page pattern (`content()` embeds the `form` schema).
+
+## 0.1 What changed in v13
 
 **v13** is a docs-only alignment (issue #50) — no code, config, or behavior changes.
 

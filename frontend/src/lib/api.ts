@@ -79,12 +79,49 @@ export async function getMeta(): Promise<CatalogMeta> {
   return apiFetch("/meta", { next: { revalidate: 60 } });
 }
 
-export async function createOrder(payload: CheckoutPayload): Promise<CheckoutResponse> {
-  return apiFetch("/orders", {
+export async function createOrder(
+  payload: CheckoutPayload,
+  proof?: File | null,
+): Promise<CheckoutResponse> {
+  // Online orders attach their transfer slip at checkout → multipart. COD stays JSON.
+  if (!proof) {
+    return apiFetch("/orders", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+  }
+
+  const form = new FormData();
+  form.append("customer_name", payload.customer_name);
+  form.append("phone", payload.phone);
+  form.append("address", payload.address);
+  if (payload.note) form.append("note", payload.note);
+  if (payload.promo_code) form.append("promo_code", payload.promo_code);
+  if (payload.payment_method) form.append("payment_method", payload.payment_method);
+  if (payload.website) form.append("website", payload.website);
+  payload.items.forEach((item, i) => {
+    form.append(`items[${i}][fragrance_id]`, String(item.fragrance_id));
+    form.append(`items[${i}][size_ml]`, String(item.size_ml));
+    form.append(`items[${i}][quantity]`, String(item.quantity));
+  });
+  form.append("proof", proof);
+
+  // No Content-Type — the browser sets the multipart boundary.
+  const response = await fetch(`${BASE}/orders`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    headers: { Accept: "application/json" },
+    body: form,
     cache: "no-store",
   });
+
+  if (response.status === 422) {
+    const body = await response.json();
+    throw new ApiValidationError(body.message ?? "Validation failed.", body.errors ?? {});
+  }
+  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+
+  return response.json();
 }
 
 /** Preview a promo against the current cart — server re-derives the subtotal.

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\DecantPrice;
 use App\Models\Fragrance;
@@ -183,6 +184,11 @@ class OrderForm
             ->columnSpanFull()
             ->columns(2)
             ->schema([
+                Select::make('payment_method')
+                    ->options(PaymentMethod::class)
+                    ->default(PaymentMethod::Cod->value)
+                    ->required()
+                    ->helperText('How the customer is paying. Manual/DM orders default to cash on delivery.'),
                 Select::make('payment_status')
                     ->options(PaymentStatus::class)
                     ->default(PaymentStatus::Unpaid->value)
