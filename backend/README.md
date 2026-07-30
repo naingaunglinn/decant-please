@@ -107,10 +107,10 @@ backend/
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
-│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard outside production
+│   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard, explicit event wiring (auto-discovery is off)
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
 │   └── Support/                            # Money (the one Kyat formatter), CatalogImport (CSV import engine), TelegramNotifier
-├── bootstrap/app.php                       # routing + middleware wiring (api: routes/api.php)
+├── bootstrap/app.php                       # routing + middleware wiring; event auto-discovery disabled (#52)
 ├── config/cors.php                         # allowlist = FRONTEND_URL           ← must match storefront origin
 ├── database/
 │   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
@@ -119,7 +119,7 @@ backend/
 ├── resources/views/filament/               # production schedule Blade view
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 103 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices
+├── tests/Feature/                          # 104 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -148,7 +148,7 @@ backend/
 php artisan test
 ```
 
-103 tests / 527 assertions on an in-memory SQLite database — your dev Postgres data is
+104 tests / 529 assertions on an in-memory SQLite database — your dev Postgres data is
 never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`
