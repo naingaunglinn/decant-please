@@ -43,6 +43,9 @@ Full history in `00-CLAUDE.md` §0.
    | 20 | `20-payment-proof.md` | Payment confirmation — paid/unpaid status, transfer-screenshot upload, configurable KBZPay/Wave details (backend + storefront) | built |
    | 21 | `21-telegram-order-alerts.md` | Telegram alert to the decanter on each website order (event layer, admin-only, free) | built |
    | 22 | `22-online-payment-method.md` | Checkout COD/online choice + online prepay-before-confirm + admin MMQR/payment settings page | built |
+   | 23 | `23-multi-tenancy-seam.md` | Multi-tenancy A — `shops` + `shop_id` seam, throwing tenant scope, slug composites, per-shop caches/storage, two-shop isolation suite | spec ready (design: `multi-tenancy-design.md`, evidence: `multi-tenancy-findings.md`) |
+   | 24 | `24-multi-tenancy-routing.md` | Multi-tenancy B — `/api/v1/{shop}/…` path prefix + storefront base-URL change (lockstep promotion) | spec ready — after 23 |
+   | 25 | `25-multi-tenancy-shop-onboarding.md` | Multi-tenancy C — Filament tenancy, shop CRUD, per-tenant Telegram, theming, onboarding runbook | thin spec by design — **do not build until a second client exists** |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

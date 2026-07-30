@@ -1,9 +1,36 @@
-# CLAUDE.md — Decant Please! (v14)
+# CLAUDE.md — Decant Please! (v15)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v14
+## 0. What changed in v15
+
+**v15** is a docs-only change (issue #57) — no code, config, or behavior changes.
+Multi-tenancy (one deployment serving many decant shops) is now **specified, not
+built**: the accepted design lives in `prompts/multi-tenancy-design.md` — amended to
+match a codebase audit whose evidence is committed as
+`prompts/multi-tenancy-findings.md` — and the build splits into three steps:
+`prompts/23-multi-tenancy-seam.md` (the data seam), `prompts/24-multi-tenancy-routing.md`
+(path-prefix routing), and `prompts/25-multi-tenancy-shop-onboarding.md`
+(tenant-facing admin/theming — **deliberately thin, deferred until a second client
+exists**). Steps run through WORKFLOW.md only when explicitly asked, like any other.
+
+- **§8 amended, deliberately** — the third such edit, after v6's stack table and
+  v13's notification split. The blanket "multi-tenant / multi-decanter marketplace"
+  exclusion conflated two scopes, so §8 now splits them along the axis design-doc §12
+  draws: **product scope** is unchanged — no customer ever sees two shops; a
+  storefront is one decanter's shop, and there is no marketplace — while
+  **infrastructure scope** is no longer excluded — one Laravel/Filament deployment
+  may serve many shops, each with its own storefront, catalog, orders, and settings.
+- Key decisions live in the design doc, not here: path-prefix tenant routing
+  (`/api/v1/{shop}/…`), a **throwing** tenant scope plus Filament tenancy (belt and
+  braces; the scope predicate must use `qualifyColumn()`), `(shop_id, slug)`
+  composites on brands/fragrances, per-shop cache keys and busting, `{shop}/` storage
+  prefixes, tracking codes staying globally unique via a `withoutTenancy()` dedup
+  check, and `shop_settings` staying its own table (`shop_id` + unique index) rather
+  than folding into `shops`.
+
+## 0.1 What changed in v14
 
 **v14** adds a **payment-method choice at checkout** (COD vs online prepay) and a
 **decanter-managed MMQR/payment settings** admin page (Step 22). Still no gateway —
@@ -583,7 +610,15 @@ client on checkout (see `05-api-layer.md`).
   details) but adds **no** gateway: money still moves outside the system.
 - Customer accounts / login on the customer side
 - Chat/messaging features
-- Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)
+- **Marketplace — product scope.** No customer-visible multi-shop anything: a
+  storefront shows exactly one decanter's catalog, and no customer ever sees two
+  shops. Unchanged from v1. *Split in v15 along design-doc §12's axis:*
+  **infrastructure scope** — how many shops one deployment serves — is no longer
+  excluded. Multi-tenancy is specified in `prompts/multi-tenancy-design.md` +
+  `prompts/23`–`25` (nothing built yet; each step runs only when explicitly asked,
+  and step 25 waits for a second client). Do not read shared multi-shop
+  infrastructure as a violation of this bullet — and do not read this bullet as
+  permission to put two shops in front of one customer.
 - Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
   stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
   reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
