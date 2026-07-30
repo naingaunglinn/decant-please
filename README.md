@@ -255,14 +255,14 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 103 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, full API
+docker compose exec backend php artisan test   # 104 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 
 Or with local toolchains:
 
 ```bash
-cd backend && php artisan test   # same 103 tests, using your local toolchain
+cd backend && php artisan test   # same 104 tests, using your local toolchain
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 

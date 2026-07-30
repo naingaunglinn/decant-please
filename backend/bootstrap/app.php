@@ -12,6 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Listeners are wired explicitly in AppServiceProvider (Event::listen) so the
+    // wiring stays greppable. Auto-discovery would register each app/Listeners class
+    // a second time — one OrderPlaced dispatch then alerts the admin twice (#52).
+    // Must be `false`: an empty paths array falls back to scanning app/Listeners.
+    ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware): void {
         // Heroku terminates TLS and forwards over HTTP with X-Forwarded-* headers, and
         // the dyno is only reachable through that router — so trust it. Without this,
