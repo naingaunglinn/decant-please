@@ -10,7 +10,9 @@ use App\Models\Order;
 use App\Models\ShopSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -29,13 +31,35 @@ class PaymentMethodTest extends TestCase
         $this->assertSame(PaymentMethod::Cod, Order::firstOrFail()->payment_method);
     }
 
-    public function test_checkout_stores_the_online_method(): void
+    public function test_online_checkout_stores_the_method_and_attaches_the_slip(): void
+    {
+        Storage::fake('local');
+        $price = $this->inStockPrice();
+
+        $this->checkout($price, method: 'online', proof: UploadedFile::fake()->image('slip.jpg'))
+            ->assertCreated();
+
+        $order = Order::firstOrFail();
+        $this->assertSame(PaymentMethod::Online, $order->payment_method);
+        $this->assertNotNull($order->payment_proof_path); // slip rode in with checkout
+        Storage::disk('local')->assertExists($order->payment_proof_path);
+    }
+
+    public function test_online_checkout_requires_a_slip(): void
     {
         $price = $this->inStockPrice();
 
-        $this->checkout($price, method: 'online')->assertCreated();
+        $this->checkout($price, method: 'online') // no proof
+            ->assertJsonValidationErrors('proof');
+        $this->assertSame(0, Order::count());
+    }
 
-        $this->assertSame(PaymentMethod::Online, Order::firstOrFail()->payment_method);
+    public function test_cod_checkout_needs_no_slip(): void
+    {
+        $price = $this->inStockPrice();
+
+        $this->checkout($price, method: 'cod')->assertCreated();
+        $this->assertNull(Order::firstOrFail()->payment_proof_path);
     }
 
     public function test_checkout_rejects_an_unknown_method(): void
@@ -48,8 +72,9 @@ class PaymentMethodTest extends TestCase
 
     public function test_receipt_reports_the_payment_method(): void
     {
+        Storage::fake('local');
         $price = $this->inStockPrice();
-        $this->checkout($price, method: 'online');
+        $this->checkout($price, method: 'online', proof: UploadedFile::fake()->image('slip.jpg'));
         $order = Order::firstOrFail();
 
         $this->getJson('/api/v1/orders/track?'.http_build_query([
@@ -59,6 +84,33 @@ class PaymentMethodTest extends TestCase
             ->assertOk()
             ->assertJsonPath('payment_method', 'online')
             ->assertJsonPath('payment_method_label', 'Online transfer');
+    }
+
+    // ---- Stock check (surfaced at Accept) -----------------------------------
+
+    public function test_stock_shortfalls_flags_tracked_fragrances_that_cannot_be_filled(): void
+    {
+        $price = $this->inStockPrice();
+        $price->fragrance->update(['stock_ml' => 8]); // only 8ml left; order needs 10ml
+
+        $order = Order::create([
+            'customer_name' => 'Aung Kyaw', 'phone' => '09-1', 'address' => 'Yangon',
+            'order_from' => 'website', 'status' => 'awaiting_confirmation',
+        ]);
+        $order->items()->create([
+            'fragrance_id' => $price->fragrance_id,
+            'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 1,
+        ]);
+
+        $short = $order->stockShortfalls();
+        $this->assertCount(1, $short);
+        $this->assertSame(10, $short[0]['needed']);
+        $this->assertSame(8, $short[0]['available']);
+
+        // an untracked fragrance (null stock) never counts as short
+        $price->fragrance->update(['stock_ml' => null]);
+        $this->assertSame([], $order->fresh()->stockShortfalls());
     }
 
     // ---- MMQR / shop payment settings ---------------------------------------
@@ -138,9 +190,9 @@ class PaymentMethodTest extends TestCase
         return $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true]);
     }
 
-    private function checkout(DecantPrice $price, ?string $method = null)
+    private function checkout(DecantPrice $price, ?string $method = null, ?UploadedFile $proof = null)
     {
-        return $this->postJson('/api/v1/orders', array_filter([
+        $payload = array_filter([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
             'address' => 'Sanchaung, Yangon',
@@ -150,6 +202,11 @@ class PaymentMethodTest extends TestCase
                 'size_ml' => $price->size_ml,
                 'quantity' => 1,
             ]],
-        ], fn ($v) => $v !== null));
+        ], fn ($v) => $v !== null);
+
+        // A slip means multipart; otherwise plain JSON (COD path).
+        return $proof
+            ? $this->post('/api/v1/orders', $payload + ['proof' => $proof], ['Accept' => 'application/json'])
+            : $this->postJson('/api/v1/orders', $payload);
     }
 }

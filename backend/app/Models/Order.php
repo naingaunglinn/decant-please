@@ -283,6 +283,38 @@ class Order extends Model
         return max(0, $this->total_mmk - $this->deposit_mmk);
     }
 
+    /**
+     * Tracked fragrances this order can't be fully poured from, given current
+     * stock_ml — surfaced at Accept so a shortfall is caught before committing,
+     * not at the decant bench. Untracked (null stock_ml) fragrances are ignored.
+     *
+     * @return array<array{name: string, needed: int, available: int}>
+     */
+    public function stockShortfalls(): array
+    {
+        $this->loadMissing('items.fragrance');
+
+        $needed = [];
+        foreach ($this->items as $item) {
+            if ($item->fragrance_id === null) {
+                continue;
+            }
+
+            $needed[$item->fragrance_id]['name'] ??= $item->fragrance?->name ?? $item->fragrance_name_snapshot;
+            $needed[$item->fragrance_id]['ml'] = ($needed[$item->fragrance_id]['ml'] ?? 0) + $item->size_ml * $item->quantity;
+            $needed[$item->fragrance_id]['stock'] = $item->fragrance?->stock_ml;
+        }
+
+        $short = [];
+        foreach ($needed as $row) {
+            if ($row['stock'] !== null && $row['ml'] > $row['stock']) {
+                $short[] = ['name' => $row['name'], 'needed' => $row['ml'], 'available' => (int) $row['stock']];
+            }
+        }
+
+        return $short;
+    }
+
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */
     public static function findByTracking(string $code, string $phone): ?self
     {

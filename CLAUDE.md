@@ -15,14 +15,22 @@ bucket (#47).
   on `orders`, defaulting `cod` (existing + manual/DM orders read as cash-on-delivery).
   Checkout takes it (`in:cod,online`, defaults cod); the receipt/tracking response
   returns it so the storefront knows which UI to show.
-- **Online = prepay before confirm.** The customer picks Online at checkout, then on
-  the order-complete page pays via the MMQR + uploads their slip (the existing
-  PaymentPanel), *before* the decanter confirms. The admin's **Needs-review** tab shows
-  the method + a "slip uploaded / awaiting slip" line, and the **Accept** modal softly
-  reminds (never blocks) if an online order is still Unpaid — check the slip, Mark paid,
-  then Accept. COD orders skip all that: a calm "pay cash on delivery" note, confirm as
-  normal. **Delivery fee is out of the online payment** — paid in cash to the courier
-  separately (the deliberate "Option B" simplification), so online = the item subtotal.
+- **Online = pay + attach slip *at checkout*.** The customer picks Online, sees the
+  **MMQR + amount (cart subtotal) on the checkout page**, pays, and **uploads their slip
+  to place the order** — the slip is required, so `POST /orders` becomes multipart and
+  the order is *born with its proof* on the private disk. This is deliberate (chosen
+  over "pay on the order-complete page"): it means **an online order can never be
+  unpaid-with-no-slip** — no ghost orders, no auto-expire needed. The admin's
+  **Needs-review** shows the method + a "slip uploaded" line; the decanter checks the
+  slip → **Mark paid** → **Accept**. COD skips all this: one-tap place order, a calm
+  "pay cash on delivery" note. If the shop has no payment settings configured, the
+  Online option is unavailable (COD only). **Delivery fee stays cash-to-courier**, off
+  the online amount (the "Option B" simplification), so online = the item subtotal.
+- **A stock check surfaces at Accept.** `Order::stockShortfalls()` compares each tracked
+  fragrance's `stock_ml` against what the order needs; the **Accept** modal shows any
+  shortfall (*"needs 10ml but only 8ml in stock"*) alongside the unpaid-online reminder —
+  soft warnings, **never a block**. So a shortfall is caught before the decant bench (and
+  before a prepaid order is committed), not discovered at the pour.
 - **MMQR/payment settings in the admin, not .env.** A single-row `ShopSetting` model +
   a Filament **Payment settings** page (Settings nav group) where the decanter uploads
   their **MMQR** (public media disk) and sets KBZPay/Wave numbers + instructions.

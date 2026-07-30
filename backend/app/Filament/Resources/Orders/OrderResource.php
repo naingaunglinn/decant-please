@@ -59,12 +59,10 @@ class OrderResource extends Resource
             ->visible(fn (Order $record): bool => $record->status === OrderStatus::AwaitingConfirmation)
             ->requiresConfirmation()
             ->modalHeading('Accept order')
-            // Soft reminder only — never a hard block. For an online order still
-            // marked Unpaid, nudge the decanter to check the slip first.
-            ->modalDescription(fn (Order $record): string => $record->payment_method === PaymentMethod::Online
-                && $record->payment_status === PaymentStatus::Unpaid
-                    ? 'Heads up: this is an ONLINE order still marked Unpaid — check the payment slip and Mark paid if the transfer landed. You can still accept now and mark paid later.'
-                    : 'Sets the decant schedule and moves the order to Pending.')
+            // Soft reminders only — never a hard block. Surfaces a stock shortfall
+            // (caught before the decant bench) and, for an unpaid online order, a
+            // nudge to check the slip first. The decanter can still accept.
+            ->modalDescription(fn (Order $record): string => self::acceptModalDescription($record))
             ->modalSubmitActionLabel('Accept order')
             ->schema([
                 DatePicker::make('decant_date')
@@ -90,6 +88,30 @@ class OrderResource extends Resource
                     ->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /**
+     * The Accept modal's body: soft warnings (a stock shortfall, or an unpaid
+     * online order) stacked before the plain confirmation. Informational only —
+     * the decanter can still accept.
+     */
+    protected static function acceptModalDescription(Order $record): string
+    {
+        $parts = [];
+
+        foreach ($record->stockShortfalls() as $short) {
+            $parts[] = "⚠ {$short['name']}: needs {$short['needed']}ml but only {$short['available']}ml in stock.";
+        }
+
+        if ($record->payment_method === PaymentMethod::Online && $record->payment_status === PaymentStatus::Unpaid) {
+            $parts[] = 'This online order is still Unpaid — check the payment slip and Mark paid if the transfer landed.';
+        }
+
+        if ($parts === []) {
+            return 'Sets the decant schedule and moves the order to Pending.';
+        }
+
+        return implode(' ', $parts).' You can still accept — you know your bottles best.';
     }
 
     /**
