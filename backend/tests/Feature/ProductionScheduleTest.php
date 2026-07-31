@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Filament\Pages\ProductionSchedule;
+use App\Filament\Pages\ProductionScheduleDay;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
@@ -28,7 +29,8 @@ class ProductionScheduleTest extends TestCase
         ]));
     }
 
-    // ---- The list's aggregation, pinned before the refactor -----------------
+    // ---- The shared aggregation (Order::productionScheduleFor) --------------
+    // Pinned against the pre-refactor day-card list; both pages read it now.
 
     public function test_same_fragrance_and_size_aggregate_into_one_line_across_orders(): void
     {
@@ -75,7 +77,7 @@ class ProductionScheduleTest extends TestCase
         $this->assertTrue($days[2]['groups']->isEmpty());
     }
 
-    public function test_cancelled_and_rejected_orders_contribute_nothing_to_the_list(): void
+    public function test_cancelled_and_rejected_orders_contribute_nothing_to_the_aggregation(): void
     {
         $kept = $this->fragrance();
         $dropped = $this->fragrance('Dior', 'Sauvage');
@@ -88,21 +90,12 @@ class ProductionScheduleTest extends TestCase
         $this->assertCount(1, $groups);
         $this->assertSame('Chanel — Allure Homme Sport', $groups[0]['label']);
         $this->assertSame(2, $groups[0]['quantity']);
-
-        Livewire::test(ProductionSchedule::class)
-            ->set('from', '2026-08-05')
-            ->set('to', '2026-08-06')
-            ->assertSee('Chanel — Allure Homme Sport')
-            ->assertDontSee('Dior — Sauvage');
     }
 
-    public function test_range_swaps_when_inverted_and_caps_at_31_days(): void
+    public function test_an_inverted_range_swaps_to_a_single_day(): void
     {
         $this->assertCount(1, $this->scheduleDays('2026-08-10', '2026-08-01'));
-        $this->assertCount(32, $this->scheduleDays('2026-08-01', '2026-12-31')); // from + 31 days
     }
-
-    // ---- The extracted method (Order::productionScheduleFor) ----------------
 
     public function test_a_single_day_window_includes_that_day(): void
     {
@@ -119,42 +112,7 @@ class ProductionScheduleTest extends TestCase
         $this->assertSame(2, $days[0]['groups'][0]['quantity']);
     }
 
-    public function test_the_page_reads_through_the_domain_method(): void
-    {
-        // Delegation pin: the list must never grow its own copy of the grouping.
-        $fragrance = $this->fragrance();
-        $this->orderOn('2026-08-05', [[$fragrance, 10, 1]]);
-        $this->orderOn('2026-08-05', [[$fragrance, 5, 4]]);
-
-        $flatten = fn (array $days) => collect($days)
-            ->map(fn ($day) => [$day['date']->toDateString(), $day['groups']->toArray()])
-            ->all();
-
-        $this->assertEquals(
-            $flatten(Order::productionScheduleFor(
-                CarbonImmutable::parse('2026-08-04'),
-                CarbonImmutable::parse('2026-08-06'),
-            )),
-            $flatten($this->scheduleDays('2026-08-04', '2026-08-06')),
-        );
-    }
-
-    public function test_list_renders_the_grouped_lines(): void
-    {
-        $fragrance = $this->fragrance();
-        $this->orderOn('2026-08-05', [[$fragrance, 10, 1]]);
-        $this->orderOn('2026-08-05', [[$fragrance, 10, 2]]);
-
-        Livewire::test(ProductionSchedule::class)
-            ->set('from', '2026-08-05')
-            ->set('to', '2026-08-06')
-            ->assertOk()
-            ->assertSee('Chanel — Allure Homme Sport')
-            ->assertSee('× 3')
-            ->assertSee('2 order(s)');
-    }
-
-    // ---- The calendar feed --------------------------------------------------
+    // ---- The calendar page --------------------------------------------------
 
     public function test_a_busy_day_produces_exactly_one_calendar_entry_with_the_vial_sum(): void
     {
@@ -192,6 +150,17 @@ class ProductionScheduleTest extends TestCase
         $this->assertSame(['2026-08-05'], $events->pluck('start')->all());
     }
 
+    public function test_calendar_feed_clamps_the_window_a_wire_call_can_ask_for(): void
+    {
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-01', [[$fragrance, 10, 1]]);
+        $this->orderOn('2026-12-25', [[$fragrance, 10, 1]]);
+
+        $events = collect($this->calendarEvents('2026-08-01', '2027-01-01'));
+
+        $this->assertSame(['2026-08-01'], $events->pluck('start')->all());
+    }
+
     public function test_cancelled_and_rejected_orders_contribute_nothing_to_the_calendar(): void
     {
         $fragrance = $this->fragrance();
@@ -199,6 +168,23 @@ class ProductionScheduleTest extends TestCase
         $this->orderOn('2026-08-05', [[$fragrance, 10, 5]], OrderStatus::Rejected);
 
         $this->assertSame([], $this->calendarEvents('2026-08-01', '2026-09-01'));
+    }
+
+    public function test_past_days_still_holding_unpoured_vials_flag_overdue(): void
+    {
+        $this->travelTo('2026-08-10');
+
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 2]]); // pending behind us — overdue
+        $this->orderOn('2026-08-06', [[$fragrance, 10, 2]], OrderStatus::Delivered); // poured — history
+        $this->orderOn('2026-08-20', [[$fragrance, 10, 2]]); // pending ahead — just scheduled
+
+        $events = collect($this->calendarEvents('2026-08-01', '2026-09-01'));
+
+        $this->assertSame(
+            ['2026-08-05' => ['ps-overdue'], '2026-08-06' => [], '2026-08-20' => []],
+            $events->pluck('classNames', 'start')->all(),
+        );
     }
 
     public function test_calendar_days_stay_put_under_utc_and_yangon_timezones(): void
@@ -222,28 +208,117 @@ class ProductionScheduleTest extends TestCase
         }
     }
 
-    public function test_reveal_day_focuses_the_list_on_that_day(): void
-    {
-        $this->orderOn('2026-08-05', [[$this->fragrance(), 10, 2]]);
-
-        Livewire::test(ProductionSchedule::class)
-            ->call('revealDay', '2026-08-05')
-            ->assertSet('from', '2026-08-05')
-            ->assertSet('to', '2026-08-05')
-            ->assertSee(CarbonImmutable::parse('2026-08-05')->format('l, j M Y'));
-    }
-
-    public function test_the_page_serves_calendar_and_list_together(): void
+    public function test_the_page_is_calendar_only_and_links_days_to_their_worklists(): void
     {
         Livewire::test(ProductionSchedule::class)
             ->assertOk()
             ->assertSeeHtml('id="ps-calendar"')
-            ->assertSee('Nothing to decant'); // the list is still there
+            ->assertDontSeeHtml('id="ps-from"') // the From/To range inputs are gone
+            ->assertDontSee('Nothing to decant'); // and so is the day-card list
 
-        // the vendored bundle is wired into the full page (assets hoist to the layout)
+        // the vendored bundle + the day-URL template are wired into the full page
         $this->get(ProductionSchedule::getUrl())
             ->assertOk()
-            ->assertSee('vendor/fullcalendar/index.global.min.js', false);
+            ->assertSee('vendor/fullcalendar/index.global.min.js', false)
+            ->assertSee('__DATE__', false);
+    }
+
+    // ---- The day detail page (/admin/production-schedule/{date}) -----------
+
+    public function test_day_page_renders_the_grouped_lines(): void
+    {
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 1]]);
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 2]]);
+        $this->orderOn('2026-08-05', [[$this->fragrance('Dior', 'Sauvage'), 10, 5]], OrderStatus::Cancelled);
+
+        Livewire::test(ProductionScheduleDay::class, ['date' => '2026-08-05'])
+            ->assertOk()
+            ->assertSee(CarbonImmutable::parse('2026-08-05')->format('l, j M Y'))
+            ->assertSee('Chanel — Allure Homme Sport')
+            ->assertSee('× 3')
+            ->assertSee('2 order(s)')
+            ->assertDontSee('Dior — Sauvage')
+            ->assertSee('@media print', false); // the sheet carries its print styles
+    }
+
+    public function test_day_page_shows_a_real_empty_state(): void
+    {
+        Livewire::test(ProductionScheduleDay::class, ['date' => '2026-08-05'])
+            ->assertOk()
+            ->assertSee('Nothing to decant')
+            ->assertSee('No orders have vials scheduled for this day.');
+    }
+
+    public function test_day_page_404s_on_anything_but_a_plain_y_m_d_param(): void
+    {
+        $invalid = [
+            '2026-8-5', // unpadded
+            '20260805', // no dashes
+            'not-a-date',
+            '2026-02-30', // well-formed, not a real date
+            '2026-13-01', // no thirteenth month
+            '2026-08-05T00:00:00', // datetimes invite timezone math — rejected
+        ];
+
+        foreach ($invalid as $bad) {
+            $this->get(ProductionScheduleDay::getUrl(['date' => $bad]))
+                ->assertNotFound();
+        }
+
+        $this->get(ProductionScheduleDay::getUrl(['date' => '2026-08-05']))->assertOk();
+    }
+
+    public function test_day_page_total_equals_that_days_calendar_aggregate(): void
+    {
+        $chanel = $this->fragrance();
+        $dior = $this->fragrance('Dior', 'Sauvage');
+        $this->orderOn('2026-08-05', [[$chanel, 10, 1]]);
+        $this->orderOn('2026-08-05', [[$chanel, 10, 1], [$chanel, 5, 4]]);
+        $this->orderOn('2026-08-05', [[$dior, 10, 6]]);
+
+        $dayTotal = $this->dayPage('2026-08-05')->getDay()['groups']->sum('quantity');
+        $event = collect($this->calendarEvents('2026-08-01', '2026-09-01'))->firstWhere('start', '2026-08-05');
+
+        $this->assertSame(12, $dayTotal);
+        $this->assertSame("{$dayTotal} vials", $event['title']);
+    }
+
+    public function test_both_pages_agree_under_utc_and_yangon_timezones(): void
+    {
+        foreach (['UTC' => '2026-08-05', 'Asia/Yangon' => '2026-08-20'] as $tz => $day) {
+            config()->set('app.timezone', $tz);
+            date_default_timezone_set($tz);
+
+            $this->orderOn($day, [[$this->fragrance(), 10, 2]]);
+
+            $event = collect($this->calendarEvents('2026-08-01', '2026-09-01'))->firstWhere('start', $day);
+            $this->assertNotNull($event, "calendar lost {$day} under {$tz}");
+            $this->assertSame('2 vials', $event['title']);
+
+            $page = $this->dayPage($day);
+            $this->assertSame($day, $page->getDay()['date']->toDateString(), "detail day shifted under {$tz}");
+            $this->assertSame(2, $page->getDay()['groups']->sum('quantity'));
+
+            Livewire::test(ProductionScheduleDay::class, ['date' => $day])
+                ->assertSee('Chanel — Allure Homme Sport')
+                ->assertSee('× 2');
+        }
+    }
+
+    public function test_day_page_steps_between_days_and_links_back_to_the_calendar(): void
+    {
+        $this->assertStringEndsWith(
+            '/admin/production-schedule/2026-08-05',
+            ProductionScheduleDay::getUrl(['date' => '2026-08-05']),
+        );
+        // it needs a date, so it must never appear in the sidebar
+        $this->assertFalse(ProductionScheduleDay::shouldRegisterNavigation());
+
+        Livewire::test(ProductionScheduleDay::class, ['date' => '2026-08-05'])
+            ->assertSeeHtml(ProductionScheduleDay::getUrl(['date' => '2026-08-04']))
+            ->assertSeeHtml(ProductionScheduleDay::getUrl(['date' => '2026-08-06']))
+            ->assertSeeHtml('href="'.ProductionSchedule::getUrl().'"');
     }
 
     // ---- helpers ------------------------------------------------------------
@@ -255,21 +330,29 @@ class ProductionScheduleTest extends TestCase
     }
 
     /**
-     * The list's own read path — what the blade calls. Pin windows end a day
-     * past the target day: the pre-refactor whereBetween missed a window's
-     * final day under SQLite (the date cast stores 'Y-m-d 00:00:00', and SQLite
-     * compares it as a string against the bare 'Y-m-d' bound — Postgres's DATE
-     * column truncates, so production never saw it). Kept wide so these pins
-     * hold on both sides of the refactor; the single-day case gets its own
-     * regression test once the extracted method compares dates engine-proof.
+     * The shared domain read. Pin windows end a day past the target day: they
+     * were written against the pre-refactor list, whose whereBetween missed a
+     * window's final day under SQLite (the date cast stores 'Y-m-d 00:00:00',
+     * and SQLite compares it as a string against the bare 'Y-m-d' bound —
+     * Postgres's DATE column truncates, so production never saw it). Kept wide
+     * so the pins hold on both sides of that refactor; the single-day case has
+     * its own regression test now that whereDate compares dates engine-proof.
      */
     private function scheduleDays(string $from, string $to): array
     {
-        $page = new ProductionSchedule;
-        $page->from = $from;
-        $page->to = $to;
+        return Order::productionScheduleFor(
+            CarbonImmutable::parse($from),
+            CarbonImmutable::parse($to),
+        );
+    }
 
-        return $page->getDays();
+    /** The day page as the route mounts it — validated, reading the shared method. */
+    private function dayPage(string $date): ProductionScheduleDay
+    {
+        $page = new ProductionScheduleDay;
+        $page->mount($date);
+
+        return $page;
     }
 
     private function fragrance(string $brandName = 'Chanel', string $name = 'Allure Homme Sport'): Fragrance

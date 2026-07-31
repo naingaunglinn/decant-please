@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use BackedEnum;
 use Carbon\CarbonImmutable;
@@ -21,32 +22,6 @@ class ProductionSchedule extends Page
 
     protected static ?int $navigationSort = 2;
 
-    public string $from = '';
-
-    public string $to = '';
-
-    public function mount(): void
-    {
-        $this->from = today()->toDateString();
-        $this->to = today()->addDays(7)->toDateString();
-    }
-
-    /**
-     * The day-card list's data: the domain aggregation over the picked window.
-     *
-     * @return array<int, array{date: CarbonImmutable, groups: Collection}>
-     */
-    public function getDays(): array
-    {
-        $from = CarbonImmutable::parse($this->from ?: today());
-        $to = CarbonImmutable::parse($this->to ?: today());
-
-        // ponytail: hard cap at 31 days — a wider window is a reporting tool, not a schedule
-        $to = $to->min($from->addDays(31));
-
-        return Order::productionScheduleFor($from, $to);
-    }
-
     /**
      * FullCalendar's event feed: one all-day entry per day with work, titled
      * with that day's total vial count. Dates in and out are plain Y-m-d
@@ -54,7 +29,7 @@ class ProductionSchedule extends Page
      * tz conversion on a half-hour offset shifts day cells, a bug invisible
      * from a UTC test. $end arrives exclusive, as FullCalendar sends it.
      *
-     * @return array<int, array{start: string, title: string, allDay: bool}>
+     * @return array<int, array{start: string, title: string, allDay: bool, classNames: array<int, string>}>
      */
     public function calendarEvents(string $start, string $end): array
     {
@@ -68,25 +43,40 @@ class ProductionSchedule extends Page
         foreach (Order::productionScheduleFor($from, $to) as $day) {
             $vials = $day['groups']->sum('quantity');
 
-            if ($vials > 0) {
-                $events[] = [
-                    'start' => $day['date']->toDateString(),
-                    'title' => $vials.' '.Str::plural('vial', $vials),
-                    'allDay' => true,
-                ];
+            if ($vials === 0) {
+                continue;
             }
+
+            $events[] = [
+                'start' => $day['date']->toDateString(),
+                'title' => $vials.' '.Str::plural('vial', $vials),
+                'allDay' => true,
+                // Overdue is not history: a past day whose vials aren't all
+                // poured yet stays visually distinct from scheduled work.
+                'classNames' => $this->isOverdue($day) ? ['ps-overdue'] : [],
+            ];
         }
 
         return $events;
     }
 
-    /** Calendar day-click, when the clicked day's card isn't already in the
-     *  list window: focus the list on that single day. */
-    public function revealDay(string $date): void
+    /**
+     * A day is overdue when it's behind us and any of its vials are still
+     * unpoured — an order not yet decanted or delivered. Fully-poured past
+     * days render as plain history.
+     *
+     * @param  array{date: CarbonImmutable, groups: Collection}  $day
+     */
+    private function isOverdue(array $day): bool
     {
-        $day = CarbonImmutable::parse($date)->toDateString();
+        if ($day['date']->gte(today())) {
+            return false;
+        }
 
-        $this->from = $day;
-        $this->to = $day;
+        return $day['groups']->contains(
+            fn (array $group): bool => $group['orders']->contains(
+                fn (Order $order): bool => ! in_array($order->status, [OrderStatus::Decanted, OrderStatus::Delivered], true),
+            ),
+        );
     }
 }
