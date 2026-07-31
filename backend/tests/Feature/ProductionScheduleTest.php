@@ -154,7 +154,105 @@ class ProductionScheduleTest extends TestCase
             ->assertSee('2 order(s)');
     }
 
+    // ---- The calendar feed --------------------------------------------------
+
+    public function test_a_busy_day_produces_exactly_one_calendar_entry_with_the_vial_sum(): void
+    {
+        $chanel = $this->fragrance();
+        $dior = $this->fragrance('Dior', 'Sauvage');
+        $this->orderOn('2026-08-05', [[$chanel, 10, 1]]);
+        $this->orderOn('2026-08-05', [[$chanel, 10, 1], [$chanel, 5, 4]]);
+        $this->orderOn('2026-08-05', [[$dior, 10, 6]]);
+
+        $events = collect($this->calendarEvents('2026-08-01', '2026-09-01'));
+
+        // four fragrance/size lines, ONE entry — and the count is asserted,
+        // not merely that an entry exists (existence checks are how #52 shipped)
+        $this->assertSame(1, $events->count());
+        $this->assertSame('2026-08-05', $events[0]['start']);
+        $this->assertSame('12 vials', $events[0]['title']); // 1+1+4+6
+        $this->assertTrue($events[0]['allDay']);
+    }
+
+    public function test_a_single_vial_day_reads_singular(): void
+    {
+        $this->orderOn('2026-08-05', [[$this->fragrance(), 10, 1]]);
+
+        $this->assertSame('1 vial', $this->calendarEvents('2026-08-01', '2026-09-01')[0]['title']);
+    }
+
+    public function test_calendar_window_end_is_exclusive_as_fullcalendar_sends_it(): void
+    {
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 1]]);
+        $this->orderOn('2026-08-06', [[$fragrance, 10, 1]]);
+
+        $events = collect($this->calendarEvents('2026-08-01', '2026-08-06'));
+
+        $this->assertSame(['2026-08-05'], $events->pluck('start')->all());
+    }
+
+    public function test_cancelled_and_rejected_orders_contribute_nothing_to_the_calendar(): void
+    {
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 5]], OrderStatus::Cancelled);
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 5]], OrderStatus::Rejected);
+
+        $this->assertSame([], $this->calendarEvents('2026-08-01', '2026-09-01'));
+    }
+
+    public function test_calendar_days_stay_put_under_utc_and_yangon_timezones(): void
+    {
+        // Myanmar is UTC+6:30 — if any tz conversion sneaks into the feed, a
+        // half-hour offset shifts the day cell. Write and read under both zones.
+        $fragrance = $this->fragrance();
+        $written = [];
+
+        foreach (['UTC' => '2026-08-05', 'Asia/Yangon' => '2026-08-20'] as $tz => $day) {
+            config()->set('app.timezone', $tz);
+            date_default_timezone_set($tz);
+
+            $this->orderOn($day, [[$fragrance, 10, 2]]);
+            $written[] = $day;
+
+            $events = collect($this->calendarEvents('2026-08-01', '2026-09-01'));
+
+            // every day written so far renders on exactly its own cell
+            $this->assertSame($written, $events->pluck('start')->all(), "day shifted under {$tz}");
+        }
+    }
+
+    public function test_reveal_day_focuses_the_list_on_that_day(): void
+    {
+        $this->orderOn('2026-08-05', [[$this->fragrance(), 10, 2]]);
+
+        Livewire::test(ProductionSchedule::class)
+            ->call('revealDay', '2026-08-05')
+            ->assertSet('from', '2026-08-05')
+            ->assertSet('to', '2026-08-05')
+            ->assertSee(CarbonImmutable::parse('2026-08-05')->format('l, j M Y'));
+    }
+
+    public function test_the_page_serves_calendar_and_list_together(): void
+    {
+        Livewire::test(ProductionSchedule::class)
+            ->assertOk()
+            ->assertSeeHtml('id="ps-calendar"')
+            ->assertSee('Nothing to decant'); // the list is still there
+
+        // the vendored bundle is wired into the full page (assets hoist to the layout)
+        $this->get(ProductionSchedule::getUrl())
+            ->assertOk()
+            ->assertSee('vendor/fullcalendar/index.global.min.js', false);
+    }
+
     // ---- helpers ------------------------------------------------------------
+
+    /** The calendar's own read path, exclusive end — what the JS feed calls. */
+    private function calendarEvents(string $start, string $endExclusive): array
+    {
+        return (new ProductionSchedule)->calendarEvents($start, $endExclusive);
+    }
 
     /**
      * The list's own read path — what the blade calls. Pin windows end a day
