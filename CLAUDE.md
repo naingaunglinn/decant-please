@@ -1,9 +1,39 @@
-# CLAUDE.md — Decant Please! (v14)
+# CLAUDE.md — Decant Please! (v16)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v14
+## 0. What changed in v16
+
+**v16** widens step 21's Telegram layer (issue #59): the decanter now sees **how the
+customer chose to pay** the moment an order lands, and gets buzzed when a transfer
+slip arrives later. (v15 is the multi-tenancy spec on the open #57 branch, landing
+separately — the number is skipped here deliberately, not lost.)
+
+- **The new-order alert names the payment method.** One added line — `Payment: Cash
+  on delivery`, or `Payment: Online transfer — slip attached|awaited`. "Attached"
+  is the normal online case (a v14 checkout slip rides in with the order, and the
+  proof is attached before `OrderPlaced` dispatches); "awaited" is defensive — the
+  listener doesn't assume its dispatcher. Deliberately **no `payment_status`**:
+  every order is `unpaid` at placement, so it carries no signal there.
+- **A second event on the same layer.** `PaymentProofUploaded` (the order + an
+  `isReplacement` flag), dispatched from the standalone proof endpoint only, after
+  the write commits — never from checkout, whose slip the new-order alert already
+  reports (dispatching from both would double-send, the #52 lesson). Its listener
+  `NotifyAdminOfPaymentProof` is wired explicitly in `AppServiceProvider` —
+  required, since event discovery is off.
+- **The slip message** carries order number, customer, total + balance due, track
+  code, and the admin order URL — and distinguishes a **first upload** ("slip
+  uploaded") from a **replacement** ("slip replaced"): the endpoint overwrites, so
+  a customer retrying a blurry photo shouldn't buzz identically several times.
+  **Link only, never the image**: proofs are private by design (#47), and a 4MB
+  multipart doesn't fit the notifier's 5s bound.
+- Same two hard rules as v11: never throws, no-op when unconfigured — a Telegram
+  outage can't fail a slip upload. Tests assert send **counts**
+  (`Http::assertSentCount`), not just content — `assertSent` alone passes on a
+  double-send, which is exactly how #52 shipped.
+
+## 0.1 What changed in v14
 
 **v14** adds a **payment-method choice at checkout** (COD vs online prepay) and a
 **decanter-managed MMQR/payment settings** admin page (Step 22). Still no gateway —

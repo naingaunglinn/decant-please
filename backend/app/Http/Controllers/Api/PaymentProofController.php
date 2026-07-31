@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\PaymentProofUploaded;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\JsonResponse;
@@ -32,11 +33,17 @@ class PaymentProofController extends Controller
             return TrackOrderController::notFoundResponse();
         }
 
+        $hadProof = $order->payment_proof_path !== null;
+
         // The private proofs disk, never the public media disk. Replacing an
         // earlier upload cleans up the old object via the model's updated hook.
         $path = $request->file('proof')->store('payment-proofs', config('filesystems.proofs_disk'));
 
         $order->attachPaymentProof($path);
+
+        // After the write commits. This endpoint is the event's only dispatch
+        // site — a checkout slip is already reported by the new-order alert.
+        PaymentProofUploaded::dispatch($order, isReplacement: $hadProof);
 
         return response()->json(TrackOrderController::receipt($order));
     }
