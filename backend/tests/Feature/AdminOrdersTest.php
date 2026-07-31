@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
-use App\Filament\Pages\ProductionSchedule;
+use App\Filament\Pages\ProductionScheduleDay;
 use App\Filament\Resources\Orders\Pages\CreateOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Widgets\OrderStats;
@@ -68,7 +68,7 @@ class AdminOrdersTest extends TestCase
         $this->assertSame(today()->addDays(2)->toDateString(), $order->delivery_date->toDateString());
 
         // both orders' items aggregate into one production line: 1 + 2 = 3 vials
-        Livewire::test(ProductionSchedule::class)
+        Livewire::test(ProductionScheduleDay::class, ['date' => $decantDate])
             ->assertOk()
             ->assertSee('Chanel — Allure Homme Sport')
             ->assertSee('× 3')
@@ -186,7 +186,7 @@ class AdminOrdersTest extends TestCase
     {
         $this->manualOrder(OrderStatus::Cancelled, decantDate: today());
 
-        Livewire::test(ProductionSchedule::class)
+        Livewire::test(ProductionScheduleDay::class, ['date' => today()->toDateString()])
             ->assertOk()
             ->assertSee('Nothing to decant')
             ->assertDontSee('Chanel —');
