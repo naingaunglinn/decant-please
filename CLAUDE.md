@@ -1,9 +1,44 @@
-# CLAUDE.md — Decant Please! (v16)
+# CLAUDE.md — Decant Please! (v17)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v16
+## 0. What changed in v17
+
+**v17** gives the production schedule a **month calendar view** (Step 23,
+`prompts/23-production-schedule-calendar.md`, issue #61) — the overview the
+day-card list never provided, so delivery dates stop being committed blind to the
+week they land on. The list is unchanged and stays the worklist; the calendar sits
+above it. (Step numbering: the open #58 multi-tenancy PR also claims 23–25 for its
+spec files; the two collide only in name, and whichever merges second renumbers.)
+
+- **Approach A of the spec, deliberately.** FullCalendar v6 (MIT) is **vendored as
+  a committed static asset** (`backend/public/vendor/fullcalendar/`, the
+  Padauk-font precedent) and embedded in the existing Blade page — **not**
+  `saade/filament-fullcalendar`, which would need a Vite-compiled Filament custom
+  theme in a Heroku build path that has no Node (monorepo + `heroku/php`
+  buildpacks, whose ordering already caused one production-only failure), to buy
+  event-CRUD features this page cannot use (dates change only through order
+  Accept). Deploy path unchanged; `DEPLOY.md` untouched.
+- **One aggregation, one place.** The per-day grouping moved off the page class
+  into `Order::productionScheduleFor($from, $to)`; the day-card list and the
+  calendar's event feed both read it. When multi-tenancy's seam step lands, shop
+  scoping happens there once — a custom Filament page sits outside Filament's
+  tenancy scoping. The move also made the date window engine-proof (`whereDate`):
+  the old `whereBetween` silently missed a window's last day under SQLite (the
+  test engine compares the date cast's stored `Y-m-d 00:00:00` textually) while
+  Postgres's DATE column truncates — the v6 lesson pointing the other way.
+- **One chip per day, all-day, plain strings.** A busy day renders a single
+  `12 vials` aggregate (a month cell truncates past ~2 chips, so per-line entries
+  would show less than the list already does); clicking a day scrolls to — or
+  refocuses the list on — that day's card. Every date crossing the wire is a bare
+  `Y-m-d` string: Myanmar is UTC+6:30, and any timezone-bearing value can shift a
+  day cell — pinned by tests that run the feed under both UTC and Asia/Yangon.
+- `phpunit.xml` now pins **blank Telegram env**: a real bot token in a developer's
+  `.env` was inherited by the suite and failed the four "unconfigured" alert
+  tests. Same `env`+`server` pairing (and reason) as the DB overrides.
+
+## 0.1 What changed in v16
 
 **v16** widens step 21's Telegram layer (issue #59): the decanter now sees **how the
 customer chose to pay** the moment an order lands, and gets buzzed when a transfer
@@ -557,6 +592,9 @@ client on checkout (see `05-api-layer.md`).
    showing, per upcoming day, which fragrances + sizes need decanting and in what
    quantity, aggregated across all non-cancelled/non-rejected orders due that day.
    This is the "automatically generate a schedule" requirement from the brief.
+   **v17:** a month calendar overview sits above that list — one aggregate
+   vial-count chip per day, click-through to the day's card; the list stays the
+   worklist. See §0.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
    count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
    **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —

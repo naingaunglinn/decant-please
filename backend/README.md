@@ -74,7 +74,7 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 | `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
 | `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
-| `/admin/production-schedule` | Aggregated daily decant schedule |
+| `/admin/production-schedule` | Decant schedule — month calendar overview + aggregated per-day worklist |
 
 **Utility**
 
@@ -93,10 +93,10 @@ Trimmed to the files you'd look for first. Deployment-relevant paths are marked 
 backend/
 ├── app/
 │   ├── Console/Commands/                   # FreshStart (decant:fresh-start handover wipe), TelegramTest (telegram:test)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentStatus, PromoType
-│   ├── Events/ + Listeners/                # OrderPlaced (website checkout) → NotifyAdminOfNewOrder (Telegram)
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, PromoType
+│   ├── Events/ + Listeners/                # OrderPlaced, PaymentProofUploaded → Telegram admin alerts (NotifyAdminOf*)
 │   ├── Filament/
-│   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ Blade view in resources/)
+│   │   ├── Pages/                          # ProductionSchedule (month calendar + day list), ManagePayment (MMQR/payment settings)
 │   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
@@ -116,10 +116,11 @@ backend/
 │   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
+│   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git
 ├── resources/views/filament/               # production schedule Blade view
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 104 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices
+├── tests/Feature/                          # 138 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
