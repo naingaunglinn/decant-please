@@ -38,6 +38,14 @@
              happens to have in .env. -->
         <env name="ADMIN_PASSWORD" value="testing-admin-password" force="true"/>
         <server name="ADMIN_PASSWORD" value="testing-admin-password"/>
+        <!-- Alert tests assume Telegram is unconfigured unless they opt in via
+             config(); a real bot token in the developer's .env must not leak
+             into the suite. Same env+server pairing as above, for the same
+             env() lookup-order reason. -->
+        <env name="TELEGRAM_BOT_TOKEN" value="" force="true"/>
+        <server name="TELEGRAM_BOT_TOKEN" value=""/>
+        <env name="TELEGRAM_ADMIN_CHAT_ID" value="" force="true"/>
+        <server name="TELEGRAM_ADMIN_CHAT_ID" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

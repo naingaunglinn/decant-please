@@ -1,9 +1,119 @@
-# CLAUDE.md — Decant Please! (v13)
+# CLAUDE.md — Decant Please! (v17)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v13
+## 0. What changed in v17
+
+**v17** rebuilds the production schedule around a **month calendar** (Step 23,
+`prompts/23-production-schedule-calendar.md`, issue #61) — the overview the
+day-card list never provided, so delivery dates stop being committed blind to the
+week they land on. After a review round, the calendar is the page's only content;
+the worklist moved to a per-day detail page, `/admin/production-schedule/{date}`,
+which is also the printable bench sheet. (Step numbering: the open #58
+multi-tenancy PR also claims 23–25 for its spec files; the two collide only in
+name, and whichever merges second renumbers.)
+
+- **Approach A of the spec, deliberately.** FullCalendar v6 (MIT) is **vendored as
+  a committed static asset** (`backend/public/vendor/fullcalendar/`, the
+  Padauk-font precedent) and embedded in the existing Blade page — **not**
+  `saade/filament-fullcalendar`, which would need a Vite-compiled Filament custom
+  theme in a Heroku build path that has no Node (monorepo + `heroku/php`
+  buildpacks, whose ordering already caused one production-only failure), to buy
+  event-CRUD features this page cannot use (dates change only through order
+  Accept). Deploy path unchanged; `DEPLOY.md` untouched.
+- **One aggregation, one place.** The per-day grouping moved off the page class
+  into `Order::productionScheduleFor($from, $to)`; the calendar's event feed and
+  the day page (called with `$date, $date`) both read it. When multi-tenancy's
+  seam step lands, shop scoping happens there once — a custom Filament page sits
+  outside Filament's tenancy scoping. The move also made the date window engine-proof (`whereDate`):
+  the old `whereBetween` silently missed a window's last day under SQLite (the
+  test engine compares the date cast's stored `Y-m-d 00:00:00` textually) while
+  Postgres's DATE column truncates — the v6 lesson pointing the other way.
+- **One chip per day, all-day, plain strings.** A busy day renders a single
+  `12 vials` aggregate (a month cell truncates past ~2 chips, so per-line entries
+  would show less than the worklist does); a past day still holding unpoured
+  vials renders it in the overdue style — overdue is not history. Every date
+  crossing the wire is a bare `Y-m-d` string: Myanmar is UTC+6:30, and any
+  timezone-bearing value can shift a day cell — pinned by tests that run the
+  feed under both UTC and Asia/Yangon.
+- **The worklist is a page per day.** Clicking any day — chip or empty cell —
+  opens `/admin/production-schedule/{date}`: the old day card's grouped lines
+  plus prev/next stepping, a real empty state, and `@media print` A5 styles
+  matching the invoice conventions (this sheet goes to the decant bench). The
+  `{date}` param is a strictly-validated plain `Y-m-d`; anything else 404s,
+  because a lenient parse would invite datetime/timezone math. Not in the
+  sidebar (`shouldRegisterNavigation()` false) — it needs a date.
+- `phpunit.xml` now pins **blank Telegram env**: a real bot token in a developer's
+  `.env` was inherited by the suite and failed the four "unconfigured" alert
+  tests. Same `env`+`server` pairing (and reason) as the DB overrides.
+
+## 0.1 What changed in v16
+
+**v16** widens step 21's Telegram layer (issue #59): the decanter now sees **how the
+customer chose to pay** the moment an order lands, and gets buzzed when a transfer
+slip arrives later. (v15 is the multi-tenancy spec on the open #57 branch, landing
+separately — the number is skipped here deliberately, not lost.)
+
+- **The new-order alert names the payment method.** One added line — `Payment: Cash
+  on delivery`, or `Payment: Online transfer — slip attached|awaited`. "Attached"
+  is the normal online case (a v14 checkout slip rides in with the order, and the
+  proof is attached before `OrderPlaced` dispatches); "awaited" is defensive — the
+  listener doesn't assume its dispatcher. Deliberately **no `payment_status`**:
+  every order is `unpaid` at placement, so it carries no signal there.
+- **A second event on the same layer.** `PaymentProofUploaded` (the order + an
+  `isReplacement` flag), dispatched from the standalone proof endpoint only, after
+  the write commits — never from checkout, whose slip the new-order alert already
+  reports (dispatching from both would double-send, the #52 lesson). Its listener
+  `NotifyAdminOfPaymentProof` is wired explicitly in `AppServiceProvider` —
+  required, since event discovery is off.
+- **The slip message** carries order number, customer, total + balance due, track
+  code, and the admin order URL — and distinguishes a **first upload** ("slip
+  uploaded") from a **replacement** ("slip replaced"): the endpoint overwrites, so
+  a customer retrying a blurry photo shouldn't buzz identically several times.
+  **Link only, never the image**: proofs are private by design (#47), and a 4MB
+  multipart doesn't fit the notifier's 5s bound.
+- Same two hard rules as v11: never throws, no-op when unconfigured — a Telegram
+  outage can't fail a slip upload. Tests assert send **counts**
+  (`Http::assertSentCount`), not just content — `assertSent` alone passes on a
+  double-send, which is exactly how #52 shipped.
+
+## 0.1 What changed in v14
+
+**v14** adds a **payment-method choice at checkout** (COD vs online prepay) and a
+**decanter-managed MMQR/payment settings** admin page (Step 22). Still no gateway —
+payment stays offline; this just lets the customer *choose* to prepay and gives the
+decanter a place to put their QR. Builds on v10's payment-proof + v12's private-proof
+bucket (#47).
+
+- **The method, chosen at ordering time.** A `payment_method` enum (`cod` | `online`)
+  on `orders`, defaulting `cod` (existing + manual/DM orders read as cash-on-delivery).
+  Checkout takes it (`in:cod,online`, defaults cod); the receipt/tracking response
+  returns it so the storefront knows which UI to show.
+- **Online = pay + attach slip *at checkout*.** The customer picks Online, sees the
+  **MMQR + amount (cart subtotal) on the checkout page**, pays, and **uploads their slip
+  to place the order** — the slip is required, so `POST /orders` becomes multipart and
+  the order is *born with its proof* on the private disk. This is deliberate (chosen
+  over "pay on the order-complete page"): it means **an online order can never be
+  unpaid-with-no-slip** — no ghost orders, no auto-expire needed. The admin's
+  **Needs-review** shows the method + a "slip uploaded" line; the decanter checks the
+  slip → **Mark paid** → **Accept**. COD skips all this: one-tap place order, a calm
+  "pay cash on delivery" note. If the shop has no payment settings configured, the
+  Online option is unavailable (COD only). **Delivery fee stays cash-to-courier**, off
+  the online amount (the "Option B" simplification), so online = the item subtotal.
+- **A stock check surfaces at Accept.** `Order::stockShortfalls()` compares each tracked
+  fragrance's `stock_ml` against what the order needs; the **Accept** modal shows any
+  shortfall (*"needs 10ml but only 8ml in stock"*) alongside the unpaid-online reminder —
+  soft warnings, **never a block**. So a shortfall is caught before the decant bench (and
+  before a prepaid order is committed), not discovered at the pour.
+- **MMQR/payment settings in the admin, not .env.** A single-row `ShopSetting` model +
+  a Filament **Payment settings** page (Settings nav group) where the decanter uploads
+  their **MMQR** (public media disk) and sets KBZPay/Wave numbers + instructions.
+  `/api/v1/meta` now reads these from the DB, **falling back to the `PAYMENT_*` env**
+  so existing deployments keep working; saving busts the meta cache. The page mirrors
+  Filament's own `EditProfile` form-page pattern (`content()` embeds the `form` schema).
+
+## 0.1 What changed in v13
 
 **v13** is a docs-only alignment (issue #50) — no code, config, or behavior changes.
 
@@ -492,6 +602,10 @@ client on checkout (see `05-api-layer.md`).
    showing, per upcoming day, which fragrances + sizes need decanting and in what
    quantity, aggregated across all non-cancelled/non-rejected orders due that day.
    This is the "automatically generate a schedule" requirement from the brief.
+   **v17:** the page is the month calendar — one aggregate vial-count chip per
+   day, overdue flagged distinctly — and every day clicks through to
+   `/admin/production-schedule/{date}`, the per-day worklist and printable (A5)
+   bench sheet. See §0.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
    count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
    **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —

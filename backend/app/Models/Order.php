@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'paid_at', 'payment_proof_path'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -99,6 +102,7 @@ class Order extends Model
                 'notes' => $data['notes'] ?? null,
                 'order_from' => OrderSource::Website,
                 'status' => OrderStatus::AwaitingConfirmation,
+                'payment_method' => $data['payment_method'] ?? PaymentMethod::Cod->value,
             ]);
 
             foreach ($data['items'] as $i => $item) {
@@ -281,6 +285,95 @@ class Order extends Model
         return max(0, $this->total_mmk - $this->deposit_mmk);
     }
 
+    /**
+     * Tracked fragrances this order can't be fully poured from, given current
+     * stock_ml — surfaced at Accept so a shortfall is caught before committing,
+     * not at the decant bench. Untracked (null stock_ml) fragrances are ignored.
+     *
+     * @return array<array{name: string, needed: int, available: int}>
+     */
+    public function stockShortfalls(): array
+    {
+        $this->loadMissing('items.fragrance');
+
+        $needed = [];
+        foreach ($this->items as $item) {
+            if ($item->fragrance_id === null) {
+                continue;
+            }
+
+            $needed[$item->fragrance_id]['name'] ??= $item->fragrance?->name ?? $item->fragrance_name_snapshot;
+            $needed[$item->fragrance_id]['ml'] = ($needed[$item->fragrance_id]['ml'] ?? 0) + $item->size_ml * $item->quantity;
+            $needed[$item->fragrance_id]['stock'] = $item->fragrance?->stock_ml;
+        }
+
+        $short = [];
+        foreach ($needed as $row) {
+            if ($row['stock'] !== null && $row['ml'] > $row['stock']) {
+                $short[] = ['name' => $row['name'], 'needed' => $row['ml'], 'available' => (int) $row['stock']];
+            }
+        }
+
+        return $short;
+    }
+
+    /**
+     * The production schedule's one source of truth: the window's order items,
+     * grouped per day into fragrance+size production lines. Both schedule views
+     * (day-card list and month calendar) read this — the grouping must never
+     * fork, and when multi-tenancy lands, shop scoping happens here, once
+     * (a custom Filament page is outside Filament's tenancy scoping). Days
+     * without work are kept (confirmed-empty); cancelled/rejected orders never
+     * count. Dates compare via whereDate: the date cast stores a datetime
+     * string, which SQLite matches textually against a bare Y-m-d bound
+     * (silently missing the window's last day) while Postgres's DATE column
+     * truncates — whereDate reads identically on both engines.
+     *
+     * @return array<int, array{date: CarbonImmutable, groups: Collection}>
+     */
+    public static function productionScheduleFor(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $from = $from->startOfDay();
+        $to = $to->startOfDay();
+
+        if ($to->lessThan($from)) {
+            $to = $from;
+        }
+
+        $items = OrderItem::query()
+            ->whereHas('order', fn ($query) => $query
+                ->whereDate('decant_date', '>=', $from->toDateString())
+                ->whereDate('decant_date', '<=', $to->toDateString())
+                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
+            ->with(['order', 'fragrance.brand'])
+            ->get();
+
+        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
+
+        $days = [];
+
+        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
+            $groups = ($byDay->get($day->toDateString()) ?? collect())
+                ->groupBy(fn (OrderItem $item) => "{$item->fragrance_id}:{$item->size_ml}")
+                ->map(function (Collection $group): array {
+                    $first = $group->first();
+
+                    return [
+                        'label' => "{$first->fragrance->brand->name} — {$first->fragrance->name}",
+                        'size_ml' => $first->size_ml,
+                        'quantity' => $group->sum('quantity'),
+                        'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
+                    ];
+                })
+                ->sortBy([['label', 'asc'], ['size_ml', 'asc']])
+                ->values();
+
+            $days[] = ['date' => $day, 'groups' => $groups];
+        }
+
+        return $days;
+    }
+
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */
     public static function findByTracking(string $code, string $phone): ?self
     {
@@ -337,6 +430,7 @@ class Order extends Model
             'order_from' => OrderSource::class,
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
+            'payment_method' => PaymentMethod::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
             'paid_at' => 'datetime',

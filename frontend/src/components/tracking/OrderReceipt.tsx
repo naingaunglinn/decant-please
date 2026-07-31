@@ -223,9 +223,26 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
           />
         </div>
 
-        {/* offline payment: where to send it, upload proof, see confirmation.
-            Hidden once an order is cancelled/rejected — there's nothing to pay. */}
-        {!negative && <PaymentPanel order={order} onOrderUpdate={setOrder} />}
+        {/* Online: the pay-now panel (QR + upload slip). COD: just a calm note.
+            Both hidden once an order is cancelled/rejected — nothing to pay. */}
+        {!negative && order.payment_method === "online" && (
+          <PaymentPanel order={order} onOrderUpdate={setOrder} />
+        )}
+        {!negative && order.payment_method === "cod" && (
+          <div className="no-print mt-4 rounded-2xl border border-rule px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Pill tone="muted">Payment</Pill>
+              <Pill tone={order.payment_status === "paid" ? "pine" : "muted"}>
+                {order.payment_status === "paid" ? "Paid" : "Cash on delivery"}
+              </Pill>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              {order.payment_status === "paid"
+                ? "Payment received — thank you!"
+                : "Pay in cash when your order is delivered — nothing to transfer now."}
+            </p>
+          </div>
+        )}
 
         {deliveryLine && <p className="mt-6 text-sm text-muted">{deliveryLine}</p>}
 

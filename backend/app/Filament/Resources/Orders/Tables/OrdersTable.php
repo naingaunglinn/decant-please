@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
@@ -68,6 +69,15 @@ class OrdersTable
                 TextColumn::make('payment_status')
                     ->label('Payment')
                     ->badge(),
+                TextColumn::make('payment_method')
+                    ->label('Method')
+                    ->badge()
+                    // the needs-review signal: which online orders have a slip to check
+                    ->description(fn (Order $record): ?string => match (true) {
+                        $record->payment_proof_path !== null => 'slip uploaded',
+                        $record->payment_method === PaymentMethod::Online => 'awaiting slip',
+                        default => null,
+                    }),
                 TextColumn::make('total_mmk')
                     ->label('Total')
                     ->formatStateUsing(fn (int $state): string => Money::kyat($state))
@@ -87,6 +97,9 @@ class OrdersTable
                 SelectFilter::make('payment_status')
                     ->label('Payment')
                     ->options(PaymentStatus::class),
+                SelectFilter::make('payment_method')
+                    ->label('Method')
+                    ->options(PaymentMethod::class),
             ])
             ->recordActions([
                 OrderResource::acceptAction(),

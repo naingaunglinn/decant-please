@@ -7,6 +7,7 @@ use App\Enums\Concentration;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Models\DecantPrice;
+use App\Models\ShopSetting;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -64,13 +65,17 @@ class MetaController extends Controller
      */
     protected static function payment(): ?array
     {
+        // The decanter's admin-managed settings take precedence; env is the
+        // fallback so an existing PAYMENT_* deployment keeps working unchanged.
+        $settings = ShopSetting::current();
+
         $fields = array_filter([
-            'kbzpay_name' => config('app.payment.kbzpay_name'),
-            'kbzpay_number' => config('app.payment.kbzpay_number'),
-            'wave_name' => config('app.payment.wave_name'),
-            'wave_number' => config('app.payment.wave_number'),
-            'qr_url' => config('app.payment.qr_url'),
-            'instructions' => config('app.payment.instructions'),
+            'kbzpay_name' => $settings->kbzpay_name ?: config('app.payment.kbzpay_name'),
+            'kbzpay_number' => $settings->kbzpay_number ?: config('app.payment.kbzpay_number'),
+            'wave_name' => $settings->wave_name ?: config('app.payment.wave_name'),
+            'wave_number' => $settings->wave_number ?: config('app.payment.wave_number'),
+            'qr_url' => $settings->qrUrl() ?: config('app.payment.qr_url'),
+            'instructions' => $settings->payment_instructions ?: config('app.payment.instructions'),
         ], fn ($value) => filled($value));
 
         return $fields === [] ? null : $fields;

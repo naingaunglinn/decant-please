@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Events\OrderPlaced;
+use App\Events\PaymentProofUploaded;
 use App\Listeners\NotifyAdminOfNewOrder;
+use App\Listeners\NotifyAdminOfPaymentProof;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -44,8 +46,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('payment-proof', fn (Request $request) => Limit::perMinute(10)->by('payment-proof|'.$request->ip()));
         RateLimiter::for('promo', fn (Request $request) => Limit::perMinute(10)->by('promo|'.$request->ip()));
 
-        // Order alerts. Registered explicitly rather than relying on listener
-        // auto-discovery, so the wiring is greppable in one place.
+        // Admin Telegram alerts. Wired explicitly, and necessarily so: event
+        // auto-discovery is off (bootstrap/app.php, #52), so a listener that
+        // isn't registered here silently never runs.
         Event::listen(OrderPlaced::class, NotifyAdminOfNewOrder::class);
+        Event::listen(PaymentProofUploaded::class, NotifyAdminOfPaymentProof::class);
     }
 }
