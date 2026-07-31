@@ -74,7 +74,8 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 | `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
 | `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
-| `/admin/production-schedule` | Decant schedule — month calendar overview + aggregated per-day worklist |
+| `/admin/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
+| `/admin/production-schedule/{date}` | One day's aggregated worklist, printable as an A5 bench sheet — strict `Y-m-d` param, 404 otherwise |
 
 **Utility**
 
@@ -96,7 +97,7 @@ backend/
 │   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, PromoType
 │   ├── Events/ + Listeners/                # OrderPlaced, PaymentProofUploaded → Telegram admin alerts (NotifyAdminOf*)
 │   ├── Filament/
-│   │   ├── Pages/                          # ProductionSchedule (month calendar + day list), ManagePayment (MMQR/payment settings)
+│   │   ├── Pages/                          # ProductionSchedule (month calendar), ProductionScheduleDay (printable day worklist), ManagePayment (MMQR settings)
 │   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
@@ -117,10 +118,10 @@ backend/
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
 │   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git
-├── resources/views/filament/               # production schedule Blade view
+├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 138 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
+├── tests/Feature/                          # 143 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -149,7 +150,7 @@ backend/
 php artisan test
 ```
 
-104 tests / 529 assertions on an in-memory SQLite database — your dev Postgres data is
+143 tests / 659 assertions on an in-memory SQLite database — your dev Postgres data is
 never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`

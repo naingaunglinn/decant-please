@@ -54,18 +54,27 @@ lands, this query has to be scoped by hand. One method means one place.
 
 Cancelled and rejected orders stay excluded, as today.
 
-## 3. The two views
+## 3. The two views *(amended after the first review round — this is as built)*
 
-**Calendar (new, default).** Month grid. Each day carries **one aggregate entry** — total
-vials for that day, e.g. `12 vials` — not one entry per fragrance/size. A month cell holds
-about two chips before truncating, and a busy day has six or more line items, so per-item
-entries would render as `+5 more` and show less than the list already does.
+**Calendar (`/admin/production-schedule`).** Month grid, the page's only content — the
+From/To inputs and the stacked day cards are gone. Each day carries **one aggregate
+entry** — total vials for that day, e.g. `12 vials` — not one entry per fragrance/size. A
+month cell holds about two chips before truncating, and a busy day has six or more line
+items, so per-item entries would render as `+5 more` and show less than the worklist does.
+A past day still holding unpoured vials (an order not yet decanted or delivered) renders
+its entry in the overdue style — overdue is not history. Every day cell is clickable,
+chips and empty days alike: both `dateClick` and `eventClick` navigate to that day's
+detail page.
 
-**List (existing, kept).** Unchanged in content. Clicking a day in the calendar reveals or
-scrolls to that day's card.
-
-The existing From/To range inputs keep working for the list. The calendar drives its own
-month navigation.
+**Day detail (`/admin/production-schedule/{date}`).** The worklist for one day — the same
+aggregated fragrance/size lines the day cards used to show, fed by the §2 method called
+with `($date, $date)`, never a second query. The route param is a plain `Y-m-d` string,
+strictly validated: any other shape (unpadded, no dashes, a datetime, an impossible date
+like `2026-02-30`) 404s — no lenient parse, no timezone conversion (Yangon is UTC+6:30).
+Prev/next day stepping, a link back to the calendar, a real empty state for quiet days,
+and `@media print` A5 styles matching the invoice conventions — this page is what gets
+printed and taken to the bench. `shouldRegisterNavigation()` is false: it requires a
+date, so it must not appear in the sidebar.
 
 ## 4. Dates — all-day, plain strings, no timezones
 
@@ -96,7 +105,10 @@ must not reintroduce it.
 - Cancelled and rejected orders contribute nothing to either view.
 - A decant date renders on the same calendar day under both `UTC` and `Asia/Yangon` app
   timezones.
-- The Livewire page renders with the calendar present and the list still present.
+- The calendar page renders with the calendar present — and nothing of the old list.
+- The day page renders for a date with vials and for one without; an invalid date param
+  404s; the day total equals that day's calendar aggregate; and both pages agree under
+  both timezones above.
 
 ## 7. Docs
 
@@ -112,7 +124,8 @@ must not reintroduce it.
 ## 8. Verification before opening the PR
 
 - `php artisan test` exits 0.
-- The list view is byte-for-byte equivalent in content to before the refactor.
+- The list view was byte-for-byte equivalent through the round-1 refactor; the round-2
+  amendment then moved that content onto the day page, where the retargeted pins hold.
 - If B: a clean checkout with no local `node_modules` still produces a working panel through
   the actual Heroku build path — or the PR states plainly that it does not and what must
   change.
