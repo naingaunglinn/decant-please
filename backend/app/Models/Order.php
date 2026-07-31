@@ -6,11 +6,13 @@ use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -313,6 +315,63 @@ class Order extends Model
         }
 
         return $short;
+    }
+
+    /**
+     * The production schedule's one source of truth: the window's order items,
+     * grouped per day into fragrance+size production lines. Both schedule views
+     * (day-card list and month calendar) read this — the grouping must never
+     * fork, and when multi-tenancy lands, shop scoping happens here, once
+     * (a custom Filament page is outside Filament's tenancy scoping). Days
+     * without work are kept (confirmed-empty); cancelled/rejected orders never
+     * count. Dates compare via whereDate: the date cast stores a datetime
+     * string, which SQLite matches textually against a bare Y-m-d bound
+     * (silently missing the window's last day) while Postgres's DATE column
+     * truncates — whereDate reads identically on both engines.
+     *
+     * @return array<int, array{date: CarbonImmutable, groups: Collection}>
+     */
+    public static function productionScheduleFor(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $from = $from->startOfDay();
+        $to = $to->startOfDay();
+
+        if ($to->lessThan($from)) {
+            $to = $from;
+        }
+
+        $items = OrderItem::query()
+            ->whereHas('order', fn ($query) => $query
+                ->whereDate('decant_date', '>=', $from->toDateString())
+                ->whereDate('decant_date', '<=', $to->toDateString())
+                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
+            ->with(['order', 'fragrance.brand'])
+            ->get();
+
+        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
+
+        $days = [];
+
+        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
+            $groups = ($byDay->get($day->toDateString()) ?? collect())
+                ->groupBy(fn (OrderItem $item) => "{$item->fragrance_id}:{$item->size_ml}")
+                ->map(function (Collection $group): array {
+                    $first = $group->first();
+
+                    return [
+                        'label' => "{$first->fragrance->brand->name} — {$first->fragrance->name}",
+                        'size_ml' => $first->size_ml,
+                        'quantity' => $group->sum('quantity'),
+                        'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
+                    ];
+                })
+                ->sortBy([['label', 'asc'], ['size_ml', 'asc']])
+                ->values();
+
+            $days[] = ['date' => $day, 'groups' => $groups];
+        }
+
+        return $days;
     }
 
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */

@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -99,6 +100,43 @@ class ProductionScheduleTest extends TestCase
     {
         $this->assertCount(1, $this->scheduleDays('2026-08-10', '2026-08-01'));
         $this->assertCount(32, $this->scheduleDays('2026-08-01', '2026-12-31')); // from + 31 days
+    }
+
+    // ---- The extracted method (Order::productionScheduleFor) ----------------
+
+    public function test_a_single_day_window_includes_that_day(): void
+    {
+        // Regression for the SQLite artifact scheduleDays() documents: with
+        // whereDate, the window's last day counts on every engine.
+        $this->orderOn('2026-08-05', [[$this->fragrance(), 10, 2]]);
+
+        $days = Order::productionScheduleFor(
+            CarbonImmutable::parse('2026-08-05'),
+            CarbonImmutable::parse('2026-08-05'),
+        );
+
+        $this->assertCount(1, $days);
+        $this->assertSame(2, $days[0]['groups'][0]['quantity']);
+    }
+
+    public function test_the_page_reads_through_the_domain_method(): void
+    {
+        // Delegation pin: the list must never grow its own copy of the grouping.
+        $fragrance = $this->fragrance();
+        $this->orderOn('2026-08-05', [[$fragrance, 10, 1]]);
+        $this->orderOn('2026-08-05', [[$fragrance, 5, 4]]);
+
+        $flatten = fn (array $days) => collect($days)
+            ->map(fn ($day) => [$day['date']->toDateString(), $day['groups']->toArray()])
+            ->all();
+
+        $this->assertEquals(
+            $flatten(Order::productionScheduleFor(
+                CarbonImmutable::parse('2026-08-04'),
+                CarbonImmutable::parse('2026-08-06'),
+            )),
+            $flatten($this->scheduleDays('2026-08-04', '2026-08-06')),
+        );
     }
 
     public function test_list_renders_the_grouped_lines(): void
