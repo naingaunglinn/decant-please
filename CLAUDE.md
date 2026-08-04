@@ -1,9 +1,40 @@
-# CLAUDE.md — Decant Please! (v18)
+# CLAUDE.md — Decant Please! (v19)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v18
+## 0. What changed in v19
+
+**v19** adds **bottle cost and a liquid-only gross margin** (Step 28,
+`prompts/28-cost-and-margin-tracking.md`, issue #66) — §8's "cost/margin
+accounting" exclusion, reversed by explicit ask in the v8/v13 scoped pattern: a
+reference cost and one honest margin figure come in; per-bottle tracking, batch
+identity, FIFO/weighted-average COGS, and real accounting stay out.
+
+- **A reference pair on `fragrances`** — `bottle_cost_mmk` + `bottle_volume_ml`,
+  nullable, both-or-neither, independent of the `stock_ml` opt-in — feeds one
+  derivation site, `Fragrance::liquidCostMmk()`: pure-integer **ceiling**
+  division, deliberately the project's second rounding rule beside the promo
+  floor, because the directions of safety differ — flooring a cost would flatter
+  every margin figure. Liquid only: vial, label, and spillage are not in the
+  number, and every label that shows it says so.
+- **Order items snapshot cost exactly as they snapshot price** —
+  `unit_cost_mmk`/`line_cost_mmk`, written once at creation (one creating-only
+  model hook covers checkout, manual admin entry, and late-added lines), never
+  refreshed; legacy rows stay null forever, no backfill — null means unknown,
+  excluded and counted, never coalesced to zero.
+- **`Order::liquidGrossMarginMmk()`** — Σ line_total − discount − Σ line_cost,
+  the delivery fee on neither side (courier pass-through, unmeasured not zero) —
+  is null unless *every* line is costed. The dashboard's **"Gross margin (liquid
+  only)"** stat (same window and status exclusions as its revenue neighbour)
+  sums it over fully-costed orders only, in PHP: a SQL `SUM(line_cost_mmk)`
+  would count partially-costed orders' non-null lines and overstate margin. The
+  CSV export gains blank-not-zero cost/margin columns; cost never crosses the
+  public API, the A5 invoice, or the fragrances CSV export — pinned by tests.
+- Accepted limit (v8's register): a rebuy between order creation and the pour
+  isn't reflected in that order's cost.
+
+## 0.1 What changed in v18
 
 **v18** vendors two advisory **business-finance skills** into `.claude/skills/`
 (issue #64) — agent guidance only; no app code, config, or behavior changes.
@@ -308,8 +339,9 @@ inventory — chosen after weighing it against the simplicity the tool is built 
 There is a separate, fuller **per-bottle** implementation on branch
 `40-decant-bottle-stock` (its own `bottles` table, auto-`in_stock`, drawdown at
 accept-time). v8 deliberately did **not** use it — it reverses the three choices
-above. If per-bottle tracking, batch identity, or cost/margin ever become real needs,
-that branch is the reference, not this.
+above. If per-bottle tracking or batch identity ever become real needs, that branch
+is the reference, not this; cost/margin landed fragrance-level in v19 — the branch
+contains no cost fields.
 
 Files new/changed in v8: this section and §6/§8 below; migration
 `…add_stock_to_fragrances_table`; `Fragrance` + `Order` models; `FragranceForm`,
@@ -622,7 +654,9 @@ client on checkout (see `05-api-layer.md`).
    `/admin/production-schedule/{date}`, the per-day worklist and printable (A5)
    bench sheet. See §0.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
-   count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
+   count, decants due today, top fragrances, **low stock — reorder soon** (v8), and
+   **gross margin (liquid only)** (v19 — fully-costed orders only, with the
+   exclusions and N-of-M coverage named in its description).
    **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —
    drawn down when an order is decanted, surfaced on the fragrance table + low-stock
    widget, never touching the manual `in_stock` toggle. See §0.
@@ -684,9 +718,12 @@ client on checkout (see `05-api-layer.md`).
 - Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)
 - Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
   stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
-  reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
-  cost/margin accounting. The customer-facing `in_stock` flag stays manual — v8's
-  stock warns, it never flips it.
+  reversal, and **v19 added reference-cost, liquid-only margin visibility**
+  (step 28) as a second one; what stays out of scope is *per-bottle* tracking,
+  batch identity, FIFO/weighted-average COGS, consumables costing (vial, label,
+  spillage — undecided, and deciding it changes the stat's label), and real
+  accounting (expenses, ledgers, tax). The customer-facing `in_stock` flag stays
+  manual — v8's stock warns, it never flips it.
 - **Customer-facing** notifications — email, SMS, or messaging apps. *Amended in
   v13: admin-side alerts are no longer excluded — v11 (step 21, `prompts/21`)
   shipped Telegram order alerts to the decanter.* The boundary sits where

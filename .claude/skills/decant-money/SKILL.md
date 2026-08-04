@@ -90,7 +90,30 @@ Burmese names and addresses render.
 - Keep the font bundled. A missing glyph on a printed invoice is a delivery failure, not a
   typography nit.
 
-## 6. Before finishing any money change
+## 6. Cost and margin
+
+v19 (step 28) tracks a reference bottle cost per fragrance and snapshots liquid-only
+costs onto order items. The figure is deliberately partial, and four rules keep it honest:
+
+- **Null means unknown, never zero.** Legacy items stay null forever — no backfill; a
+  zero-cost line is a 100%-margin lie. Aggregates exclude *and count* unknowns ("on N
+  of M orders"), and an order's margin exists only when **every** line has a cost — a
+  partial cost sum understates cost silently, so never `SUM(line_cost_mmk)` across
+  orders that might be partially costed.
+- **The cost rounding rule is CEILING** (`Fragrance::liquidCostMmk()`), deliberately
+  opposite in direction to the promo floor: flooring a discount can only make the shop
+  keep more, while flooring a cost would understate cost and flatter every margin
+  figure. Ceiling errs by at most 1 Ks per vial, conservative. Two rules now exist —
+  do not add a third without the same direction-of-safety argument.
+- **The delivery fee is on neither side of the margin** — it is courier pass-through,
+  *unmeasured, not zero* (FINANCE.md gap 4). Never compute margin off `total_mmk`,
+  which contains that fee.
+- **"Liquid only" rides the label everywhere the figure surfaces** — vial, label, and
+  spillage are not in this number, and omitting them understates small sizes hardest.
+  Cost is admin-eyes only: never the public API, the A5 invoice, or the fragrances
+  CSV export.
+
+## 7. Before finishing any money change
 
 - Add or extend a test in the backend suite, which already covers domain, admin, invoices,
   and the API. An untested money path is one the next refactor will silently break.
@@ -107,6 +130,8 @@ Burmese names and addresses render.
 
 ## Out of scope
 
-Online payments, bottle-volume inventory, and a multi-decanter marketplace are deliberately
-excluded from this project. `CLAUDE.md` §8 is the gate — read it before proposing anything
-that adds a payment rail, or a second seller's money, to the schema.
+Online payment *gateways*, per-bottle inventory (batch identity, FIFO/weighted-average
+COGS — the fragrance-level reference cost and liquid-only margin are in as of v19), and
+a multi-decanter marketplace are deliberately excluded from this project. `CLAUDE.md` §8
+is the gate — read it before proposing anything that adds a payment rail, a second
+seller's money, or a fuller costing model to the schema.

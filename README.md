@@ -47,7 +47,8 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 
 **Admin panel (`/admin`, login required)**
 
-- Brand & fragrance CRUD with image upload, per-size pricing and stock toggles
+- Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a
+  liquid-only bottle-cost reference (admin-eyes only — never the public API or invoices)
 - **Needs review** inbox for website orders — accept (assign decant/delivery dates) or
   reject (with a reason the customer sees when tracking)
 - Manual order entry for customers who still order by DM
@@ -64,10 +65,12 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Telegram alert to the decanter's phone the moment a website order lands (off until a
   bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
-- Dashboard: monthly revenue, orders by status, unpaid orders + outstanding total,
-  decants due today, top fragrances, and a low-stock reorder panel
-- CSV export of orders, respecting the current tab/filters/sort (incl. payment +
-  balance-due columns)
+- Dashboard: monthly revenue, a "Gross margin (liquid only)" stat (fully-costed
+  orders only — vial/label/spillage and delivery excluded, coverage named), orders by
+  status, unpaid orders + outstanding total, decants due today, top fragrances, and a
+  low-stock reorder panel
+- CSV export of orders, respecting the current tab/filters/sort (incl. payment,
+  balance-due, and liquid-only cost/margin columns — blank when unknown, never 0)
 - Printable A5 packing invoices (PDF) — print or download per order, or one batch PDF for
   the filtered view (e.g. today's deliveries), with an emphasized balance-due figure and a
   bundled Myanmar-script font so Burmese names/addresses render
@@ -305,7 +308,8 @@ motion moment is the tracking timeline filling like a vial. Tokens live in
 ## Deliberately out of scope
 
 Online payment gateways, customer accounts, chat, multi-decanter marketplace,
-per-bottle inventory (total-ml decant stock *is* in, since v8), and **customer-facing**
+per-bottle inventory (total-ml decant stock *is* in since v8, and a liquid-only
+cost/margin view since step 28), and **customer-facing**
 notifications — admin-side Telegram alerts shipped in step 21, but a bot can't message
 a customer who never pressed Start, so reaching them would need per-customer opt-in or
 a paid channel; the tracking page stays the customer's channel. See `CLAUDE.md` §8

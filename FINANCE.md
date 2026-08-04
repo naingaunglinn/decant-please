@@ -26,6 +26,7 @@ treat §8 itself as the source.
 | Revenue this month, revenue chart | `OrderStats.php:17`, `RevenueChart` |
 | Top fragrances (by vials, not money) | `TopFragrances` |
 | Stock in ml, low-stock alert | `stock_ml`, `low_stock_threshold_ml` (v8) |
+| Bottle cost + liquid-only gross margin | `liquidCostMmk` (ceiling), `unit_cost_mmk`/`line_cost_mmk` snapshots, dashboard stat, CSV columns (step 28) |
 | Order CSV export incl. balance due | `OrdersTable.php:126` |
 | A5 invoice with balance due | invoice generator |
 
@@ -36,11 +37,8 @@ below are what's genuinely absent.
 
 ## In flight
 
-**Cost and margin** — `prompts/28-cost-and-margin-tracking.md` (28, not 26: open PR #58's
-specs renumber to 24–26 when it merges, and the local harness draft lands at 27 — verified
-2026-08-04). Spec drafted, issue open; Decision 1 below is resolved and locked, Decision 2
-is deliberately deferred out of this step. Delivery fee excluded from the margin on both
-sides. Ships the §8 v8-bullet and §0.1-v8 amendments already identified.
+**Nothing.** Cost and margin (prompt 28, issue #66) is built — see Already built. The next
+phase starts at gap 1, behind #67's two-promotion sequence.
 
 ---
 
