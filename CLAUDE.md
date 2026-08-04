@@ -654,9 +654,12 @@ client on checkout (see `05-api-layer.md`).
    `/admin/production-schedule/{date}`, the per-day worklist and printable (A5)
    bench sheet. See §0.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
-   count, decants due today, top fragrances, **low stock — reorder soon** (v8), and
+   count, decants due today, top fragrances, **low stock — reorder soon** (v8),
    **gross margin (liquid only)** (v19 — fully-costed orders only, with the
-   exclusions and N-of-M coverage named in its description).
+   exclusions and N-of-M coverage named in its description), **discount cost by
+   code** (#75 — from the order snapshots, never `times_used`), and **cash with
+   couriers** (#77 — the COD float, snapshotted at handoff, immune to markPaid
+   timing and the payment-method conflation).
    **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —
    drawn down when an order is decanted, surfaced on the fragrance table + low-stock
    widget, never touching the manual `in_stock` toggle. See §0.
