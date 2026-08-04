@@ -37,6 +37,9 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   const paid = order.payment_status === "paid";
+  // A negative balance is the API saying "overpaid" (#67's signed contract).
+  // Tolerated here before the backend ever emits one, so the storefront ships first.
+  const overpaid = order.balance_due_mmk < 0;
 
   useEffect(() => {
     let active = true;
@@ -88,20 +91,23 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
 
       {paid ? (
         <p className="mt-4 text-sm leading-relaxed text-pine">
-          Payment confirmed — thank you! Nothing more to do here.
+          {overpaid
+            ? `Payment confirmed — you've overpaid by ${formatKyat(-order.balance_due_mmk)}; we'll sort the difference out with you.`
+            : "Payment confirmed — thank you! Nothing more to do here."}
         </p>
       ) : (
         <>
           <div className="mt-4 flex items-baseline justify-between gap-4">
             <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-              Balance due
+              {overpaid ? "Overpaid" : "Balance due"}
             </span>
             <span className="text-base font-bold text-pine">
-              {formatKyat(order.balance_due_mmk)}
+              {formatKyat(Math.abs(order.balance_due_mmk))}
             </span>
           </div>
 
-          {hasDetails && (
+          {/* never ask for another transfer when the shop owes them */}
+          {hasDetails && !overpaid && (
             <div className="mt-4 flex flex-col gap-3 border-t border-rule pt-4">
               <p className="text-xs leading-relaxed text-muted">
                 Transfer the balance, then upload your screenshot below — we confirm every
