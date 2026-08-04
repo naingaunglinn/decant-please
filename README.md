@@ -20,8 +20,10 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 | `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` — [README](backend/README.md) with routes & file structure |
 | `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
 | `CLAUDE.md` | Project spec and source of truth for every product/design decision |
+| `FINANCE.md` | Financial-surface roadmap — what's built, the real gaps in build order, and the money decisions locked or still open |
 | `DEPLOY.md` | Production deployment guide (Heroku backend + Vercel frontend + Cloudflare R2 storage, backups) |
 | `prompts/` | The step-by-step build prompts this project was built from |
+| `prompts/WORKFLOW.md` | The issue → branch → PR loop every step follows — PRs always wait for human review; `main` changes only via the promotion PR |
 
 ## Features
 
