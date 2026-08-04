@@ -65,6 +65,10 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Telegram alert to the decanter's phone the moment a website order lands (off until a
   bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
+- Expenses & monthly P&L (Finance menu) — category'd expense entry in seconds, and a
+  Profit & loss page: income from order snapshots, liquid COGS with coverage, expenses
+  as entered, a delivery result line, and an honestly-labelled net; stock purchases sit
+  below the line (inventory — they become COGS as poured)
 - Dashboard: monthly revenue, a "Gross margin (liquid only)" stat (fully-costed
   orders only — vial/label/spillage and delivery excluded, coverage named), orders by
   status, unpaid orders + outstanding total, decants due today, top fragrances, and a

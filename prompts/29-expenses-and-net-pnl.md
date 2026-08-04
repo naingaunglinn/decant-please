@@ -58,7 +58,7 @@ small value object — not in the page class):
 Sales income            Σ line_total − Σ discount   (orders created in month; = total − fee per order)
 − COGS (liquid)         Σ line_cost over FULLY-costed orders    [coverage: on N of M orders]
 = Gross margin (liquid only)
-− Operating expenses    Σ expenses by category, stock_purchase EXCLUDED   [as entered]
+− Operating expenses    Σ expenses by category — stock_purchase AND delivery EXCLUDED   [as entered]
 + Delivery result       fees collected (Σ delivery_fee_mmk) − courier paid (delivery category)
 = Net operating profit (liquid COGS; expenses as entered)
 ——— below the line ———
@@ -68,6 +68,9 @@ Discounts given         Σ discount                  (already netted from income
 
 - **The delivery line closes FINANCE.md gap 4 at month level**: fees collected vs courier
   costs paid finally makes delivery margin *measured* — record that in FINANCE.md.
+- **No courier double-count** *(amended during implementation — the spec's first draft had
+  it)*: the delivery category is excluded from the operating block because it is already
+  subtracted inside the delivery result line. One subtraction, one place.
 - **The COGS trap from #71 applies**: sum per-order `liquidGrossMarginMmk()` components
   over fully-costed orders only; never a bare `SUM(line_cost_mmk)`.
 - Sales income is computed from line snapshots and discounts, **never `total_mmk`**

@@ -129,6 +129,9 @@ or losing money that no report can show. Excluded from profit per the v14 pass-t
 reading — but document it as **unmeasured, not zero**, and revisit if the decanter says the
 fee isn't actually break-even.
 
+**Measured at month level by step 29 (#76):** the P&L's delivery result line — fees
+collected − courier-category expenses. Per-order / per-township measurement stays open.
+
 ### 5. Discount cost report — built (#74)
 
 A dashboard widget: this month's discounts by code, hand-edited discounts as their own
@@ -188,17 +191,20 @@ step may settle this implicitly:**
 
 ---
 
-## The fork: operational finance or real books
+## The fork: taken — in-app books (2026-08-04, step 29 / #76)
 
-Everything above is **operational finance** — orders, payments, costs, margin, receivables.
-It stops short of expenses, capital, drawings, and tax.
+Everything above is **operational finance**. The fork to real books was taken deliberately,
+with the caveat presented and accepted: the P&L is only as true as the decanter's
+willingness to enter every expense, and one that silently omits last month's packaging
+order is worse than none, because it gets believed. The build carries that discipline —
+every P&L figure labels its coverage ("as entered", N-of-M COGS), and the no-double-count
+rule lives in one place (`ExpenseCategory::isOperating()`): stock purchases are inventory
+below the line, never an operating expense, because v19's margin already expenses the
+juice as COGS when it pours. Delivery is likewise subtracted exactly once — inside the
+delivery result line, never also in the operating block.
 
-Adding an expenses table and a true P&L roughly doubles the build and adds a permanent daily
-discipline: the P&L is only as true as the decanter's willingness to enter every expense, and
-one that silently omits last month's packaging order is worse than none, because it gets
-believed. Recommend keeping books outside the app, fed by a clean per-line-item export.
-
-Revisit only if expense entry will genuinely happen daily.
+Still outside the app: double-entry books, a balance sheet, drawings/capital, budgets, and
+tax (registration stays decanter-question 3).
 
 ---
 
