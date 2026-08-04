@@ -106,6 +106,8 @@ class OrdersTable
                 OrderResource::rejectAction(),
                 OrderResource::markPaidAction(),
                 OrderResource::markUnpaidAction(),
+                OrderResource::handedToCourierAction(),
+                OrderResource::courierSettledAction(),
                 OrderResource::printInvoiceAction(),
                 OrderResource::downloadInvoiceAction(),
                 EditAction::make(),

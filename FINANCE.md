@@ -104,15 +104,19 @@ Owed exists as a total. Aged doesn't. Bucket by days since delivery (0–7, 8–
 surface the oldest unpaid order. That's the one worth a phone call, and a single total can't
 tell you which it is.
 
-### 3. COD float
+### 3. COD float — built (#77)
 
 Cash collected by a courier that hasn't reached the decanter. On a cash-on-delivery model
-this is a real asset sitting outside the business and it is currently invisible. Minimum
-version: mark an order handed to a courier with a date; float is the sum not yet settled.
-No courier entity needed for v1.
+this is a real asset sitting outside the business and it was invisible until now.
 
 No generic e-commerce template will give you this. It matters more here than most of what
 one would.
+
+Built shape: **Handed to courier** snapshots `courier_carrying_mmk` (default: the balance
+due at that moment, editable) plus the handoff date; **Courier settled** releases it; a
+dashboard stat sums the snapshots with the oldest handoff named. Snapshots, deliberately —
+immune to markPaid timing (pinned by test) and to the method conflation below, exactly
+because the float never reads `payment_method` or a live balance.
 
 Hazard (gap 1's caveat applies): `payment_method = cod` conflates chose-COD with pre-v14
 backfill and silently-defaulted manual orders — and online orders generate courier cash

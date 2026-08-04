@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -255,6 +255,34 @@ class Order extends Model
         $this->save();
     }
 
+    /**
+     * Cash leaves with the courier: stamps the handoff and SNAPSHOTS what they
+     * carry — by default the balance due right now, editable, because a courier
+     * sometimes carries an agreed different amount. A snapshot, deliberately
+     * (decant-money §2): a live balance would shrink the float the moment the
+     * order is marked paid, before the cash physically arrives — and scoping the
+     * float by this marking sidesteps the payment_method conflation entirely.
+     * Handing off again (a re-delivery) restarts the float for this order.
+     */
+    public function handToCourier(CarbonInterface $date, int $carryingMmk): void
+    {
+        $this->handed_to_courier_at = $date;
+        $this->courier_carrying_mmk = max(0, $carryingMmk);
+        $this->courier_settled_at = null;
+        $this->save();
+    }
+
+    /** The courier handed the cash over — the float lets go of this order. */
+    public function settleCourier(CarbonInterface $date): void
+    {
+        if ($this->handed_to_courier_at === null) {
+            throw new LogicException('Only orders handed to a courier can be settled.');
+        }
+
+        $this->courier_settled_at = $date;
+        $this->save();
+    }
+
     /** Store the customer's transfer screenshot; does NOT mark paid — the
      *  decanter still eyeballs it and confirms. */
     public function attachPaymentProof(string $path): void
@@ -458,11 +486,14 @@ class Order extends Model
             'payment_method' => PaymentMethod::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
+            'handed_to_courier_at' => 'date',
+            'courier_settled_at' => 'date',
             'paid_at' => 'datetime',
             'deposit_mmk' => 'integer',
             'delivery_fee_mmk' => 'integer',
             'discount_mmk' => 'integer',
             'total_mmk' => 'integer',
+            'courier_carrying_mmk' => 'integer',
         ];
     }
 }
