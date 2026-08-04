@@ -663,6 +663,10 @@ client on checkout (see `05-api-layer.md`).
 - Slugs auto-generated; images stored via Laravel `storage` and served publicly.
 - All list endpoints paginated.
 - Keep code simple and readable — this is a small business tool, not enterprise SaaS.
+- **Process:** every step ships through the loop in `prompts/WORKFLOW.md` — issue →
+  branch (named by issue number, off fresh `develop`) → implement → docs in the same
+  branch → PR into `develop` → **stop**. PRs are never merged by Claude Code, and
+  `main` changes only through the promotion PR described there.
 - Your Claude Code environment already has `frontend-design`, the `vercel-*` skills,
   and `web-design-guidelines` active — consult those for implementation-level
   Next.js/Vercel patterns (view transitions, composition, React best practices)
