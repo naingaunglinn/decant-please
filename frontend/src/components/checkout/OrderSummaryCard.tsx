@@ -17,8 +17,9 @@ interface AppliedPromo {
 
 interface OrderSummaryCardProps {
   lineErrors: Record<number, string>;
-  /** Reports the applied code up so CheckoutClient can send it with the order. */
-  onPromoChange: (code: string | null) => void;
+  /** Reports the applied code and its previewed discount up — the code rides the
+   *  order; the discount nets the online "amount to pay" (#67). */
+  onPromoChange: (code: string | null, discountMmk: number) => void;
 }
 
 export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCardProps) {
@@ -52,7 +53,7 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
           new_total_formatted: preview.new_total_formatted,
         });
         setInput("");
-        onPromoChange(code.toUpperCase());
+        onPromoChange(code.toUpperCase(), preview.discount_mmk);
       } else {
         // the backend says exactly what's wrong — show that, not a generic line
         setPromoError(preview.message ?? "That code can't be applied.");
@@ -71,7 +72,7 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
   const remove = () => {
     setApplied(null);
     setPromoError(null);
-    onPromoChange(null);
+    onPromoChange(null, 0);
   };
 
   // cart edited after a code was applied → re-preview so the shown discount stays honest
@@ -95,6 +96,8 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
               new_total_formatted: preview.new_total_formatted,
             },
           );
+          // the online amount must track the refreshed discount, not just this card
+          onPromoChange(applied.code, preview.discount_mmk);
         } else {
           remove();
           setPromoError(preview.message ?? "That code no longer applies to your cart.");

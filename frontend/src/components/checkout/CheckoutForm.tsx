@@ -21,9 +21,17 @@ interface CheckoutFormProps {
   submitting: boolean;
   fieldErrors: Partial<Record<keyof ContactFields, string>>;
   subtotal: number;
+  /** The previewed promo discount — nets the online "amount to pay". */
+  discount: number;
 }
 
-export function CheckoutForm({ onSubmit, submitting, fieldErrors, subtotal }: CheckoutFormProps) {
+export function CheckoutForm({
+  onSubmit,
+  submitting,
+  fieldErrors,
+  subtotal,
+  discount,
+}: CheckoutFormProps) {
   const [honeypot, setHoneypot] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cod");
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
@@ -157,10 +165,12 @@ export function CheckoutForm({ onSubmit, submitting, fieldErrors, subtotal }: Ch
         )}
 
         {method === "online" && (
+          // the amount asked online is the *discounted* item subtotal — matching the
+          // receipt (#67); the delivery fee stays cash-to-courier, never in this figure
           <OnlinePay
             payment={payment}
             paymentLoaded={paymentLoaded}
-            amount={subtotal}
+            amount={Math.max(0, subtotal - discount)}
             onProof={setProofFile}
           />
         )}

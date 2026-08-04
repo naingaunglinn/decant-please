@@ -22,6 +22,7 @@ export function CheckoutClient() {
   const [errors, setErrors] = useState<CheckoutErrors>(NO_ERRORS);
   const [submitting, setSubmitting] = useState(false);
   const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
 
   if (!hydrated) return null;
 
@@ -112,11 +113,18 @@ export function CheckoutClient() {
           submitting={submitting}
           fieldErrors={errors.fields}
           subtotal={subtotal}
+          discount={promoDiscount}
         />
       </div>
 
       <div className="order-1 md:order-2">
-        <OrderSummaryCard lineErrors={errors.lines} onPromoChange={setPromoCode} />
+        <OrderSummaryCard
+          lineErrors={errors.lines}
+          onPromoChange={(code, discountMmk) => {
+            setPromoCode(code);
+            setPromoDiscount(discountMmk);
+          }}
+        />
       </div>
     </div>
   );
