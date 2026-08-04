@@ -112,6 +112,13 @@ costs onto order items. The figure is deliberately partial, and four rules keep 
   spillage are not in this number, and omitting them understates small sizes hardest.
   Cost is admin-eyes only: never the public API, the A5 invoice, or the fragrances
   CSV export.
+- **Stock purchases are inventory, never an operating expense** (v20): the margin
+  already expenses juice as COGS when it pours — expensing the bottle too counts it
+  twice. The rule lives in `ExpenseCategory::isOperating()`; the P&L shows stock cash
+  below the line, and delivery is subtracted exactly once, inside its own result line.
+- **A net figure names its own limits.** "Net operating profit (liquid COGS; expenses
+  as entered)" — the label is load-bearing: expenses sum only what was entered, and a
+  P&L that looks complete gets believed.
 
 ## 7. Before finishing any money change
 

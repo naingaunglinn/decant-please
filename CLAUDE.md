@@ -1,9 +1,35 @@
-# CLAUDE.md — Decant Please! (v19)
+# CLAUDE.md — Decant Please! (v20)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v19
+## 0. What changed in v20
+
+**v20** adds **expenses and a monthly net P&L** (Step 29,
+`prompts/29-expenses-and-net-pnl.md`, issue #76) — the FINANCE.md fork, taken
+deliberately: the decanter chose in-app books with the caveat presented that a
+P&L missing expenses is worse than none, because it gets believed. The design
+carries that discipline instead of hiding it:
+
+- **An `expenses` table + ExpenseCategory'd CRUD** (Finance nav group, entry in
+  seconds — date, category, integer-Kyat amount, note). The category enum owns
+  the one accounting rule that matters most here: `stock_purchase` is
+  **inventory, never an operating expense** — v19's margin already expenses that
+  juice as COGS when it pours, so expensing the bottle too would count it twice
+  (`ExpenseCategory::isOperating()`). Stock cash surfaces below the line.
+- **A Profit & loss page** (Finance group), one month at a time with prev/next
+  stepping: sales income from line snapshots − discounts (never `total_mmk`,
+  which holds the courier's fee), liquid COGS with N-of-M coverage, gross
+  margin, operating expenses **as entered** (delivery excluded — it lives in its
+  own line, one subtraction in one place), a **delivery result** line (fees
+  collected − courier paid) that finally measures FINANCE.md gap 4 at month
+  level, and a net labelled with its own limits: "Net operating profit (liquid
+  COGS; expenses as entered)".
+- Accrual-lite by order-created month, matching every existing figure; §4
+  exclusions everywhere, asserted by test; month boundaries via date columns
+  and half-open ranges, no timezone math (the v17 lesson).
+
+## 0.1 What changed in v19
 
 **v19** adds **bottle cost and a liquid-only gross margin** (Step 28,
 `prompts/28-cost-and-margin-tracking.md`, issue #66) — §8's "cost/margin
@@ -666,7 +692,12 @@ client on checkout (see `05-api-layer.md`).
 6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
    only) and a bulk PDF for the filtered view, one order per page, with an
    emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
-7. Everything remains notes + financials + fulfillment only — no messaging, no
+7. **Expenses & monthly P&L (v20)** — category'd expense entry (Finance group,
+   seconds per row) and a Profit & loss page: income from line snapshots −
+   discounts, liquid COGS with coverage, operating expenses as entered, a
+   delivery result line, an honestly-labelled net; stock purchases below the
+   line — inventory, never expensed (they become COGS as poured).
+8. Everything remains notes + financials + fulfillment only — no messaging, no
    customer portal, no payment processing.
 
 ## 7. Conventions
@@ -721,12 +752,14 @@ client on checkout (see `05-api-layer.md`).
 - Multi-tenant / multi-decanter marketplace (single decanter for v1/v2)
 - Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
   stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
-  reversal, and **v19 added reference-cost, liquid-only margin visibility**
-  (step 28) as a second one; what stays out of scope is *per-bottle* tracking,
-  batch identity, FIFO/weighted-average COGS, consumables costing (vial, label,
-  spillage — undecided, and deciding it changes the stat's label), and real
-  accounting (expenses, ledgers, tax). The customer-facing `in_stock` flag stays
-  manual — v8's stock warns, it never flips it.
+  reversal, **v19 added reference-cost, liquid-only margin visibility** (step
+  28), and **v20 added expenses + a monthly net P&L** (step 29 — the FINANCE.md
+  fork, chosen deliberately with its truth-discipline caveat accepted); what
+  stays out of scope is *per-bottle* tracking, batch identity, FIFO/weighted-
+  average COGS, consumables costing (vial, label, spillage — undecided, and
+  deciding it changes the stat's label), double-entry books, a balance sheet,
+  budgets, drawings/capital, and tax automation. The customer-facing `in_stock`
+  flag stays manual — v8's stock warns, it never flips it.
 - **Customer-facing** notifications — email, SMS, or messaging apps. *Amended in
   v13: admin-side alerts are no longer excluded — v11 (step 21, `prompts/21`)
   shipped Telegram order alerts to the decanter.* The boundary sits where
