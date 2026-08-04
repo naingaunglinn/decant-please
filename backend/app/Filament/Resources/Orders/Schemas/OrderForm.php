@@ -83,7 +83,7 @@ class OrderForm
                         Repeater::make('items')
                             ->relationship()
                             ->hiddenLabel()
-                            ->columns(4)
+                            ->columns(5)
                             ->minItems(1)
                             ->defaultItems(1)
                             ->addActionLabel('Add item')
@@ -125,6 +125,13 @@ class OrderForm
                                     ->required()
                                     ->live(onBlur: true)
                                     ->helperText('Auto-filled from the catalog — edit freely.'),
+                                TextInput::make('unit_cost_mmk')
+                                    ->label('Unit cost')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->suffix('Ks')
+                                    ->live(onBlur: true)
+                                    ->helperText('Liquid only — auto-filled from the fragrance cost; edit freely. Blank = unknown.'),
                                 TextInput::make('quantity')
                                     ->numeric()
                                     ->minValue(1)
@@ -169,6 +176,28 @@ class OrderForm
                             ->content(fn (Get $get): string => Money::kyat(
                                 max(0, self::liveTotal($get) - (int) ($get('deposit_mmk') ?: 0))
                             )),
+                        Placeholder::make('gross_margin')
+                            ->label('Gross margin (liquid only)')
+                            // Saved-state figure, from the stored snapshots — unsaved
+                            // line edits show after save. Admin-eyes only.
+                            ->content(function (?Order $record): string {
+                                if (! $record) {
+                                    return '—';
+                                }
+
+                                $record->loadMissing('items');
+                                $margin = $record->liquidGrossMarginMmk();
+
+                                if ($margin === null) {
+                                    $uncosted = $record->items
+                                        ->filter(fn ($item): bool => $item->line_cost_mmk === null)
+                                        ->count();
+
+                                    return $uncosted > 0 ? "unknown — {$uncosted} line(s) uncosted" : '—';
+                                }
+
+                                return Money::kyat($margin).' — excludes vial, label, spillage & delivery';
+                            }),
                         Textarea::make('notes')
                             ->rows(2)
                             ->columnSpanFull(),
@@ -254,6 +283,15 @@ class OrderForm
 
         if ($price !== null) {
             $set('unit_price_mmk', $price);
+        }
+
+        // Cost mirrors price: pre-filled from the live reference, hand-correctable.
+        // Only a real value overwrites — an uncosted fragrance keeps whatever's typed.
+        $cost = Fragrance::query()->find($get('fragrance_id'))
+            ?->liquidCostMmk((int) $get('size_ml'));
+
+        if ($cost !== null) {
+            $set('unit_cost_mmk', $cost);
         }
     }
 

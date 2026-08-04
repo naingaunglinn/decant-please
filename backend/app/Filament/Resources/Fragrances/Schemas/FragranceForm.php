@@ -118,6 +118,28 @@ class FragranceForm
                             ->suffix('ml')
                             ->helperText('Flag it on the dashboard once the remaining volume falls to this.'),
                     ]),
+                Section::make('Cost')
+                    ->description('What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('bottle_cost_mmk')
+                            ->label('Bottle cost')
+                            ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
+                            ->stripCharacters(',')
+                            ->numeric()
+                            ->minValue(0)
+                            ->suffix('Ks')
+                            ->requiredWith('bottle_volume_ml')
+                            ->helperText('Update by hand when you rebuy at a new price — past orders keep the cost they were created with.'),
+                        TextInput::make('bottle_volume_ml')
+                            ->label('Bottle size')
+                            ->numeric()
+                            ->minValue(1)
+                            ->suffix('ml')
+                            ->datalist([30, 50, 75, 100, 125, 200])
+                            ->requiredWith('bottle_cost_mmk'),
+                    ]),
                 Section::make('Decant prices')
                     ->columnSpanFull()
                     ->schema([

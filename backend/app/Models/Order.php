@@ -286,6 +286,31 @@ class Order extends Model
     }
 
     /**
+     * Liquid-only gross margin: Σ line_total − discount − Σ line_cost, with the
+     * delivery fee on neither side — it's courier pass-through, unmeasured, not
+     * zero (FINANCE.md gap 4) — which is also why this is never computed off
+     * total_mmk, which contains that fee.
+     *
+     * Null unless EVERY line carries a cost snapshot: a partially-costed order
+     * reports unknown, because a partial cost sum understates cost silently.
+     * Vial, label, and spillage are not in line costs; every surface that shows
+     * this figure labels it "liquid only".
+     */
+    public function liquidGrossMarginMmk(): ?int
+    {
+        $this->loadMissing('items');
+
+        if ($this->items->isEmpty()
+            || $this->items->contains(fn (OrderItem $item): bool => $item->line_cost_mmk === null)) {
+            return null;
+        }
+
+        return (int) $this->items->sum('line_total_mmk')
+            - $this->discount_mmk
+            - (int) $this->items->sum('line_cost_mmk');
+    }
+
+    /**
      * Tracked fragrances this order can't be fully poured from, given current
      * stock_ml — surfaced at Accept so a shortfall is caught before committing,
      * not at the decant bench. Untracked (null stock_ml) fragrances are ignored.
