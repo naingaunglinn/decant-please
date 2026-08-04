@@ -66,7 +66,8 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
   bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Dashboard: monthly revenue, a "Gross margin (liquid only)" stat (fully-costed
-  orders only — vial/label/spillage and delivery excluded, coverage named), orders by
+  orders only — vial/label/spillage and delivery excluded, coverage named), discount
+  cost by code, cash with couriers (COD float — snapshotted at handoff), orders by
   status, unpaid orders + outstanding total, decants due today, top fragrances, and a
   low-stock reorder panel
 - CSV export of orders, respecting the current tab/filters/sort (incl. payment,
