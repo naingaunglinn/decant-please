@@ -129,10 +129,11 @@ or losing money that no report can show. Excluded from profit per the v14 pass-t
 reading — but document it as **unmeasured, not zero**, and revisit if the decanter says the
 fee isn't actually break-even.
 
-### 5. Discount cost report
+### 5. Discount cost report — built (#74)
 
-Promo data is fully there and entirely unreported. How much did codes give away this month,
-by code. Cheap to build, immediately useful for deciding whether a code earns its keep.
+A dashboard widget: this month's discounts by code, hand-edited discounts as their own
+row, summed from the **order snapshots** — never `times_used`, which counts claims
+including orders later cancelled. §4 exclusions asserted by test.
 
 ### 6. Margin by size and by fragrance
 
