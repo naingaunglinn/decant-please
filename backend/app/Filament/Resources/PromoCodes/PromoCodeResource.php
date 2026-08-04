@@ -21,7 +21,7 @@ class PromoCodeResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Sales';
+    protected static string|UnitEnum|null $navigationGroup = 'Finance';
 
     protected static ?string $recordTitleAttribute = 'code';
 
