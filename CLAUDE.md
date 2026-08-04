@@ -1,9 +1,24 @@
-# CLAUDE.md — Decant Please! (v17)
+# CLAUDE.md — Decant Please! (v18)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v17
+## 0. What changed in v18
+
+**v18** vendors two advisory **business-finance skills** into `.claude/skills/`
+(issue #64) — agent guidance only; no app code, config, or behavior changes.
+`accounting` (bookkeeping setup, chart of accounts, weekly reconciliation, P&L
+review) and `finances` (unit economics, margin, cash-flow modeling) are copied —
+not symlinked — from `whawkinsiv/claude-code-skills`, pinned by hash in
+`skills-lock.json` (the vendored-asset precedent: Padauk, FullCalendar). Chosen
+after content review over higher-ranked registry hits, which turned out to be
+institutional equity research or robo-advisor scaffolding — wrong domain for a
+one-person decant shop. Both speak in US/SaaS examples (Stripe, QuickBooks, USD,
+MRR): they are advice for the decanter's *books*, and none of it licenses code
+changes — integer-Kyat rules, server-side pricing, and §8's no-gateway line stay
+governed by the `decant-money` skill and this file.
+
+## 0.1 What changed in v17
 
 **v17** rebuilds the production schedule around a **month calendar** (Step 23,
 `prompts/23-production-schedule-calendar.md`, issue #61) — the overview the
