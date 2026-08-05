@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { getMeta } from "@/lib/api";
 import { formatKyat } from "@/lib/format";
 import type { DeliveryTownshipOption, DeliveryZones, PaymentInfo } from "@/lib/types";
@@ -148,23 +149,20 @@ export function CheckoutForm({
       ) : (
         <>
           <Field label="State / Region" error={fieldErrors.delivery_township_id}>
-            <select
-              name="delivery_region"
-              required
-              disabled={zones === null}
-              value={region}
-              onChange={(event) => pickRegion(event.target.value)}
-              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
-            >
-              <option value="">
-                {zones === null ? "Loading delivery areas…" : "Choose your state or region…"}
-              </option>
-              {zones?.regions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={region} onValueChange={pickRegion} disabled={zones === null}>
+              <SelectTrigger aria-label="State / Region">
+                <SelectValue
+                  placeholder={zones === null ? "Loading delivery areas…" : "Choose your state or region…"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {zones?.regions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field
@@ -172,23 +170,24 @@ export function CheckoutForm({
             hint={township ? undefined : "Your delivery fee comes from this."}
             error={fieldErrors.delivery_township_id}
           >
-            <select
-              name="delivery_township_id"
-              required
-              disabled={region === ""}
+            <Select
               value={township ? String(township.id) : ""}
-              onChange={(event) => pickTownship(event.target.value)}
-              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
+              onValueChange={pickTownship}
+              disabled={region === ""}
             >
-              <option value="">
-                {region === "" ? "Pick a region first…" : "Choose your township…"}
-              </option>
-              {regionTownships.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger aria-label="Township">
+                <SelectValue
+                  placeholder={region === "" ? "Pick a region first…" : "Choose your township…"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {regionTownships.map((option) => (
+                  <SelectItem key={option.id} value={String(option.id)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field
