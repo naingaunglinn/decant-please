@@ -47,6 +47,7 @@ Full history in `00-CLAUDE.md` §0.
    | 28 | `28-cost-and-margin-tracking.md` | Bottle cost + liquid-only gross margin — reference pair on fragrances, immutable cost snapshots on order items, dashboard stat, CSV columns (24–26 reserved by open #58's renumber, 27 by the harness draft) | built |
    | 29 | `29-expenses-and-net-pnl.md` | Expenses CRUD + monthly Profit & loss page — the FINANCE.md fork taken deliberately; stock purchases below the line, delivery in its own result line, every figure labels its coverage | built |
    | 30 | `30-delivery-zones-and-fees.md` | Delivery zones — structured checkout address (region → township) with the fee derived server-side; township rate table seeded from RoyalX's coverage chart, per-courier coverage/reference costs admin-only, courier recorded at Accept | built |
+| 31 | `31-shadcn-select-and-form-polish.md` | Checkout region/township selects rebuilt as a Radix-backed, project-styled dropdown (native `<option>` popups can't be styled); `appearance-none` + on-brand chevron on all native selects via `SelectShell`; one runtime dep, shadcn token layer not adopted, ≥16px iOS rule enforced | built |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

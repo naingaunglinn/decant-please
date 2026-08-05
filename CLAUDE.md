@@ -1,9 +1,49 @@
-# CLAUDE.md — Decant Please! (v21)
+# CLAUDE.md — Decant Please! (v22)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v21
+## 0. What changed in v22
+
+**v22** is a **frontend-only** finish pass on the checkout region/township selects
+(Step 31, `prompts/31-shadcn-select-and-form-polish.md`, issue #82) — no API,
+migration, or admin change. Step 30's selects were right in behaviour but wrong in
+finish: a native `<option>` popup is drawn by the browser (OS-blue list, square
+corners, system font) and no CSS reaches it, which reads as unfinished inside §3's
+apothecary restraint — and the trigger lacked `appearance-none`, so the browser drew
+its own chevron inside the `rounded-full` pill.
+
+- **Two problems, two commits, deliberately separable.** The `appearance-none` +
+  on-brand-chevron fix ships first as **`SelectShell`** (`components/ui/`) with **no
+  dependency** — so it survives if the library is ever reverted — routed through **all
+  three** native selects (checkout region + township, and the shop **sort** dropdown,
+  which had the identical defect; keeping sort native gives `SelectShell` a permanent
+  consumer). `SelectShell` owns only its right padding (chevron clearance); consumers
+  add left/vertical classes, so there's no Tailwind conflict and no `cn()` helper.
+- **One Radix primitive, project-styled — not shadcn's token layer.** The two checkout
+  selects become a Radix `Select` (`@radix-ui/react-select`, the **one** runtime
+  dependency added). Authored in shadcn's **copy-in spirit** (we own and restyle the
+  source) but **without** its CLI, `components.json`, OKLCH token layer,
+  `cn()`/`clsx`/`tailwind-merge`, or `lucide` — a half-configured `components.json` with
+  no CLI in the loop is a landmine and §3's hex palette is fixed. `globals.css`'s
+  `@theme` block stays **byte-identical**. Highlight is `pine-soft`, selected is `pine`,
+  icons are the inline SVG chevron; the popup carries the **only shadow in the codebase**
+  (soft, pine-tinted) because a dropdown floats over live content with no scrim and a
+  hairline alone can't lift it — every other surface here separates by border + tone.
+  See `prompts/31 §4a`.
+- **≥16px is a hard rule any copied-in component must meet.** v5 locked `text-base`
+  (16px) on real controls because iOS Safari zooms the viewport when a sub-16px control
+  takes focus — worst on checkout. shadcn primitives default to `text-sm` (14px); the
+  trigger, value, and items here are all `text-base`, and "zero `text-sm` in the Select"
+  is a check every future copy-in must pass. This is also why the project's own
+  `Button`/`Pill`/`Input`/`Textarea`/`Label`/`Skeleton` were **not** replaced — they
+  already satisfy the rule and carry §3's motifs.
+- Radix's built-in type-ahead covers Yangon's ~45 townships, so no Combobox (`Popover` +
+  `Command`) was pulled — a third dependency and a second interaction model this list
+  doesn't need. No dark mode. No motion beyond Radix's open/close, kept instant (the
+  popup isn't animated), so `prefers-reduced-motion` is honoured by construction.
+
+## 0.1 What changed in v21
 
 **v21** makes the delivery destination structured data and derives the fee from
 it (Step 30, `prompts/30-delivery-zones-and-fees.md`, issue #80) — the first
@@ -645,6 +685,15 @@ Delivered. Everything else stays quiet.
 
 **Layout:** generous whitespace, mobile-first, near-black text on `mist`, pine used
 sparingly (never as a large fill except buttons and the vial-fill status track).
+
+**Component library note (v22):** the storefront's own primitives (`Button`, `Pill`,
+`SelectShell`, `QuantityStepper`, `ImagePlate`, `Skeleton`) carry these tokens directly.
+The one library component is the checkout region/township **`Select`**, which wraps
+`@radix-ui/react-select` for a stylable option list — but restyled entirely to the tokens
+above (`pine-soft` highlight, `pine` selected, hairline `rule` border, `rounded-full`
+trigger). shadcn's own token/OKLCH layer was **not** adopted and the `@theme` block is
+unchanged. Any copied-in component must be patched to **≥16px (`text-base`)** on every
+control — below 16px, iOS Safari zooms the viewport on focus (the v5 rule).
 
 ## 4. Domain model (source of truth)
 
