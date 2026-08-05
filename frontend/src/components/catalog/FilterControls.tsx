@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { SelectShell } from "@/components/ui/SelectShell";
 import type { Brand, CatalogMeta } from "@/lib/types";
 
 /** URL params owned by the filter UI (page resets whenever one changes). */
@@ -134,16 +135,16 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
       </FilterGroup>
 
       <FilterGroup label="Sort">
-        <select
+        <SelectShell
           value={searchParams.get("sort") ?? "newest"}
           onChange={(event) => setParams({ sort: event.target.value === "newest" ? null : event.target.value })}
-          className="w-full rounded-full border border-rule bg-transparent px-4 py-2.5 text-base"
+          className="pl-4 py-2.5"
         >
           <option value="newest">Newest first</option>
           <option value="price_asc">Price — low to high</option>
           <option value="price_desc">Price — high to low</option>
           <option value="name">Name A–Z</option>
-        </select>
+        </SelectShell>
       </FilterGroup>
 
       {activeCount > 0 && (

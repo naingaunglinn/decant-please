@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { SelectShell } from "@/components/ui/SelectShell";
 import { getMeta } from "@/lib/api";
 import { formatKyat } from "@/lib/format";
 import type { DeliveryTownshipOption, DeliveryZones, PaymentInfo } from "@/lib/types";
@@ -148,15 +149,15 @@ export function CheckoutForm({
       ) : (
         <>
           <Field label="State / Region" error={fieldErrors.delivery_township_id}>
-            <select
+            <SelectShell
               name="delivery_region"
               required
               disabled={zones === null}
               value={region}
               onChange={(event) => pickRegion(event.target.value)}
-              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
+              className="min-h-12 pl-5 py-3"
             >
-              <option value="">
+              <option value="" disabled>
                 {zones === null ? "Loading delivery areas…" : "Choose your state or region…"}
               </option>
               {zones?.regions.map((option) => (
@@ -164,7 +165,7 @@ export function CheckoutForm({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </SelectShell>
           </Field>
 
           <Field
@@ -172,15 +173,15 @@ export function CheckoutForm({
             hint={township ? undefined : "Your delivery fee comes from this."}
             error={fieldErrors.delivery_township_id}
           >
-            <select
+            <SelectShell
               name="delivery_township_id"
               required
               disabled={region === ""}
               value={township ? String(township.id) : ""}
               onChange={(event) => pickTownship(event.target.value)}
-              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
+              className="min-h-12 pl-5 py-3"
             >
-              <option value="">
+              <option value="" disabled>
                 {region === "" ? "Pick a region first…" : "Choose your township…"}
               </option>
               {regionTownships.map((option) => (
@@ -188,7 +189,7 @@ export function CheckoutForm({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </SelectShell>
           </Field>
 
           <Field
