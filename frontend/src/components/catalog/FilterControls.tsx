@@ -2,7 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SelectShell } from "@/components/ui/SelectShell";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import type { Brand, CatalogMeta } from "@/lib/types";
 
 /** URL params owned by the filter UI (page resets whenever one changes). */
@@ -135,16 +135,20 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
       </FilterGroup>
 
       <FilterGroup label="Sort">
-        <SelectShell
+        <Select
           value={searchParams.get("sort") ?? "newest"}
-          onChange={(event) => setParams({ sort: event.target.value === "newest" ? null : event.target.value })}
-          className="pl-4 py-2.5"
+          onValueChange={(value) => setParams({ sort: value === "newest" ? null : value })}
         >
-          <option value="newest">Newest first</option>
-          <option value="price_asc">Price — low to high</option>
-          <option value="price_desc">Price — high to low</option>
-          <option value="name">Name A–Z</option>
-        </SelectShell>
+          <SelectTrigger aria-label="Sort">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="price_asc">Price — low to high</SelectItem>
+            <SelectItem value="price_desc">Price — high to low</SelectItem>
+            <SelectItem value="name">Name A–Z</SelectItem>
+          </SelectContent>
+        </Select>
       </FilterGroup>
 
       {activeCount > 0 && (

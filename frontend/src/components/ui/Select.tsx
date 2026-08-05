@@ -13,8 +13,9 @@ import type { ComponentProps } from "react";
  *
  * This follows shadcn's copy-in *spirit* — we own the source and restyle it to project
  * tokens — but NOT shadcn's token layer, CLI, `cn()`, or icon library. Every class here
- * is a project token; `globals.css`'s @theme block is untouched. Icons are the inline SVG
- * chevron from SelectShell. `data-slot` attributes are kept for debugging/future hooks.
+ * is a project token; `globals.css`'s @theme block is untouched. Icons are inline SVG (the
+ * same chevron used elsewhere), so `lucide` isn't a dependency. `data-slot` attributes are
+ * kept for debugging/future hooks.
  *
  * Hard rule (v5): every control is `text-base` (16px). A smaller size makes iOS Safari
  * zoom the viewport on focus — worst of all on checkout — so no size here is under 16px.

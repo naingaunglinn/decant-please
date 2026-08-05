@@ -165,6 +165,13 @@ running the shadcn CLI. Concretely:
   the one place a shadow is introduced, kept soft and pine-tinted so it stays quiet. The §7
   "no shadow heavier than elsewhere" check reads against that: elsewhere is zero, so the bar
   is "as light as possible", which this meets.
+- **Follow-up (review round) — the shop sort joined the Radix `Select`, and `SelectShell`
+  was removed.** §2's `SelectShell` shipped as planned (the appearance-none commit) and
+  briefly carried all three native selects. A review-round decision then moved the shop
+  **sort** onto the same Radix dropdown for one consistent control, which left `SelectShell`
+  with no consumer — so it was deleted. The storefront now has **no native `<select>`**; the
+  appearance-none fix survives as its own commit in history. §2 above describes that
+  intermediate state, not the final file layout.
 
 ## 5. The iOS trap — the one thing most likely to regress
 

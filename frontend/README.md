@@ -71,7 +71,7 @@ frontend/
 │   │   ├── robots.ts · sitemap.ts · icon.svg # /robots.txt, /sitemap.xml, favicon
 │   │   └── error.tsx · not-found.tsx       # branded error/404 pages
 │   ├── components/
-│   │   ├── ui/                             # primitives: Pill, Button, SelectShell, ImagePlate, QuantityStepper, Skeleton; Select (Radix, restyled to tokens)
+│   │   ├── ui/                             # primitives: Pill, Button, ImagePlate, QuantityStepper, Skeleton; Select (Radix, restyled to tokens)
 │   │   ├── layout/                         # Navbar, Footer (social links from /meta), MobileNav, CartButton
 │   │   ├── catalog/                        # FragranceCard/Grid, filters, Pagination, RecentlyViewed
 │   │   ├── product/                        # SizeSelector, PurchasePanel (add to cart)
@@ -102,13 +102,13 @@ frontend/
 - **Server components fetch; client components animate.** Catalog data is fetched on the
   server (60s revalidation); GSAP/Motion run only in client components, and all motion
   respects `prefers-reduced-motion`.
-- **One library UI primitive, restyled.** The checkout region/township `Select` wraps
-  `@radix-ui/react-select` — the only non-motion runtime dependency — so the option list
-  can be styled (native `<option>` popups can't be). It's restyled entirely to the
-  `globals.css` tokens; shadcn's token layer was **not** adopted, and the `@theme` block
-  is unchanged. Any copied-in component must use `text-base` (≥16px) on every control, or
-  iOS Safari zooms the viewport on focus. Everything else (`Button`, `Pill`, `SelectShell`
-  for the shop's native sort select, …) is the project's own.
+- **One library UI primitive, restyled.** The `Select` (checkout region/township and the
+  shop sort) wraps `@radix-ui/react-select` — the only non-motion runtime dependency — so
+  the option list can be styled (native `<option>` popups can't be). It's restyled entirely
+  to the `globals.css` tokens; shadcn's token layer was **not** adopted, and the `@theme`
+  block is unchanged. Any copied-in component must use `text-base` (≥16px) on every control,
+  or iOS Safari zooms the viewport on focus. There are no native `<select>` elements left;
+  everything else (`Button`, `Pill`, `QuantityStepper`, …) is the project's own.
 
 ## Deployment
 
