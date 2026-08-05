@@ -27,6 +27,7 @@ treat §8 itself as the source.
 | Top fragrances (by vials, not money) | `TopFragrances` |
 | Stock in ml, low-stock alert | `stock_ml`, `low_stock_threshold_ml` (v8) |
 | Bottle cost + liquid-only gross margin | `liquidCostMmk` (ceiling), `unit_cost_mmk`/`line_cost_mmk` snapshots, dashboard stat, CSV columns (step 28) |
+| Township rate table + fee derived at checkout | `delivery_townships` (+ per-courier coverage/reference-cost rows), `/delivery-zones`, order snapshots (step 30) |
 | Order CSV export incl. balance due | `OrdersTable.php:126` |
 | A5 invoice with balance due | invoice generator |
 
@@ -127,14 +128,22 @@ fee cash.
 
 ### 4. Delivery margin (measurement gap)
 
-`delivery_fee_mmk` records what the customer was charged. Nothing records what the courier
-was paid. If the fee is flat and courier rates vary by township, delivery is quietly making
-or losing money that no report can show. Excluded from profit per the v14 pass-through
-reading — but document it as **unmeasured, not zero**, and revisit if the decanter says the
-fee isn't actually break-even.
+`delivery_fee_mmk` records what the customer was charged. Historically the fee was flat
+and hand-entered while courier rates vary by township, so delivery could quietly make or
+lose money no report could show. Excluded from profit per the v14 pass-through reading —
+documented as **unmeasured, not zero**.
 
 **Measured at month level by step 29 (#76):** the P&L's delivery result line — fees
-collected − courier-category expenses. Per-order / per-township measurement stays open.
+collected − courier-category expenses.
+
+**Fee varies by township as of step 30 (#80):** checkout derives the fee from the
+township rate table, and both couriers' rates are recordable per township as reference
+costs — visible as a display-only best-case margin, **never entering any money figure**
+(the P&L's courier-paid side stays the `delivery` expense category alone; feeding
+per-order costs in too would double-count). What stays open is the **per-order half**:
+`delivery_courier` is now recorded at Accept, so after a month of data the natural next
+step is an expected-vs-actual reconciliation (Σ recorded reference cost vs the `delivery`
+expense category), with the expense staying authoritative for net profit.
 
 ### 5. Discount cost report — built (#74)
 

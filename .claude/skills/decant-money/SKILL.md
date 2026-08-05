@@ -119,6 +119,16 @@ costs onto order items. The figure is deliberately partial, and four rules keep 
 - **A net figure names its own limits.** "Net operating profit (liquid COGS; expenses
   as entered)" — the label is load-bearing: expenses sum only what was entered, and a
   P&L that looks complete gets believed.
+- **The delivery fee derives from the township, server-side** (v21): checkout sends
+  `delivery_township_id` and the server reads `fee_mmk` off the serviceable row — a
+  client-sent fee is ignored, exactly as a client-sent price is. A `fee_mmk` of 0 is a
+  real free-delivery zone, never "unpriced" (`is_active` is the only gate), and the fee
+  is a stored integer copied to the order — no third rounding rule.
+- **Courier costs are reference-only** (`delivery_township_couriers.cost_mmk`): they
+  never reach `fee_mmk`, `total_mmk`, `balanceDue()`, any margin, the P&L, the invoice,
+  a CSV export, or the public API. The P&L's courier-paid figure comes only from the
+  `delivery` expense category — adding per-order courier costs in as well would count
+  the courier twice.
 
 ## 7. Before finishing any money change
 
