@@ -189,7 +189,7 @@ class PublicApiTest extends TestCase
     {
         $this->postJson('/api/v1/orders', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['customer_name', 'phone', 'address', 'items']);
+            ->assertJsonValidationErrors(['customer_name', 'phone', 'delivery_township_id', 'address_line', 'items']);
     }
 
     public function test_tracking_round_trip_and_generic_404s(): void
@@ -208,7 +208,8 @@ class PublicApiTest extends TestCase
             ->assertJsonPath('rejection_reason', null)
             ->assertJsonPath('customer_name', 'Su Su')
             ->assertJsonPath('phone', '09-771234561')
-            ->assertJsonPath('address', 'No. 12, Bahan Township, Yangon')
+            // composed server-side: line, township (Burmese), region, smallest-to-largest
+            ->assertJsonPath('address', "No. 12, Inya Road\nBahan (ဗဟန်း), Yangon Region")
             ->assertJsonPath('items.0.fragrance_name', 'Chanel — Allure Homme Sport (Cologne)')
             ->assertJsonPath('items.0.size_ml', 10)
             ->assertJsonPath('items.0.unit_price_mmk', 55000)
@@ -252,7 +253,9 @@ class PublicApiTest extends TestCase
             ->assertJsonPath('message', "This order's already being prepared — call to cancel or change it.");
 
         // accepted order → 409, status untouched
-        $accepted = Order::newFromCheckout($this->payload());
+        $accepted = Order::newFromCheckout([
+            'delivery_township' => $this->serviceableTownship(),
+        ] + $this->payload());
         $accepted->accept(today()->addDay());
         $this->postJson('/api/v1/orders/cancel', ['tracking_code' => $accepted->tracking_code, 'phone' => '09-771234561'])
             ->assertStatus(409);
@@ -286,7 +289,8 @@ class PublicApiTest extends TestCase
         return $overrides + [
             'customer_name' => 'Su Su',
             'phone' => '09-771234561',
-            'address' => 'No. 12, Bahan Township, Yangon',
+            'delivery_township_id' => $this->serviceableTownship(nameMm: 'ဗဟန်း')->id,
+            'address_line' => 'No. 12, Inya Road',
             'note' => 'Please call before delivery',
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
         ];

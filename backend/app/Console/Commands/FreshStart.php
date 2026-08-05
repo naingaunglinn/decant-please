@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\DecantPrice;
+use App\Models\DeliveryTownship;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -21,7 +22,7 @@ class FreshStart extends Command
     public function handle(): int
     {
         if (! $this->option('force') && ! $this->confirm(
-            'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?'
+            'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands, the admin login and the delivery-zone list are kept — but every zone is reset to inactive with no fee, so the demo placeholder can\'t go live. Continue?'
         )) {
             $this->info('Nothing deleted.');
 
@@ -48,11 +49,18 @@ class FreshStart extends Command
             Fragrance::query()->delete();
             PromoCode::query()->delete();
 
+            // Zones are configuration (geography + courier coverage), so the
+            // rows stay — but the demo's Yangon activation and placeholder fee
+            // are demo data, and a fee the code invented must not survive into
+            // a real shop. Inactive at 0 until the decanter prices each zone.
+            DeliveryTownship::query()->update(['is_active' => false, 'fee_mmk' => 0]);
+
             return $counts;
         });
 
         Cache::forget('api.meta');
         Cache::forget('api.brands');
+        Cache::forget('api.delivery-zones'); // the bulk update above fires no model events
 
         $this->info("Deleted {$counts['orders']} order(s) and {$counts['fragrances']} fragrance(s). Brands and admin user kept — ready for real inventory.");
 

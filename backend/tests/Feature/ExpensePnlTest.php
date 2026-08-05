@@ -73,6 +73,32 @@ class ExpensePnlTest extends TestCase
         $this->assertSame(300000, $pnl->stockPurchasesMmk);     // below the line, not in net
     }
 
+    public function test_pnl_delivery_line_picks_up_township_derived_fees_and_courier_paid_stays_expense_only(): void
+    {
+        $township = $this->serviceableTownship(fee: 2000, name: 'Sanchaung');
+        // a recorded courier reference cost must NOT become the P&L's courier-paid
+        $township->couriers()->first()->update(['cost_mmk' => 1500]);
+
+        \App\Models\Fragrance::findOrFail($this->fragranceId())
+            ->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 50000]);
+
+        Order::newFromCheckout([
+            'customer_name' => 'Aung Kyaw',
+            'phone' => '09-771234561',
+            'delivery_township' => $township,
+            'address_line' => 'No. 5, Baho Road',
+            'items' => [['fragrance_id' => $this->fragranceId(), 'size_ml' => 10, 'quantity' => 1]],
+        ]);
+
+        Expense::create(['spent_on' => today(), 'category' => 'delivery', 'amount_mmk' => 400]);
+
+        $pnl = \App\Support\MonthlyPnl::for(today()->year, today()->month);
+
+        $this->assertSame(2000, $pnl->deliveryFeesCollectedMmk); // the derived fee
+        $this->assertSame(400, $pnl->courierPaidMmk);            // the expense — never the 1,500 reference
+        $this->assertSame(1600, $pnl->deliveryResultMmk);        // subtracted once, in its own line
+    }
+
     public function test_month_boundaries_are_engine_proof(): void
     {
         Expense::create(['spent_on' => today()->startOfMonth(), 'category' => 'other', 'amount_mmk' => 1000]);

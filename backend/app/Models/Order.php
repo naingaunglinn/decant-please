@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Courier;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -11,6 +12,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at', 'delivery_township_id', 'region_snapshot', 'township_snapshot', 'address_line', 'address_extra', 'delivery_courier'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -36,6 +38,22 @@ class Order extends Model
     {
         static::creating(function (self $order) {
             $order->tracking_code ??= self::generateTrackingCode();
+        });
+
+        // Region/township are snapshotted the way fragrance_name_snapshot is:
+        // copied whenever the township association is set or changed (checkout
+        // and the admin form both pass through here), then never rewritten — a
+        // rename, reprice, or delete of the township leaves placed orders
+        // reading what was true when they were placed.
+        static::saving(function (self $order) {
+            if ($order->isDirty('delivery_township_id') && $order->delivery_township_id !== null) {
+                $township = DeliveryTownship::find($order->delivery_township_id);
+
+                if ($township) {
+                    $order->region_snapshot = $township->region->label();
+                    $order->township_snapshot = $township->name;
+                }
+            }
         });
 
         // Stock is drawn down when the vials are physically filled — i.e. the
@@ -86,19 +104,54 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function deliveryTownship(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryTownship::class);
+    }
+
+    /**
+     * The one place a checkout address is assembled — smallest to largest, the
+     * way a Myanmar address is written and the way the invoice prints one. The
+     * township line carries the Burmese name when recorded, because that line
+     * is for the courier's rider. Called from the checkout path only: Filament
+     * keeps writing `address` directly (a DM address is whatever the customer
+     * typed in a DM), and a composed address is never re-derived later.
+     */
+    public static function composeAddress(string $addressLine, DeliveryTownship $township, ?string $extra): string
+    {
+        $lines = [
+            trim($addressLine),
+            "{$township->optionLabel()}, {$township->region->label()}",
+        ];
+
+        if (filled($extra)) {
+            $lines[] = trim($extra);
+        }
+
+        return implode("\n", $lines);
+    }
+
     /**
      * The only path website checkouts take. Prices and availability are re-derived
-     * from the current catalog — anything price-like in $data['items'] is ignored.
+     * from the current catalog — anything price-like in $data['items'] is ignored,
+     * and the delivery fee is read off the validated township row, never from the
+     * client (the price-trust rule, extended to the fee).
      *
-     * @param  array{customer_name: string, phone: string, address: string, notes?: ?string, items: array<array{fragrance_id: int, size_ml: int, quantity: int}>}  $data
+     * @param  array{customer_name: string, phone: string, delivery_township: DeliveryTownship, address_line: string, address_extra?: ?string, notes?: ?string, items: array<array{fragrance_id: int, size_ml: int, quantity: int}>}  $data
      */
     public static function newFromCheckout(array $data): self
     {
         return DB::transaction(function () use ($data) {
+            $township = $data['delivery_township'];
+
             $order = self::create([
                 'customer_name' => $data['customer_name'],
                 'phone' => $data['phone'],
-                'address' => $data['address'],
+                'address' => self::composeAddress($data['address_line'], $township, $data['address_extra'] ?? null),
+                'address_line' => $data['address_line'],
+                'address_extra' => $data['address_extra'] ?? null,
+                'delivery_township_id' => $township->id,
+                'delivery_fee_mmk' => $township->fee_mmk,
                 'notes' => $data['notes'] ?? null,
                 'order_from' => OrderSource::Website,
                 'status' => OrderStatus::AwaitingConfirmation,
@@ -484,6 +537,7 @@ class Order extends Model
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
+            'delivery_courier' => Courier::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
             'handed_to_courier_at' => 'date',

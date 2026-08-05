@@ -10,6 +10,7 @@ use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
+use App\Models\DeliveryTownship;
 use App\Models\Order;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -80,8 +81,18 @@ class OrderResource extends Resource
                     ->required()
                     ->default(today()->addDays(2))
                     ->afterOrEqual('decant_date'),
+                Select::make('delivery_courier')
+                    ->label('Courier')
+                    ->options(fn (Order $record): array => DeliveryTownship::courierOptionsFor($record->delivery_township_id))
+                    ->placeholder('Decide later')
+                    ->helperText('Who carries this parcel — each option shows its recorded cost. A snapshot: no cost is ever copied onto the order.'),
             ])
             ->action(function (Order $record, array $data): void {
+                // set before accept() so its save() persists both in one write
+                if (filled($data['delivery_courier'] ?? null)) {
+                    $record->delivery_courier = $data['delivery_courier'];
+                }
+
                 $record->accept(Carbon::parse($data['decant_date']), Carbon::parse($data['delivery_date']));
 
                 Notification::make()

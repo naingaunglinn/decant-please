@@ -49,7 +49,8 @@ class DecantStockTest extends TestCase
         $order = Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [
                 ['fragrance_id' => $fragrance->id, 'size_ml' => 10, 'quantity' => 1],
                 ['fragrance_id' => $fragrance->id, 'size_ml' => 5, 'quantity' => 1],
@@ -134,7 +135,8 @@ class DecantStockTest extends TestCase
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [[
                 'fragrance_id' => $fragrance->id,
                 'size_ml' => $sizeMl,

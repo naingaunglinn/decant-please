@@ -4,14 +4,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { getMeta } from "@/lib/api";
 import { formatKyat } from "@/lib/format";
-import type { PaymentInfo } from "@/lib/types";
+import type { DeliveryTownshipOption, DeliveryZones, PaymentInfo } from "@/lib/types";
 
 export type PaymentMethod = "cod" | "online";
 
 export interface ContactFields {
   customer_name: string;
   phone: string;
-  address: string;
+  /** Non-null once the form can submit — the server re-derives the fee from it. */
+  delivery_township_id: number | null;
+  address_line: string;
+  address_extra?: string;
   note?: string;
   payment_method: PaymentMethod;
 }
@@ -23,6 +26,12 @@ interface CheckoutFormProps {
   subtotal: number;
   /** The previewed promo discount — nets the online "amount to pay". */
   discount: number;
+  /** The serviceable destination tree; null while loading. */
+  zones: DeliveryZones | null;
+  /** The zones fetch failed — the form fails visibly, never falls back to free text. */
+  zonesFailed: boolean;
+  /** Reports the picked township up, so the summary card can show its fee. */
+  onTownshipChange: (township: DeliveryTownshipOption | null) => void;
 }
 
 export function CheckoutForm({
@@ -31,12 +40,17 @@ export function CheckoutForm({
   fieldErrors,
   subtotal,
   discount,
+  zones,
+  zonesFailed,
+  onTownshipChange,
 }: CheckoutFormProps) {
   const [honeypot, setHoneypot] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cod");
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
   const [paymentLoaded, setPaymentLoaded] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [region, setRegion] = useState("");
+  const [township, setTownship] = useState<DeliveryTownshipOption | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,11 +69,26 @@ export function CheckoutForm({
     };
   }, []);
 
+  const regionTownships =
+    zones?.regions.find((candidate) => candidate.value === region)?.townships ?? [];
+
+  const pickRegion = (value: string) => {
+    setRegion(value);
+    setTownship(null);
+    onTownshipChange(null);
+  };
+
+  const pickTownship = (id: string) => {
+    const picked = regionTownships.find((candidate) => String(candidate.id) === id) ?? null;
+    setTownship(picked);
+    onTownshipChange(picked);
+  };
+
   const onlineReady = payment !== null;
   const needsSlip = method === "online";
   // Online can't submit until the shop is configured AND a slip is attached.
   const blockedOnline = needsSlip && (!onlineReady || !proofFile);
-  const canSubmit = !submitting && !blockedOnline;
+  const canSubmit = !submitting && !blockedOnline && township !== null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,7 +97,9 @@ export function CheckoutForm({
       {
         customer_name: String(data.get("customer_name") ?? "").trim(),
         phone: String(data.get("phone") ?? "").trim(),
-        address: String(data.get("address") ?? "").trim(),
+        delivery_township_id: township?.id ?? null,
+        address_line: String(data.get("address_line") ?? "").trim(),
+        address_extra: String(data.get("address_extra") ?? "").trim() || undefined,
         note: String(data.get("note") ?? "").trim() || undefined,
         payment_method: method,
       },
@@ -103,15 +134,90 @@ export function CheckoutForm({
         />
       </Field>
 
-      <Field label="Delivery address" error={fieldErrors.address}>
-        <textarea
-          name="address"
-          required
-          rows={3}
-          autoComplete="street-address"
-          className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-base"
-        />
-      </Field>
+      {zonesFailed ? (
+        // No free-text fallback, deliberately: an order must never land with
+        // no zone and no fee. Failing loudly beats failing into bad data.
+        <p role="alert" className="rounded-2xl border border-status-danger/30 px-5 py-4 text-sm leading-relaxed text-status-danger">
+          We couldn&apos;t load our delivery areas just now, so checkout can&apos;t continue —
+          your cart is safe; please reload the page to try again.
+        </p>
+      ) : zones !== null && zones.regions.length === 0 ? (
+        <p role="alert" className="rounded-2xl border border-status-pending/40 px-5 py-4 text-sm leading-relaxed text-status-pending">
+          Delivery areas aren&apos;t set up yet — please message the shop to order for now.
+        </p>
+      ) : (
+        <>
+          <Field label="State / Region" error={fieldErrors.delivery_township_id}>
+            <select
+              name="delivery_region"
+              required
+              disabled={zones === null}
+              value={region}
+              onChange={(event) => pickRegion(event.target.value)}
+              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
+            >
+              <option value="">
+                {zones === null ? "Loading delivery areas…" : "Choose your state or region…"}
+              </option>
+              {zones?.regions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            label="Township"
+            hint={township ? undefined : "Your delivery fee comes from this."}
+            error={fieldErrors.delivery_township_id}
+          >
+            <select
+              name="delivery_township_id"
+              required
+              disabled={region === ""}
+              value={township ? String(township.id) : ""}
+              onChange={(event) => pickTownship(event.target.value)}
+              className="min-h-12 w-full rounded-full border border-rule bg-transparent px-5 py-3 text-base disabled:opacity-50"
+            >
+              <option value="">
+                {region === "" ? "Pick a region first…" : "Choose your township…"}
+              </option>
+              {regionTownships.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            label="Address"
+            hint="Street, ward, house number."
+            error={fieldErrors.address_line}
+          >
+            <textarea
+              name="address_line"
+              required
+              rows={2}
+              autoComplete="street-address"
+              className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-base"
+            />
+          </Field>
+
+          <Field
+            label="Anything else about the address (optional)"
+            hint="Prints with the address on your parcel — e.g. building entrance, landmark."
+            error={fieldErrors.address_extra}
+          >
+            <textarea
+              name="address_extra"
+              rows={2}
+              className="w-full rounded-2xl border border-rule bg-transparent px-5 py-3 text-base"
+            />
+          </Field>
+        </>
+      )}
 
       <Field label="Note (optional)" error={fieldErrors.note}>
         <textarea

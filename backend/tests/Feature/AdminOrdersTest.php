@@ -230,7 +230,8 @@ class AdminOrdersTest extends TestCase
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [[
                 'fragrance_id' => $price->fragrance_id,
                 'size_ml' => $price->size_ml,
