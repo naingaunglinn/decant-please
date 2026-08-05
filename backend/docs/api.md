@@ -136,20 +136,65 @@ Everything a client needs to build filter UI without hardcoding:
 `sizes` and `price` reflect **in-stock** decants only; `price.min/max` are `null` on
 an empty catalog. `social` URLs are `null` when unconfigured.
 
+## `GET /delivery-zones`
+
+The whole serviceable delivery tree in one response — fetch once on the checkout
+page and filter the township select client-side. Cached server-side (~10 min, busted
+the moment the decanter edits a zone). Only townships that are active **and**
+currently reachable by a courier appear; nothing about couriers themselves (names,
+costs, coverage) ever crosses this endpoint.
+
+```json
+{
+  "regions": [
+    {
+      "value": "yangon",
+      "label": "Yangon Region",
+      "townships": [
+        {
+          "id": 215,
+          "name": "Sanchaung",
+          "name_mm": "စမ်းချောင်း",        // null when not recorded
+          "label": "Sanchaung (စမ်းချောင်း)", // render this in the select
+          "fee_mmk": 2000,                  // 0 = real free delivery
+          "fee_formatted": "2,000 Ks"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Regions with no serviceable township are omitted. An empty `regions` array means
+the shop hasn't configured delivery yet — fail checkout visibly rather than
+falling back to a free-text address.
+
 ## `POST /orders` — guest checkout
+
+> **Breaking change (step 30):** the free-text `address` field is no longer
+> accepted — the address is structured, and the server composes the canonical
+> address string itself. Clients built before this must switch to
+> `delivery_township_id` + `address_line` (+ optional `address_extra`).
 
 ```json
 {
   "customer_name": "Ma Thiri",            // required, ≤255
   "phone": "09-123456789",                // required, ≤30 — becomes the tracking credential
-  "address": "…",                         // required, ≤1000
-  "note": "call before delivery",         // optional, ≤1000
+  "delivery_township_id": 215,            // required — an id from GET /delivery-zones
+  "address_line": "No. 12, Baho Road",    // required, ≤500 — street / ward / house no.
+  "address_extra": "blue gate, 2nd floor",// optional, ≤500 — prints with the address
+  "note": "call before delivery",         // optional, ≤1000 — fulfilment note, NOT address
   "promo_code": "WELCOME10",              // optional, ≤64 — case-insensitive
   "items": [                              // required, 1–20 lines
     { "fragrance_id": 20, "size_ml": 10, "quantity": 2 }   // quantity 1–50
   ]
 }
 ```
+
+The delivery fee is **never sent by the client** — it is read off the township row
+server-side, exactly as unit prices are. A township that is unknown, deactivated,
+or currently unreachable fails with a `422` on `delivery_township_id`; it never
+silently becomes a 0-fee order.
 
 There is also an optional `website` field — a **honeypot**. Real clients must omit
 it (or send it empty). Any non-empty value makes the server log the attempt, store
@@ -158,9 +203,12 @@ can't tell it was caught. Don't ever map a real UI field to `website`.
 
 What the server does, atomically:
 
-1. Re-validates every line against the live catalog (active fragrance + brand,
-   size in stock) — failures are `422` with `items.N` messages as above.
-2. Re-derives unit prices and stores them as immutable snapshots on the order items.
+1. Validates the township is serviceable and reads its fee; re-validates every
+   line against the live catalog (active fragrance + brand, size in stock) —
+   failures are `422` with `items.N` messages as above.
+2. Re-derives unit prices and stores them as immutable snapshots on the order
+   items; snapshots the region/township names and composes the canonical
+   `address` (line, then `Township (မြန်မာ), Region`, then the extra line).
 3. If `promo_code` was sent, re-evaluates it **under a row lock** (usage counted
    exactly once, no double-spend). A code that lapsed since preview does **not**
    fail the order — the discount is dropped and `promo_note` explains it.
@@ -171,8 +219,10 @@ What the server does, atomically:
 ```json
 {
   "tracking_code": "9BGQCECV6C",
-  "total_mmk": 68400,
-  "total_formatted": "68,400 Ks",
+  "total_mmk": 70400,
+  "total_formatted": "70,400 Ks",
+  "delivery_fee_mmk": 2000,
+  "delivery_fee_formatted": "2,000 Ks",
   "promo_note": null
 }
 ```
@@ -183,9 +233,10 @@ What the server does, atomically:
 - `promo_note` — `null` normally; when a promo lapsed between preview and submit it
   is exactly: `That code was no longer valid, so it wasn't applied — you can still
   place this order without it.`
-- `total_mmk` at creation = items subtotal − discount. Delivery fee and deposit are
-  0 until the decanter sets them during review — re-fetch via `/orders/track` for
-  the authoritative running totals.
+- `total_mmk` at creation = items subtotal + delivery fee − discount. The fee is
+  the township's at the moment of ordering (the decanter can still adjust it
+  during review — e.g. an unusually large parcel); deposit starts at 0. Re-fetch
+  via `/orders/track` for the authoritative running totals.
 
 ## `GET /orders/track?tracking_code=…&phone=…`
 

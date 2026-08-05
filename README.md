@@ -44,6 +44,9 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
   KBZPay/Wave transfer details and optional QR, and a transfer-screenshot upload;
   flips to "paid" once the decanter confirms (no gateway — see below)
 - Related fragrances on every detail page, a recently-viewed rail, and a generated sitemap
+- Structured delivery address at checkout — region → township selects with the delivery
+  fee derived from the township server-side (shown as its own line, paid in cash to the
+  courier; never part of an online prepayment)
 
 **Admin panel (`/admin`, login required)**
 
@@ -65,6 +68,9 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Telegram alert to the decanter's phone the moment a website order lands (off until a
   bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
+- Delivery zones (Settings) — a township rate table seeded from Royal Express's coverage
+  chart, with per-courier coverage/reference costs (admin-eyes only), bulk fee/cost
+  pricing, CSV import, and a courier choice recorded at Accept
 - Expenses & monthly P&L (Finance menu) — category'd expense entry in seconds, and a
   Profit & loss page: income from order snapshots, liquid COGS with coverage, expenses
   as entered, a delivery result line, and an honestly-labelled net; stock purchases sit
@@ -245,7 +251,8 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 | GET | `/fragrances/{slug}` | Fragrance detail | 120/min |
 | GET | `/brands` | Active brands | 120/min |
 | GET | `/meta` | Filter options, price bounds, social links, payment details | 120/min |
-| POST | `/orders` | Guest checkout | 10/min |
+| GET | `/delivery-zones` | Serviceable townships + delivery fees, grouped by region | 120/min |
+| POST | `/orders` | Guest checkout (structured address; fee derived from township) | 10/min |
 | GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/orders/cancel` | Customer cancel while awaiting confirmation | 10/min |
 | POST | `/orders/payment-proof` | Upload a transfer screenshot (code + phone gated) | 10/min |
@@ -253,9 +260,10 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 
 Guarantees worth knowing:
 
-- **Prices are never trusted from the client.** Checkout receives only
-  `fragrance_id`, `size_ml`, `quantity`; the server re-derives every price from the current
-  catalog and stores immutable snapshots on the order items.
+- **Prices are never trusted from the client — and neither is the delivery fee.**
+  Checkout receives only `fragrance_id`, `size_ml`, `quantity`, and a
+  `delivery_township_id`; the server re-derives every price from the current catalog,
+  reads the fee off the township row, and stores immutable snapshots on the order.
 - **Tracking is not a guessing oracle.** Lookup requires an exact code + phone match;
   a mismatch on either returns the same generic 404.
 - Checkout carries a honeypot field; bots get a convincing fake response and nothing is stored.

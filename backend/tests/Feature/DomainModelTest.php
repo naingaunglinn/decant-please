@@ -106,7 +106,8 @@ class DomainModelTest extends TestCase
         $order = Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [[
                 'fragrance_id' => $price->fragrance_id,
                 'size_ml' => 10,
@@ -134,7 +135,8 @@ class DomainModelTest extends TestCase
         ]);
 
         $base = [
-            'customer_name' => 'Su Su', 'phone' => '09-9', 'address' => 'Yangon',
+            'customer_name' => 'Su Su', 'phone' => '09-9',
+            'delivery_township' => $this->serviceableTownship(), 'address_line' => 'Yangon',
         ];
 
         // out-of-stock size

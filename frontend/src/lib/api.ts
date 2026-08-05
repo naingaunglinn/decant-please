@@ -4,6 +4,7 @@ import type {
   CheckoutItem,
   CheckoutPayload,
   CheckoutResponse,
+  DeliveryZones,
   Fragrance,
   FragranceFilters,
   OrderStatusResponse,
@@ -79,6 +80,13 @@ export async function getMeta(): Promise<CatalogMeta> {
   return apiFetch("/meta", { next: { revalidate: 60 } });
 }
 
+/** The serviceable delivery tree — fetched once on the checkout page. If this
+ *  fails, checkout fails visibly: there is deliberately no free-text fallback,
+ *  or an order would land with no zone and no fee. */
+export async function getDeliveryZones(): Promise<DeliveryZones> {
+  return apiFetch("/delivery-zones", { cache: "no-store" });
+}
+
 export async function createOrder(
   payload: CheckoutPayload,
   proof?: File | null,
@@ -95,7 +103,9 @@ export async function createOrder(
   const form = new FormData();
   form.append("customer_name", payload.customer_name);
   form.append("phone", payload.phone);
-  form.append("address", payload.address);
+  form.append("delivery_township_id", String(payload.delivery_township_id));
+  form.append("address_line", payload.address_line);
+  if (payload.address_extra) form.append("address_extra", payload.address_extra);
   if (payload.note) form.append("note", payload.note);
   if (payload.promo_code) form.append("promo_code", payload.promo_code);
   if (payload.payment_method) form.append("payment_method", payload.payment_method);

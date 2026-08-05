@@ -55,7 +55,8 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 | GET | `/api/v1/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
 | GET | `/api/v1/brands` | Active brands | 120/min |
 | GET | `/api/v1/meta` | Filter options, price bounds, social links, payment details | 120/min |
-| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
+| GET | `/api/v1/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
+| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices and the delivery fee (structured address since step 30) | 10/min |
 | GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
 | POST | `/api/v1/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |

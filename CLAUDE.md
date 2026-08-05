@@ -1,9 +1,60 @@
-# CLAUDE.md — Decant Please! (v20)
+# CLAUDE.md — Decant Please! (v21)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v20
+## 0. What changed in v21
+
+**v21** makes the delivery destination structured data and derives the fee from
+it (Step 30, `prompts/30-delivery-zones-and-fees.md`, issue #80) — the first
+step since v14 to touch checkout on both sides, and the step that makes the
+P&L's delivery-fees line mean something:
+
+- **A `Region` enum (15 states/regions + Naypyidaw) + `delivery_townships`
+  table**, seeded from **Royal Express's official coverage chart** ("Last
+  Updated 1/8/2026", committed as `backend/database/data/preview.webp` beside
+  the two CSVs — the chart is perishable; re-check it when fees are reviewed).
+  196 in-service + 32 suspended destinations, plus Yangon's city townships
+  restored (the chart prices the whole city as one destination; customers pick
+  a township, so the seed carries all 45 + the chart's sub-township points).
+  **Every row seeds inactive at fee 0** — the seed is geography, not a shipping
+  promise, and the seeder never invents a fee. The demo path alone activates
+  Yangon at a placeholder; `decant:fresh-start` resets every zone to inactive/0.
+- **Per-courier coverage in a child table** (`delivery_township_couriers`, the
+  DecantPrice shape): Royal Express and BeeXprss as an enum, each row carrying
+  **that courier's own spelling** (the reconciliation alias — both couriers
+  romanise the same townships differently), an optional **reference cost**
+  (never in any money figure — the P&L's courier-paid line stays the `delivery`
+  expense category alone, the §0-v20 no-double-count rule), and `is_available`
+  (suspended ≠ unserved: only one reverses). Serviceable = active + an open
+  route, one definition (`scopeServiceable`). **Nothing about couriers crosses
+  the public API** — the v19 cost rule extended to supplier data, pinned by test.
+- **Checkout collects a structured address**: region → township selects (from
+  `GET /api/v1/delivery-zones`, cached, serviceable rows only), a street line,
+  an optional extra line. The fee is read off the township row server-side —
+  a client-sent fee is ignored, the §7 price-trust rule extended verbatim.
+  `orders.address` stays canonical, composed once at creation
+  (`Order::composeAddress()`, smallest-to-largest, Burmese township name
+  included for the rider) — so the invoice, receipt, Telegram alert, and admin
+  textarea needed zero changes; region/township are snapshotted like
+  `fragrance_name_snapshot`; legacy orders keep null structured columns.
+  **Breaking API change, deliberately clean** (the storefront is the only
+  client): `POST /orders` now takes `delivery_township_id` + `address_line`
+  (+`address_extra`) and no longer accepts `address`. **The online prepay
+  amount does not change** — the fee stays cash-to-courier (v14's Option B;
+  #67 owns the balance arithmetic), and the checkout copy says so out loud.
+- **Admin: Delivery zones** (Settings group) — region-grouped table with
+  courier-coverage pills, cheapest recorded cost and a blank-never-0 best-case
+  margin, bulk set-fee / set-cost / activate (a district filter + one action
+  prices an area), CSV import + template on the v9 `CatalogImport` idiom. The
+  order form gains an optional township pick that pre-fills the editable fee;
+  **Accept** offers the courier choice with each courier's recorded cost as
+  helper text, snapshotted to `orders.delivery_courier` — no cost ever copied.
+- **Post-promotion obligation:** production starts with every zone inactive, so
+  the decanter must price + activate townships (bulk actions) as part of going
+  live, or checkout has nothing to offer.
+
+## 0.1 What changed in v20
 
 **v20** adds **expenses and a monthly net P&L** (Step 29,
 `prompts/29-expenses-and-net-pnl.md`, issue #76) — the FINANCE.md fork, taken
@@ -611,6 +662,14 @@ sparingly (never as a large fill except buttons and the vial-fill status track).
 
 ### Order — **changed in v2**
 - `customer_name`, `phone`, `address`
+- `delivery_township_id` (nullable FK, `nullOnDelete`), `region_snapshot`,
+  `township_snapshot`, `address_line`, `address_extra` — **new in v21.**
+  Checkout writes them and composes `address` from them once; snapshots follow
+  the `fragrance_name_snapshot` rule (copied at write, never recomputed — a
+  township rename/reprice/delete leaves placed orders untouched). Null on
+  legacy and DM orders, where `address` stays whatever was typed.
+- `delivery_courier` — **new in v21.** Nullable `Courier` enum value recorded at
+  Accept (or on the form): who actually carried it. A snapshot; no cost copied.
 - `order_from`: `website` \| `tiktok` \| `facebook` \| `other` — **`website` is new**;
   the other three remain for orders the decanter still logs manually from a DM
 - `tracking_code` — **new.** Unique random alphanumeric (~10 chars), generated on
@@ -654,8 +713,12 @@ client on checkout (see `05-api-layer.md`).
 4. **Cart** — a slide-in drawer, not a separate page. Client-side only
    (React context + `localStorage`), guest, no account. Quantity per line, remove
    line, subtotal for display only (server re-derives the real total at checkout).
-5. **Checkout** — cart summary + contact form (name, phone, address, optional
-   note). No payment fields. Submits to a new public write endpoint.
+5. **Checkout** — cart summary + contact form (name, phone, optional note) and,
+   since v21, a **structured address**: region → township selects (serviceable
+   townships only, fee shown as its own summary line the moment one is picked),
+   a street line, an optional extra line. No payment fields. Submits to a
+   public write endpoint; the delivery fee is derived server-side from the
+   township, never sent by the client.
 6. **Order complete** — shows the tracking code prominently, order summary, and a
    link to the tracking page. URL carries the code so it survives a refresh.
 7. **Track order** — form (tracking code + phone) → status timeline. No login.
@@ -697,7 +760,12 @@ client on checkout (see `05-api-layer.md`).
    discounts, liquid COGS with coverage, operating expenses as entered, a
    delivery result line, an honestly-labelled net; stock purchases below the
    line — inventory, never expensed (they become COGS as poured).
-8. Everything remains notes + financials + fulfillment only — no messaging, no
+8. **Delivery zones (v21)** — a Settings resource over the township rate table:
+   region-grouped, courier-coverage pills (suspended and no-courier states
+   distinct), reference costs with a blank-never-0 best-case margin, bulk
+   set-fee/set-cost/activate, CSV import + template. Courier data is
+   admin-eyes only; the Accept modal records who carries each parcel.
+9. Everything remains notes + financials + fulfillment only — no messaging, no
    customer portal, no payment processing.
 
 ## 7. Conventions
@@ -721,7 +789,9 @@ client on checkout (see `05-api-layer.md`).
 - **Checkout-specific:** the server re-derives `unit_price_mmk` and validates
   `is_active`/`in_stock` from the current catalog at submission time — the client
   only ever sends `fragrance_id`, `size_ml`, and `quantity`. Never trust a
-  client-submitted price.
+  client-submitted price. **v21 extends this verbatim to the delivery fee:** the
+  client sends `delivery_township_id`; the server reads `fee_mmk` off the
+  serviceable row and ignores any client-sent fee or free-text `address`.
 - **Tracking lookup** requires an exact `tracking_code` + `phone` match; a mismatch on
   either returns the same generic "not found," so the endpoint isn't a guessing
   oracle for either field.

@@ -174,7 +174,8 @@ class PromoCodeTest extends TestCase
         return $overrides + [
             'customer_name' => 'Su Su',
             'phone' => '09-771234561',
-            'address' => 'No. 12, Bahan Township, Yangon',
+            'delivery_township_id' => $this->serviceableTownship()->id,
+            'address_line' => 'No. 12, Bahan Township, Yangon',
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
         ];
     }

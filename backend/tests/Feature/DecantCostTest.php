@@ -148,7 +148,8 @@ class DecantCostTest extends TestCase
         $order = Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [
                 ['fragrance_id' => $costed->id, 'size_ml' => 10, 'quantity' => 1],
                 ['fragrance_id' => $uncosted->id, 'size_ml' => 10, 'quantity' => 1],
@@ -226,7 +227,8 @@ class DecantCostTest extends TestCase
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township' => $this->serviceableTownship(),
+            'address_line' => 'Sanchaung, Yangon',
             'items' => [[
                 'fragrance_id' => $fragrance->id,
                 'size_ml' => $sizeMl,

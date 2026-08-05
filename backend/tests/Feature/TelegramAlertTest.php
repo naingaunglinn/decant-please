@@ -339,7 +339,8 @@ class TelegramAlertTest extends TestCase
         $payload = [
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township_id' => $this->serviceableTownship()->id,
+            'address_line' => 'Sanchaung, Yangon',
             'website' => $honeypot ? 'https://spam.example' : '',
             'items' => [[
                 'fragrance_id' => $price->fragrance_id,

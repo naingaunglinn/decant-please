@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CancelOrderController;
+use App\Http\Controllers\Api\DeliveryZoneController;
 use App\Http\Controllers\Api\FragranceController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\OrderController;
@@ -16,6 +17,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/fragrances', [FragranceController::class, 'index']);
         Route::get('/fragrances/{slug}', [FragranceController::class, 'show']);
         Route::get('/meta', MetaController::class);
+        Route::get('/delivery-zones', DeliveryZoneController::class);
     });
 
     // public write + public lookup: deliberately tighter than catalog reads,

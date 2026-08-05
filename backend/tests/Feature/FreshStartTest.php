@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Brand;
+use App\Models\DeliveryTownship;
+use App\Models\DeliveryTownshipCourier;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\PromoCode;
@@ -20,6 +22,11 @@ class FreshStartTest extends TestCase
 
         $this->assertGreaterThan(0, Order::count());
         $brandCount = Brand::count();
+        $townshipCount = DeliveryTownship::count();
+        $courierRowCount = DeliveryTownshipCourier::count();
+        // the demo seed activates Yangon at a placeholder fee — the exact thing
+        // fresh-start must not let survive into a real shop
+        $this->assertGreaterThan(0, DeliveryTownship::where('is_active', true)->count());
 
         $this->artisan('decant:fresh-start', ['--force' => true])
             ->assertSuccessful();
@@ -29,6 +36,13 @@ class FreshStartTest extends TestCase
         $this->assertSame(0, PromoCode::count());
         $this->assertSame($brandCount, Brand::count());
         $this->assertSame(1, User::count());
+
+        // zones are configuration: geography + courier coverage survive, but
+        // every row resets to inactive at 0 — no invented fee goes live
+        $this->assertSame($townshipCount, DeliveryTownship::count());
+        $this->assertSame($courierRowCount, DeliveryTownshipCourier::count());
+        $this->assertSame(0, DeliveryTownship::where('is_active', true)->count());
+        $this->assertSame(0, DeliveryTownship::where('fee_mmk', '>', 0)->count());
     }
 
     public function test_fresh_start_aborts_without_confirmation(): void
@@ -38,7 +52,7 @@ class FreshStartTest extends TestCase
 
         $this->artisan('decant:fresh-start')
             ->expectsConfirmation(
-                'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands and the admin login are kept. Continue?',
+                'This permanently deletes ALL orders (with their payment proofs), ALL fragrances (with their prices and images) and ALL promo codes. Brands, the admin login and the delivery-zone list are kept — but every zone is reset to inactive with no fee, so the demo placeholder can\'t go live. Continue?',
                 'no'
             )
             ->assertSuccessful();

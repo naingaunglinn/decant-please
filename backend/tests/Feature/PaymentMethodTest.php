@@ -195,7 +195,8 @@ class PaymentMethodTest extends TestCase
         $payload = array_filter([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
-            'address' => 'Sanchaung, Yangon',
+            'delivery_township_id' => $this->serviceableTownship()->id,
+            'address_line' => 'Sanchaung, Yangon',
             'payment_method' => $method,
             'items' => [[
                 'fragrance_id' => $price->fragrance_id,
