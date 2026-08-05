@@ -150,7 +150,7 @@ export function CheckoutForm({
         <>
           <Field label="State / Region" error={fieldErrors.delivery_township_id}>
             <Select value={region} onValueChange={pickRegion} disabled={zones === null}>
-              <SelectTrigger aria-label="State or region">
+              <SelectTrigger aria-label="State / Region">
                 <SelectValue
                   placeholder={zones === null ? "Loading delivery areas…" : "Choose your state or region…"}
                 />
