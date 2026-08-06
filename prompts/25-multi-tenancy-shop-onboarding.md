@@ -22,7 +22,11 @@ ADR-004, §7, §10, §11). Requires Steps 23 + 24 merged.
   security" — vendor comment).
 - **Shop CRUD** (studio-only) + the onboarding runbook: shop row, admin user, Vercel
   project + domain + `NEXT_PUBLIC_SHOP_SLUG`, `telegram:chat-id` — F6 says minutes,
-  not a deployment.
+  not a deployment. **Now also, per the v18–v22 layer:** copy the national delivery
+  geography into the new shop (all inactive, fee 0 — the Step 23 seed), then the
+  decanter activates + prices their townships and (optionally) sets bottle costs; a shop
+  with no active township has nothing to offer at checkout, so zone activation is part
+  of go-live, not a later nicety.
 - **Per-tenant Telegram** per ADR-003: `telegram_bot_token` (encrypted cast) /
   `telegram_chat_id` on `shops`; `TelegramNotifier` takes a `Shop`; `telegram:test
   --shop=`; free tier = studio bot, paid tier = own bot.

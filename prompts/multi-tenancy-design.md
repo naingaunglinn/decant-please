@@ -390,6 +390,33 @@ one-row-per-shop. `ShopSetting::current()`'s `firstOrCreate([])` then works unch
 trait: the global scope narrows the find side, and the trait's `creating` auto-fill parameterises
 the create side — a bare scope can't do that second half; the hook has to.
 
+**Added by the v18–v22 finance + delivery-zones layer (findings addendum A1–A3):**
+
+- `expenses` (v20) — a decanter's operating ledger, tenant-owned like `orders`; `shop_id`
+  + trait, and it joins the `decant:fresh-start` per-shop reset (which today skips it — A6).
+  `ExpenseResource` auto-scopes once the trait lands.
+- `delivery_townships` + `delivery_township_couriers` (v21) — **plain `shop_id` on both,
+  geography duplicated per shop.** The township identity is national (the `(region, name)`
+  unique index carries no shop dimension; geography is seeded from committed CSVs), and only
+  `fee_mmk`/`is_active`/`sort_order` + the whole courier child are per-shop — so a
+  global-geography reference table with a `(shop_id, township_id)` **pricing overlay** is the
+  more normalized model. It is **rejected deliberately**: the overlay forks the seam's one
+  mechanism (a class of tenant tables that skip the trait, plus a read-time join), rewrites
+  v21's shipped admin UI / checkout lookup / public API, and saves only the duplication of
+  ~228 reference rows per shop — which onboarding seeds anyway, all inactive at fee 0. So both
+  tables get `shop_id`; the uniques become `(shop_id, region, name)` and
+  `(shop_id, delivery_township_id, courier)`. `delivery_township_couriers` has no Resource
+  (edited through the township's `Repeater` + a bulk action), so its `shop_id` + trait is the
+  only thing that scopes it. Same simplicity call as `ShopSetting` above and the v8 total-ml
+  stock decision.
+- Cost/finance **columns** — `bottle_cost_mmk`/`bottle_volume_ml` on `fragrances`,
+  `unit_cost_mmk`/`line_cost_mmk` on `order_items`, COD-float + delivery snapshots on `orders`
+  — ride models that are already on this list, so they inherit the scope for free. They are
+  **admin-only supplier/cost data and must never reach the public API** (confirmed absent from
+  `app/Http`); the tenant scope is not what protects them, but it must not accidentally expose
+  them either. The one integrity watch is `orders.delivery_township_id` pointing at another
+  shop's township — closed by the checkout re-validation note below.
+
 ### Existing designs that need attention
 
 **Tracking codes — decided.** Lookup is code + phone with a generic 404. Codes stay **globally
@@ -407,6 +434,10 @@ that serves one shop's KBZPay and Wave numbers (and MMQR) to another shop's stor
 ten minutes — and no Eloquent scope will ever touch a cache key. Keys become per-shop
 (`api.meta.{slug}`, `api.brands.{slug}`) and busting becomes per-shop with them: `ShopSetting`'s
 `saved` hook currently forgets the one global key, and `decant:fresh-start` forgets both.
+**v21 added a third global key, `api.delivery-zones`** (`DeliveryZoneController`), with the same
+hazard and **four** bust sites — the `saved`/`deleted` hooks on both `DeliveryTownship` and
+`DeliveryTownshipCourier`, `DeliveryZoneSeeder`, and `decant:fresh-start` (findings A5). It
+becomes `api.delivery-zones.{slug}` and every one of the four busts keys per shop.
 
 **Slugs — the highest-priority Step A item.** `brands.slug` and `fragrances.slug` are globally
 unique, and `HasSlug::generateUniqueSlug()` dedups with a plain `exists()` loop — the same shape
@@ -421,6 +452,29 @@ runs scoped.
 requesting tenant, not merely that the user is authenticated. Otherwise an incrementing order id in
 that URL walks other shops' bank screenshots. This is the highest-severity single line in the whole
 migration.
+
+**Delivery zones — public read + checkout write (v21, findings A5).** Two surfaces the audit
+missed because they postdate it. The public `GET /api/v1/delivery-zones` (the **ninth** public
+endpoint — Step 24's "eight" is now nine) must return only the current shop's serviceable
+townships and cache per-shop; the `{shop}` path prefix carries the tenant, and
+`api.delivery-zones.{slug}` carries the cache. Checkout already re-derives the fee server-side —
+`DeliveryTownship::serviceable()->find($id)`, 422 on miss, fee read off the row not the client,
+the same discipline as `currentPriceFor()`. That `find()` is shop-blind today; once
+`DeliveryTownship` carries the trait and the api request sets context, the scoped `find()`
+returns null for another shop's township id → 422, closing the cross-shop routing/pricing hole
+**with no new code**. The one integrity note is `orders.delivery_township_id`: a per-order FK into
+a now-scoped table, so an order can only ever point at its own shop's township.
+
+**Custom Finance pages — covered by the app scope, which is the point (findings A4).**
+`ProfitAndLoss` and the two production-schedule pages are custom Filament `Page`s, so *Filament's*
+tenancy scope never reaches them. But their data runs through Eloquent on trait-bearing models —
+`MonthlyPnl` over `Order`/`Expense`, `Order::productionScheduleFor()` over `OrderItem` — so once
+those models carry `BelongsToShop` and the panel request has a `TenantContext` (the interim panel
+middleware sets it, Step 23 §5), the **throwing app scope covers all three with no per-page code**.
+This is exactly why ADR-002 keeps the app scope as the floor rather than trusting Filament alone.
+The finance widgets (`DiscountCost`, `CourierFloat`, `OrderStats`' margin) are plain `Order`
+queries summed in PHP → auto-covered; only `TopFragrances`' hand-built join still needs its
+`orders.shop_id`/`order_items.shop_id` qualified (ADR-002, unchanged).
 
 ### Storage layout
 
@@ -453,6 +507,9 @@ This is not optional and it is not a follow-up. It ships with the seam.
 | Two shops, promo codes | A's code is not redeemable in B's checkout |
 | Two shops, meta cache | B's `/meta` never serves A's payment details — not even inside A's 10-minute cache window; busting A's settings busts only A's key |
 | Two shops, slugs | Both shops create brand "Chanel": both succeed, and each shop's catalog shows exactly one |
+| Two shops, P&L + expenses | A's Profit & loss counts only A's orders **and** A's expenses; an expense entered in B never moves A's net (custom page → app scope, findings A4) |
+| Two shops, delivery zones | `GET /api/v1/a/delivery-zones` returns only A's active/serviceable townships at A's fees; editing B's township busts only B's `api.delivery-zones` key |
+| Two shops, checkout township | A checkout under A's path with **B's** `delivery_township_id` gets a 422 (scoped `serviceable()->find()` returns null) — never routed to B's township or priced by B's fee |
 | Unscoped access throws | A tenant-owned query with no `TenantContext` raises, and does not return all rows |
 | Escape hatch works | `withoutTenancy()` returns cross-shop rows, and is used in ≤ 5 places repo-wide |
 

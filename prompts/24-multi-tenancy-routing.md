@@ -15,9 +15,12 @@ middleware.
 
 ## 1. Backend
 
-- Route group becomes `Route::prefix('v1/{shop}')` around **all eight public
+- Route group becomes `Route::prefix('v1/{shop}')` around **all nine public
   endpoints** (`routes/api.php`) — catalog reads, checkout, track, cancel,
-  payment-proof, validate-promo. `/up` stays unprefixed (Heroku health check).
+  payment-proof, validate-promo, and **`delivery-zones`** (v21's addition — the audit
+  and this step's earlier draft said "eight"; the delivery-zones read must be prefixed
+  too, or the storefront's township selects break under a tenant). `/up` stays unprefixed
+  (Heroku health check).
 - `ResolveTenant` middleware on the group: looks up the slug, **404s on unknown or
   inactive shops** (same generic-404 discipline as tracking — no shop-enumeration
   oracle beyond what the storefront URL already reveals), binds the `Shop` into

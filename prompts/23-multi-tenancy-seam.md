@@ -23,8 +23,11 @@ commit). Every assertion follows the Telegram-double-send lesson: **assert exact
 counts, never presence**. The §8 table is the checklist: catalog counts, cross-shop
 tracking 404, cross-shop proof route, admin table, every dashboard widget, CSV export,
 promo codes, **meta-cache isolation + per-shop busting**, **both shops create brand
-"Chanel"**, unscoped-query-throws, and the `withoutTenancy()` escape hatch (works, and
-is used in ≤ 5 places repo-wide — grep-assert that). Until Step 24 adds `{shop}` paths,
+"Chanel"**, and — added for the v18–v22 layer — **P&L + expenses isolation** (A's Profit
+& loss counts only A's orders and expenses), **delivery-zones isolation** (`/a/delivery-zones`
+returns only A's fees; a B township id in A's checkout 422s), unscoped-query-throws, and
+the `withoutTenancy()` escape hatch (works, and is used in ≤ 5 places repo-wide —
+grep-assert that). Until Step 24 adds `{shop}` paths,
 API-level tests set the tenant via `TenantContext` directly; Step 24 rewrites them
 against real paths.
 
@@ -32,10 +35,20 @@ against real paths.
 
 - `shops` — `id`, `slug` (unique, indexed), `name`, `is_active`, timestamps. Minimal:
   contact/Telegram/theming columns wait for Step 25.
-- `shop_id` (FK, indexed) on `brands`, `fragrances`, `decant_prices`, `orders`,
-  `order_items`, `promo_codes`, `shop_settings` — per design-doc §7, including the
-  denormalised ones (`order_items`, `decant_prices`) and a **unique index on
-  `shop_settings.shop_id`** (one settings row per shop).
+- `shop_id` (FK, indexed) on **ten tables**: `brands`, `fragrances`, `decant_prices`,
+  `orders`, `order_items`, `promo_codes`, `shop_settings`, and — added by the v18–v22
+  layer (design-doc §7, findings A1–A2) — `expenses`, `delivery_townships`, and
+  `delivery_township_couriers`. Per design-doc §7, including the denormalised ones
+  (`order_items`, `decant_prices`) and a **unique index on `shop_settings.shop_id`**
+  (one settings row per shop).
+- **Delivery-zone uniques become shop-scoped.** Geography is duplicated per shop (the
+  decided model — design-doc §7, findings A2), so drop the global
+  `(region, name)` unique on `delivery_townships` for `(shop_id, region, name)`, and
+  the child's `(delivery_township_id, courier)` for
+  `(shop_id, delivery_township_id, courier)`. The national CSV seed is copied into each
+  shop (all inactive, fee 0) at onboarding, so a second shop's zone import can't collide
+  with the first's on township identity — the same reasoning as the slug composites
+  below.
 - **Backfill in-migration** (Heroku's release phase runs `migrate --force` unattended —
   design-doc N5): create the one shop — slug from `SHOP_SLUG` env (add to
   `.env.example`, compose, and Heroku *before* promoting; it must match Step 24's
@@ -53,13 +66,21 @@ against real paths.
 
 - `TenantContext` (scoped singleton): `set(Shop)`, `get()`, `has()`, `id()`, and
   `withoutTenancy(callable)` — flips a bypass flag, restores it in a `finally`.
-- `BelongsToShop` trait on all seven models: a global scope that **throws a dedicated
-  `TenantNotSetException` when no tenant is set** (unless bypassing — then it applies
-  nothing, deliberately), else filters by **`$model->qualifyColumn('shop_id')`** —
-  never a bare column: joins don't apply the joined model's scopes, and an unqualified
-  `shop_id` in `TopFragrances`' join is "ambiguous" on Postgres while SQLite stays
-  green (ADR-002). Plus a `creating` hook that fills `shop_id` from the context — this
-  is what keeps `ShopSetting::current()`'s `firstOrCreate([])` working unchanged.
+- `BelongsToShop` trait on all **ten** models (the §2 list — `Expense`,
+  `DeliveryTownship`, `DeliveryTownshipCourier` join the original seven): a global scope
+  that **throws a dedicated `TenantNotSetException` when no tenant is set** (unless
+  bypassing — then it applies nothing, deliberately), else filters by
+  **`$model->qualifyColumn('shop_id')`** — never a bare column: joins don't apply the
+  joined model's scopes, and an unqualified `shop_id` in `TopFragrances`' join is
+  "ambiguous" on Postgres while SQLite stays green (ADR-002). Plus a `creating` hook
+  that fills `shop_id` from the context — this is what keeps `ShopSetting::current()`'s
+  `firstOrCreate([])` working unchanged.
+- **The custom Finance/schedule pages need no per-page code.** `ProfitAndLoss`
+  (`MonthlyPnl` over `Order`+`Expense`) and the production-schedule pages
+  (`Order::productionScheduleFor()` over `OrderItem`) are custom Pages Filament won't
+  scope — but every query runs on a trait-bearing model, so the throwing app scope
+  covers them once §5's panel middleware sets the context (findings A4). This is the
+  ADR-002 dividend: the floor scope catches exactly the queries Filament's doesn't.
 - The scope's throw is the whole point (ADR-002 Option C): a forgotten filter is a
   500 in CI, not a silent leak.
 
@@ -86,11 +107,15 @@ throws:
 
 ## 6. Per-shop caches and storage
 
-- Cache keys become `api.meta.{slug}` / `api.brands.{slug}` (`MetaController`,
-  `BrandController` build them from the context). Busting follows: `ShopSetting`'s
-  `saved` hook forgets **its own shop's** meta key; `decant:fresh-start` forgets the
-  target shop's pair. The v14 payment block makes this real money data — one global
-  key would serve shop A's KBZPay/Wave numbers to shop B for 10 minutes (findings Q5).
+- Cache keys become `api.meta.{slug}` / `api.brands.{slug}` / **`api.delivery-zones.{slug}`**
+  (`MetaController`, `BrandController`, `DeliveryZoneController` build them from the
+  context). Busting follows per shop: `ShopSetting`'s `saved` hook forgets **its own
+  shop's** meta key; the **delivery-zones key has four bust sites** — the
+  `saved`/`deleted` hooks on `DeliveryTownship` **and** `DeliveryTownshipCourier`,
+  `DeliveryZoneSeeder`, and `decant:fresh-start` — each keyed to its shop (findings A5);
+  `decant:fresh-start` forgets the target shop's whole set. The v14 payment block and
+  v21 fees make this real money data — one global key would serve shop A's KBZPay/Wave
+  numbers, or its delivery fees, to shop B for 10 minutes (findings Q5/A5).
 - New writes go under `{shop-slug}/…` at all three sites: fragrance image uploads,
   checkout's slip store (`{shop}/payment-proofs/…` on the proofs disk), ManagePayment's
   MMQR (`{shop}/payment-qr/…` on the media disk). Serving is unchanged — full paths
@@ -108,7 +133,15 @@ throws:
   it sets the context, so its Eloquent bulk deletes auto-scope, and its proof-directory
   wipe and cache-busts go per-shop. `telegram:test` stays config-based until Step 25
   (ADR-003).
-- Seeders/factories set the context (default shop) before creating tenant-owned rows.
+- **Two v18–v22 gaps to close in the reset (findings A6):** it must now also clear the
+  shop's `expenses` (today it wipes orders/fragrances/promos but leaves the expense
+  ledger — an inconsistent per-shop reset), and its township bulk-reset
+  (`DeliveryTownship::query()->update(['is_active' => false, 'fee_mmk' => 0])`) is
+  already scoped once the trait + context are in place, so it resets **only** the target
+  shop's zones, not everyone's.
+- Seeders/factories set the context (default shop) before creating tenant-owned rows —
+  including `DeliveryZoneSeeder` (writes townships + couriers) and `OrderSeeder` (resolves
+  a township per checkout), both new since the audit and both currently shop-blind.
 
 ## 8. Real-engine checks
 

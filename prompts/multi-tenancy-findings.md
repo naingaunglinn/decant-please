@@ -214,3 +214,117 @@ note stands.
 | Q5 storage prefixes | §7: `{shop}/…` on all three write sites, in Step A |
 | Q5 slugs | §7: `(shop_id, slug)` composites — highest-priority Step A item |
 | Q6 Production Branch | ADR-004: evidence corrected, still flagged unverified |
+| A1–A6 (below) | §7 `shop_id` list + delivery-zones decision; §7 cache keys; §8 isolation rows; Step 23 §2/§6/§7 |
+
+---
+
+## v18–v22 addendum — finance + delivery-zones surfaces
+
+**Why this exists:** the Q1–Q6 audit above was taken at `a35fd67` (v14). The finance +
+delivery-zones layer landed since (v19 cost/margin #66, v20 expenses/P&L #76, v21
+delivery zones #80; v18/#64 and v22/#82 add no tenant data). This addendum re-runs the
+"what new surface would a tenant scope miss" question against **`develop` at `eff5c91`
+— v22**, on branch `57-multi-tenancy-spec` after the develop sync. Same method, same
+"assert counts not presence" discipline. `shop_id` still exists nowhere in the tree —
+all of this reads/writes globally today.
+
+### A1. `expenses` — a clean new tenant-owned table
+`create_expenses_table.php:21-28`: `spent_on` (date, indexed), `category`
+(→`ExpenseCategory`), `amount_mmk`, `note`. **No FK, no unique index.** One decanter's
+operating ledger; `MonthlyPnl` reads it per month (`MonthlyPnl.php:74-79`).
+**Resolution:** `shop_id` + `BelongsToShop`, exactly like `orders`. Backed by
+`ExpenseResource` (`ExpenseResource.php:18`, model `Expense`) → Filament auto-scopes the
+CRUD once the trait lands. On §7's `shop_id` list; on `decant:fresh-start`'s per-shop
+reset (which today doesn't touch it — A6).
+
+### A2. Delivery zones — geography is global, price/activation is per-shop (decided)
+The crux question — is township data intrinsically the same across shops? — resolves
+**yes**, on three pieces of evidence:
+- **Identity has no shop dimension.** `delivery_townships` uniques on
+  `(region, name)` (`create_delivery_zones_tables.php:31`); the child uniques on
+  `(delivery_township_id, courier)` (`:49`). Both say "one row per Myanmar township,
+  globally."
+- **Geography is seeded from committed national CSVs**, not shop input:
+  `DeliveryZoneSeeder.php:54-55` loads `database/data/delivery-townships*.csv` (Royal
+  Express's coverage chart); the migration calls it "geography, not a shipping promise"
+  (`create_delivery_zones_tables.php:14`). Every seeded row is `is_active=false,
+  fee_mmk=0` (`DeliveryZoneSeeder.php:78`) — geography carries no price.
+- **The per-shop columns are named as such:** `fee_mmk` "What the customer is charged",
+  `is_active` "Offered at checkout" (`DeliveryZoneForm.php:44,52`); the whole
+  `delivery_township_couriers` row (`courier_name` alias, `cost_mmk` reference,
+  `is_available`) is the shop's own supplier relationship.
+
+So geography = `region, district, name, name_mm` (global); per-shop = `fee_mmk,
+is_active, sort_order` + all courier rows.
+
+**Decision — plain `shop_id` on both tables (geography duplicated per shop), NOT a
+global-geography + overlay table.** `delivery_townships` and
+`delivery_township_couriers` each get `shop_id`; the uniques become
+`(shop_id, region, name)` and `(shop_id, delivery_township_id, courier)`; the national
+seed is copied into each shop (all inactive/fee 0) at onboarding. **Rejected: keeping
+`delivery_townships` global-reference and moving `fee_mmk`/`is_active` into a
+`(shop_id, township_id)` overlay table.** The overlay is the more normalized model, but
+it forks the seam's one-mechanism design (a class of tenant tables that *don't* get the
+trait, plus a join on every read), rewrites v21's just-shipped admin UI / checkout
+lookup / public API, and buys nothing at this scale — duplicating ~228 geography rows
+per shop is what onboarding seeds anyway. Consistent with the doc's own precedents
+(`ShopSetting` kept its table + `shop_id`; `decant_prices` got a denormalized `shop_id`;
+v8 chose total-ml over a `bottles` table). `DeliveryTownshipCourier` has **no Resource**
+(edited via a `Repeater()->relationship()` + a bulk action — `DeliveryZoneForm.php:53`,
+`DeliveryZonesTable.php:165`), so Filament never scopes it directly; its `shop_id` +
+trait (or scope via the parent) is what protects it.
+
+### A3. New columns ride existing tenant models — cost stays admin-only
+`fragrances.bottle_cost_mmk/bottle_volume_ml` (`add_cost_to_fragrances_table.php:24-25`),
+`order_items.unit_cost_mmk/line_cost_mmk` (`add_cost_to_order_items_table.php:24-25`),
+`orders` COD-float (`handed_to_courier_at, courier_carrying_mmk, courier_settled_at`)
+and delivery columns (`delivery_township_id` FK, `region_snapshot, township_snapshot,
+address_line, address_extra, delivery_courier`). All on already-tenant-owned models →
+covered by their scope for free. **Cost/supplier columns never cross the public API** —
+a grep of `app/Http` for any cost column returns nothing; they appear only in the admin
+CSV export, form placeholders, and the fragrance table. The one integrity watch is
+`orders.delivery_township_id` pointing at another shop's township — closed by A5.
+
+### A4. Custom Finance pages are covered by the *app* scope, not Filament's — which is the point
+`ProfitAndLoss` (`ProfitAndLoss.php:18`) and `ProductionScheduleDay`/`ProductionSchedule`
+are custom `Page`s, so **Filament's** tenancy scope never reaches them (findings Q3). But
+their data funnels through Eloquent on trait-bearing models: `MonthlyPnl` queries
+`Order::query()` + `Expense::query()` (`MonthlyPnl.php:48,74`); the schedule pages both
+call `Order::productionScheduleFor()`, which runs `OrderItem::query()->whereHas('order')`
+(`Order.php:449`). Once those models carry `BelongsToShop` **and** the panel request has
+a `TenantContext` (Step 23 §5's persistent panel middleware sets it), the throwing app
+scope covers all three with **no per-page code** — this is exactly why ADR-002 chose a
+throwing app scope over Filament-only. `Order::productionScheduleFor`'s own docblock
+already anticipates it (`Order.php:434-436`). The finance widgets `DiscountCost`,
+`CourierFloat`, and `OrderStats`' margin stat are plain `Order::query()` summed in PHP
+(`DiscountCost.php:29`, `CourierFloat.php:22`, `OrderStats.php:35`) → auto-covered.
+`TopFragrances` is unchanged by this layer but remains the one raw-join hazard (Q5): its
+inner `OrderItem`→`orders` join (`TopFragrances.php:22-27`) needs `orders.shop_id` /
+`order_items.shop_id` **qualified**, since a bare `shop_id` is ambiguous on Postgres.
+
+### A5. One new global cache key + one new public endpoint, both shop-blind
+- **`api.delivery-zones`** (TTL 600), built in `DeliveryZoneController.php:28`, busted at
+  **four** sites: `DeliveryTownship` + `DeliveryTownshipCourier` `saved`/`deleted` hooks
+  (`DeliveryTownship.php:29`, `DeliveryTownshipCourier.php:26`), `DeliveryZoneSeeder.php:59`,
+  `FreshStart.php:63`. Same class as `api.meta` — one global key serves shop A's fees to
+  shop B. **Resolution:** `api.delivery-zones.{slug}`, all four busts keyed per shop.
+- **`GET /api/v1/delivery-zones`** (`routes/api.php:20`) — the **9th** public endpoint,
+  missed by Step 24's "eight endpoints". Returns only `serviceable()` townships with
+  `fee_mmk`; **no courier/cost leak** (controller docblock + field list confirm —
+  `DeliveryZoneController.php:20-23,44-57`). Under tenancy it must return only the current
+  shop's rows and cache per-shop; the `{shop}` prefix (Step 24) carries it.
+- **Checkout township re-validation is already server-side** — `newFromCheckout` does
+  `DeliveryTownship::query()->serviceable()->find($id)` and 422s on miss, reading the fee
+  off the row not the client (`OrderController` / `Order.php:154`), mirroring the
+  `fragrance_id` price re-derivation. **Gap:** that `find()` is shop-blind today; once
+  `DeliveryTownship` carries the trait + the api request sets context, the scoped `find()`
+  returns null for another shop's township → 422, closing it with no new code.
+
+### A6. Console + seeders touch the new tables shop-blind
+`FreshStart` bulk-resets **every** township (`DeliveryTownship::query()->update([...])`,
+`FreshStart.php:56`) and busts the global zones cache (`:63`), but **does not touch
+`expenses`** — a per-shop reset that wipes orders/fragrances/promos yet leaves that shop's
+expense ledger is inconsistent. Step 23 §7's `--shop` reset must scope the township update
+and **add expenses**. `DeliveryZoneSeeder` (wired in `DatabaseSeeder.php:31`) and
+`OrderSeeder` (resolves a township via `firstOrFail`, `OrderSeeder.php:97`) both write the
+new tables and must set the default-shop context like every other seeder.

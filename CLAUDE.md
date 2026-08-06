@@ -11,12 +11,15 @@ evidence in `prompts/multi-tenancy-findings.md`); build steps are
 `prompts/23-multi-tenancy-seam.md`, `24-multi-tenancy-routing.md`, and
 `25-multi-tenancy-shop-onboarding.md` (step 25 waits for a second client).
 
-- **The audit was taken at v14 and is being refreshed for v18–v22.** The finance +
-  delivery-zones layer since (v19 cost/margin, v20 expenses/P&L, v21 delivery zones)
-  added tenant-owned tables (`expenses`, `delivery_townships`,
-  `delivery_township_couriers`), cost columns, and two custom Finance pages the seam's
-  model list, custom-page scoping, cache keys, and isolation suite must now cover.
-  Step numbers 23–25 also collide with develop's 23/28–31 and will renumber.
+- **The audit (taken at v14) was refreshed against v22.** The finance + delivery-zones
+  layer since (v19 cost/margin, v20 expenses/P&L, v21 delivery zones) added tenant-owned
+  tables — `expenses` and the delivery-zone pair get `shop_id` (geography duplicated per
+  shop, the decided model); cost columns ride existing tenant models; a new
+  `api.delivery-zones` cache key and the 9th public endpoint become per-shop; and the
+  custom Finance pages are covered by the throwing app scope, not Filament's. Captured in
+  the findings addendum (A1–A6) and design §7/§8; the seam (Step 23) now lists ten
+  tenant tables. Step numbers 23–25 still collide with develop's 23/28–31 and will
+  renumber on merge.
 - **§8's blanket multi-tenant exclusion is split** (design-doc §12's axis): **product
   scope** unchanged — no marketplace, one shop per storefront, no customer sees two
   shops — while **infrastructure scope** (one deployment serving many shops) is no
