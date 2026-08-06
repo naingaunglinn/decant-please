@@ -20,8 +20,10 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 | `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` — [README](backend/README.md) with routes & file structure |
 | `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
 | `CLAUDE.md` | Project spec and source of truth for every product/design decision |
+| `FINANCE.md` | Financial-surface roadmap — what's built, the real gaps in build order, and the money decisions locked or still open |
 | `DEPLOY.md` | Production deployment guide (Heroku backend + Vercel frontend + Cloudflare R2 storage, backups) |
 | `prompts/` | The step-by-step build prompts this project was built from |
+| `prompts/WORKFLOW.md` | The issue → branch → PR loop every step follows — PRs always wait for human review; `main` changes only via the promotion PR |
 
 ## Features
 
@@ -42,10 +44,14 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
   KBZPay/Wave transfer details and optional QR, and a transfer-screenshot upload;
   flips to "paid" once the decanter confirms (no gateway — see below)
 - Related fragrances on every detail page, a recently-viewed rail, and a generated sitemap
+- Structured delivery address at checkout — region → township selects with the delivery
+  fee derived from the township server-side (shown as its own line, paid in cash to the
+  courier; never part of an online prepayment)
 
 **Admin panel (`/admin`, login required)**
 
-- Brand & fragrance CRUD with image upload, per-size pricing and stock toggles
+- Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a
+  liquid-only bottle-cost reference (admin-eyes only — never the public API or invoices)
 - **Needs review** inbox for website orders — accept (assign decant/delivery dates) or
   reject (with a reason the customer sees when tracking)
 - Manual order entry for customers who still order by DM
@@ -62,10 +68,20 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 - Telegram alert to the decanter's phone the moment a website order lands (off until a
   bot token + chat id are configured; a Telegram outage never delays checkout)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
-- Dashboard: monthly revenue, orders by status, unpaid orders + outstanding total,
-  decants due today, top fragrances, and a low-stock reorder panel
-- CSV export of orders, respecting the current tab/filters/sort (incl. payment +
-  balance-due columns)
+- Delivery zones (Settings) — a township rate table seeded from Royal Express's coverage
+  chart, with per-courier coverage/reference costs (admin-eyes only), bulk fee/cost
+  pricing, CSV import, and a courier choice recorded at Accept
+- Expenses & monthly P&L (Finance menu) — category'd expense entry in seconds, and a
+  Profit & loss page: income from order snapshots, liquid COGS with coverage, expenses
+  as entered, a delivery result line, and an honestly-labelled net; stock purchases sit
+  below the line (inventory — they become COGS as poured)
+- Dashboard: monthly revenue, a "Gross margin (liquid only)" stat (fully-costed
+  orders only — vial/label/spillage and delivery excluded, coverage named), discount
+  cost by code, cash with couriers (COD float — snapshotted at handoff), orders by
+  status, unpaid orders + outstanding total, decants due today, top fragrances, and a
+  low-stock reorder panel
+- CSV export of orders, respecting the current tab/filters/sort (incl. payment,
+  balance-due, and liquid-only cost/margin columns — blank when unknown, never 0)
 - Printable A5 packing invoices (PDF) — print or download per order, or one batch PDF for
   the filtered view (e.g. today's deliveries), with an emphasized balance-due figure and a
   bundled Myanmar-script font so Burmese names/addresses render
@@ -235,7 +251,8 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 | GET | `/fragrances/{slug}` | Fragrance detail | 120/min |
 | GET | `/brands` | Active brands | 120/min |
 | GET | `/meta` | Filter options, price bounds, social links, payment details | 120/min |
-| POST | `/orders` | Guest checkout | 10/min |
+| GET | `/delivery-zones` | Serviceable townships + delivery fees, grouped by region | 120/min |
+| POST | `/orders` | Guest checkout (structured address; fee derived from township) | 10/min |
 | GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/orders/cancel` | Customer cancel while awaiting confirmation | 10/min |
 | POST | `/orders/payment-proof` | Upload a transfer screenshot (code + phone gated) | 10/min |
@@ -243,9 +260,10 @@ All endpoints are under `/api/v1`, JSON, paginated where applicable.
 
 Guarantees worth knowing:
 
-- **Prices are never trusted from the client.** Checkout receives only
-  `fragrance_id`, `size_ml`, `quantity`; the server re-derives every price from the current
-  catalog and stores immutable snapshots on the order items.
+- **Prices are never trusted from the client — and neither is the delivery fee.**
+  Checkout receives only `fragrance_id`, `size_ml`, `quantity`, and a
+  `delivery_township_id`; the server re-derives every price from the current catalog,
+  reads the fee off the township row, and stores immutable snapshots on the order.
 - **Tracking is not a guessing oracle.** Lookup requires an exact code + phone match;
   a mismatch on either returns the same generic 404.
 - Checkout carries a honeypot field; bots get a convincing fake response and nothing is stored.
@@ -303,7 +321,8 @@ motion moment is the tracking timeline filling like a vial. Tokens live in
 ## Deliberately out of scope
 
 Online payment gateways, customer accounts, chat, multi-decanter marketplace,
-per-bottle inventory (total-ml decant stock *is* in, since v8), and **customer-facing**
+per-bottle inventory (total-ml decant stock *is* in since v8, and a liquid-only
+cost/margin view since step 28), and **customer-facing**
 notifications — admin-side Telegram alerts shipped in step 21, but a bot can't message
 a customer who never pressed Start, so reaching them would need per-customer opt-in or
 a paid channel; the tracking page stays the customer's channel. See `CLAUDE.md` §8

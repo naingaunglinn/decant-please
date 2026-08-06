@@ -3,12 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Enums\OrderStatus;
-use App\Models\OrderItem;
+use App\Models\Order;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class ProductionSchedule extends Page
@@ -21,64 +22,61 @@ class ProductionSchedule extends Page
 
     protected static ?int $navigationSort = 2;
 
-    public string $from = '';
-
-    public string $to = '';
-
-    public function mount(): void
+    /**
+     * FullCalendar's event feed: one all-day entry per day with work, titled
+     * with that day's total vial count. Dates in and out are plain Y-m-d
+     * strings, never timezone-bearing datetimes — Myanmar is UTC+6:30, and any
+     * tz conversion on a half-hour offset shifts day cells, a bug invisible
+     * from a UTC test. $end arrives exclusive, as FullCalendar sends it.
+     *
+     * @return array<int, array{start: string, title: string, allDay: bool, classNames: array<int, string>}>
+     */
+    public function calendarEvents(string $start, string $end): array
     {
-        $this->from = today()->toDateString();
-        $this->to = today()->addDays(7)->toDateString();
+        $from = CarbonImmutable::parse($start);
+        // exclusive → inclusive; a dayGrid month spans at most 42 cells, so
+        // clamp what a wire call could ask for
+        $to = CarbonImmutable::parse($end)->subDay()->min($from->addDays(42));
+
+        $events = [];
+
+        foreach (Order::productionScheduleFor($from, $to) as $day) {
+            $vials = $day['groups']->sum('quantity');
+
+            if ($vials === 0) {
+                continue;
+            }
+
+            $events[] = [
+                'start' => $day['date']->toDateString(),
+                'title' => $vials.' '.Str::plural('vial', $vials),
+                'allDay' => true,
+                // Overdue is not history: a past day whose vials aren't all
+                // poured yet stays visually distinct from scheduled work.
+                'classNames' => $this->isOverdue($day) ? ['ps-overdue'] : [],
+            ];
+        }
+
+        return $events;
     }
 
     /**
-     * One eager-loaded pass over the window's order items, grouped per day into
-     * fragrance+size production lines. Days without work are kept (confirmed-empty).
+     * A day is overdue when it's behind us and any of its vials are still
+     * unpoured — an order not yet decanted or delivered. Fully-poured past
+     * days render as plain history.
      *
-     * @return array<int, array{date: CarbonImmutable, groups: Collection}>
+     * @param  array{date: CarbonImmutable, groups: Collection}  $day
      */
-    public function getDays(): array
+    private function isOverdue(array $day): bool
     {
-        $from = CarbonImmutable::parse($this->from ?: today());
-        $to = CarbonImmutable::parse($this->to ?: today());
-
-        if ($to->lessThan($from)) {
-            $to = $from;
+        if ($day['date']->gte(today())) {
+            return false;
         }
 
-        // ponytail: hard cap at 31 days — a wider window is a reporting tool, not a schedule
-        $to = $to->min($from->addDays(31));
-
-        $items = OrderItem::query()
-            ->whereHas('order', fn ($query) => $query
-                ->whereBetween('decant_date', [$from->toDateString(), $to->toDateString()])
-                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
-            ->with(['order', 'fragrance.brand'])
-            ->get();
-
-        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
-
-        $days = [];
-
-        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
-            $groups = ($byDay->get($day->toDateString()) ?? collect())
-                ->groupBy(fn (OrderItem $item) => "{$item->fragrance_id}:{$item->size_ml}")
-                ->map(function (Collection $group): array {
-                    $first = $group->first();
-
-                    return [
-                        'label' => "{$first->fragrance->brand->name} — {$first->fragrance->name}",
-                        'size_ml' => $first->size_ml,
-                        'quantity' => $group->sum('quantity'),
-                        'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
-                    ];
-                })
-                ->sortBy([['label', 'asc'], ['size_ml', 'asc']])
-                ->values();
-
-            $days[] = ['date' => $day, 'groups' => $groups];
-        }
-
-        return $days;
+        return $day['groups']->contains(
+            fn (array $group): bool => $group['orders']->contains(
+                fn (Order $order): bool => ! in_array($order->status, [OrderStatus::Decanted, OrderStatus::Delivered], true),
+            ),
+        );
     }
 }

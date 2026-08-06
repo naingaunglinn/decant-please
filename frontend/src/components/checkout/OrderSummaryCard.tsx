@@ -6,7 +6,7 @@ import { Pill } from "@/components/ui/Pill";
 import { useCart, cartLineKey } from "@/hooks/useCart";
 import { validatePromo, ApiValidationError } from "@/lib/api";
 import { formatKyat } from "@/lib/format";
-import type { CheckoutItem } from "@/lib/types";
+import type { CheckoutItem, DeliveryTownshipOption } from "@/lib/types";
 
 interface AppliedPromo {
   code: string;
@@ -17,11 +17,15 @@ interface AppliedPromo {
 
 interface OrderSummaryCardProps {
   lineErrors: Record<number, string>;
-  /** Reports the applied code up so CheckoutClient can send it with the order. */
-  onPromoChange: (code: string | null) => void;
+  /** The picked township — its fee becomes a display-only line here; the
+   *  server re-derives the real fee at submission. */
+  township: DeliveryTownshipOption | null;
+  /** Reports the applied code and its previewed discount up — the code rides the
+   *  order; the discount nets the online "amount to pay" (#67). */
+  onPromoChange: (code: string | null, discountMmk: number) => void;
 }
 
-export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCardProps) {
+export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderSummaryCardProps) {
   const { lines, subtotal } = useCart();
   const [input, setInput] = useState("");
   const [applied, setApplied] = useState<AppliedPromo | null>(null);
@@ -52,7 +56,7 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
           new_total_formatted: preview.new_total_formatted,
         });
         setInput("");
-        onPromoChange(code.toUpperCase());
+        onPromoChange(code.toUpperCase(), preview.discount_mmk);
       } else {
         // the backend says exactly what's wrong — show that, not a generic line
         setPromoError(preview.message ?? "That code can't be applied.");
@@ -71,7 +75,7 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
   const remove = () => {
     setApplied(null);
     setPromoError(null);
-    onPromoChange(null);
+    onPromoChange(null, 0);
   };
 
   // cart edited after a code was applied → re-preview so the shown discount stays honest
@@ -95,6 +99,8 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
               new_total_formatted: preview.new_total_formatted,
             },
           );
+          // the online amount must track the refreshed discount, not just this card
+          onPromoChange(applied.code, preview.discount_mmk);
         } else {
           remove();
           setPromoError(preview.message ?? "That code no longer applies to your cart.");
@@ -179,9 +185,33 @@ export function OrderSummaryCard({ lineErrors, onPromoChange }: OrderSummaryCard
         </div>
       )}
 
+      {township && (
+        <>
+          <div className="mt-3 flex items-baseline justify-between gap-4">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted">
+              Delivery — {township.name}
+            </span>
+            <span className="rounded-full border border-rule px-3 py-1 text-sm font-medium tabular-nums">
+              {township.fee_mmk === 0 ? "Free" : township.fee_formatted}
+            </span>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between border-t border-rule pt-3">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted">Total</span>
+            <span className="text-lg font-bold tabular-nums text-ink-strong">
+              {formatKyat(
+                Math.max(0, subtotal - (applied?.discount_mmk ?? 0)) + township.fee_mmk,
+              )}
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* the fee is known now, not "agreed when we call you" — and per the v14
+          rule it is cash to the courier, never part of an online prepayment */}
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        Final total is confirmed by the decanter — delivery fee, if any, is agreed when we
-        call you.
+        {township
+          ? "The delivery fee is paid in cash to the courier when your order arrives — an online payment covers the items only. We still confirm every order by phone."
+          : "Pick your township to see the delivery fee — it's paid in cash to the courier, not online."}
       </p>
     </aside>
   );

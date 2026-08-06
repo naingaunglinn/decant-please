@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckoutForm, type ContactFields } from "./CheckoutForm";
 import { OrderSummaryCard } from "./OrderSummaryCard";
 import { Button } from "@/components/ui/Button";
 import { useCart } from "@/hooks/useCart";
-import { createOrder, ApiValidationError } from "@/lib/api";
+import { createOrder, getDeliveryZones, ApiValidationError } from "@/lib/api";
+import type { DeliveryTownshipOption, DeliveryZones } from "@/lib/types";
 
 export interface CheckoutErrors {
   fields: Partial<Record<keyof ContactFields, string>>;
@@ -22,6 +23,25 @@ export function CheckoutClient() {
   const [errors, setErrors] = useState<CheckoutErrors>(NO_ERRORS);
   const [submitting, setSubmitting] = useState(false);
   const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [zones, setZones] = useState<DeliveryZones | null>(null);
+  const [zonesFailed, setZonesFailed] = useState(false);
+  const [township, setTownship] = useState<DeliveryTownshipOption | null>(null);
+
+  // fetched once per checkout visit — the township select filters client-side
+  useEffect(() => {
+    let active = true;
+    getDeliveryZones()
+      .then((tree) => {
+        if (active) setZones(tree);
+      })
+      .catch(() => {
+        if (active) setZonesFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!hydrated) return null;
 
@@ -39,6 +59,7 @@ export function CheckoutClient() {
   }
 
   const placeOrder = async (contact: ContactFields, honeypot: string, proof: File | null) => {
+    if (contact.delivery_township_id === null) return; // the form gates on this
     setSubmitting(true);
     setErrors(NO_ERRORS);
 
@@ -46,6 +67,7 @@ export function CheckoutClient() {
       const order = await createOrder(
         {
           ...contact,
+          delivery_township_id: contact.delivery_township_id,
           website: honeypot,
           promo_code: promoCode ?? undefined,
           items: lines.map((line) => ({
@@ -81,7 +103,14 @@ export function CheckoutClient() {
           const message = messages[0];
           const itemMatch = key.match(/^items\.(\d+)/);
           if (itemMatch) next.lines[Number(itemMatch[1])] = message;
-          else if (key === "customer_name" || key === "phone" || key === "address" || key === "note")
+          else if (
+            key === "customer_name" ||
+            key === "phone" ||
+            key === "delivery_township_id" ||
+            key === "address_line" ||
+            key === "address_extra" ||
+            key === "note"
+          )
             next.fields[key] = message;
           else next.general = message;
         }
@@ -112,11 +141,22 @@ export function CheckoutClient() {
           submitting={submitting}
           fieldErrors={errors.fields}
           subtotal={subtotal}
+          discount={promoDiscount}
+          zones={zones}
+          zonesFailed={zonesFailed}
+          onTownshipChange={setTownship}
         />
       </div>
 
       <div className="order-1 md:order-2">
-        <OrderSummaryCard lineErrors={errors.lines} onPromoChange={setPromoCode} />
+        <OrderSummaryCard
+          lineErrors={errors.lines}
+          township={township}
+          onPromoChange={(code, discountMmk) => {
+            setPromoCode(code);
+            setPromoDiscount(discountMmk);
+          }}
+        />
       </div>
     </div>
   );

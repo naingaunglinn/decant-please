@@ -1,34 +1,265 @@
-# CLAUDE.md — Decant Please! (v15)
+# CLAUDE.md — Decant Please! (v23)
 
 > This file is project memory for Claude Code. Read it fully before doing any task.
 > Every implementation decision must be consistent with this document.
 
-## 0. What changed in v15
+## 0. What changed in v23
 
-**v15** is a docs-only change (issue #57) — no code, config, or behavior changes.
-Multi-tenancy (one deployment serving many decant shops) is now **specified, not
-built**: the accepted design lives in `prompts/multi-tenancy-design.md` — amended to
-match a codebase audit whose evidence is committed as
-`prompts/multi-tenancy-findings.md` — and the build splits into three steps:
-`prompts/23-multi-tenancy-seam.md` (the data seam), `prompts/24-multi-tenancy-routing.md`
-(path-prefix routing), and `prompts/25-multi-tenancy-shop-onboarding.md`
-(tenant-facing admin/theming — **deliberately thin, deferred until a second client
-exists**). Steps run through WORKFLOW.md only when explicitly asked, like any other.
+**v23** brings the multi-tenancy **spec** (issue #57) onto current develop — docs
+only, nothing built. The design lives in `prompts/multi-tenancy-design.md` (audit
+evidence in `prompts/multi-tenancy-findings.md`); build steps are
+`prompts/23-multi-tenancy-seam.md`, `24-multi-tenancy-routing.md`, and
+`25-multi-tenancy-shop-onboarding.md` (step 25 waits for a second client).
 
-- **§8 amended, deliberately** — the third such edit, after v6's stack table and
-  v13's notification split. The blanket "multi-tenant / multi-decanter marketplace"
-  exclusion conflated two scopes, so §8 now splits them along the axis design-doc §12
-  draws: **product scope** is unchanged — no customer ever sees two shops; a
-  storefront is one decanter's shop, and there is no marketplace — while
-  **infrastructure scope** is no longer excluded — one Laravel/Filament deployment
-  may serve many shops, each with its own storefront, catalog, orders, and settings.
-- Key decisions live in the design doc, not here: path-prefix tenant routing
-  (`/api/v1/{shop}/…`), a **throwing** tenant scope plus Filament tenancy (belt and
-  braces; the scope predicate must use `qualifyColumn()`), `(shop_id, slug)`
-  composites on brands/fragrances, per-shop cache keys and busting, `{shop}/` storage
-  prefixes, tracking codes staying globally unique via a `withoutTenancy()` dedup
-  check, and `shop_settings` staying its own table (`shop_id` + unique index) rather
-  than folding into `shops`.
+- **The audit was taken at v14 and is being refreshed for v18–v22.** The finance +
+  delivery-zones layer since (v19 cost/margin, v20 expenses/P&L, v21 delivery zones)
+  added tenant-owned tables (`expenses`, `delivery_townships`,
+  `delivery_township_couriers`), cost columns, and two custom Finance pages the seam's
+  model list, custom-page scoping, cache keys, and isolation suite must now cover.
+  Step numbers 23–25 also collide with develop's 23/28–31 and will renumber.
+- **§8's blanket multi-tenant exclusion is split** (design-doc §12's axis): **product
+  scope** unchanged — no marketplace, one shop per storefront, no customer sees two
+  shops — while **infrastructure scope** (one deployment serving many shops) is no
+  longer excluded.
+
+## 0.1 What changed in v22
+
+**v22** is a **frontend-only** finish pass on the checkout region/township selects
+(Step 31, `prompts/31-shadcn-select-and-form-polish.md`, issue #82) — no API,
+migration, or admin change. Step 30's selects were right in behaviour but wrong in
+finish: a native `<option>` popup is drawn by the browser (OS-blue list, square
+corners, system font) and no CSS reaches it, which reads as unfinished inside §3's
+apothecary restraint — and the trigger lacked `appearance-none`, so the browser drew
+its own chevron inside the `rounded-full` pill.
+
+- **One dropdown for all three selects; the chevron fix shipped first.** The visible half
+  of the defect — a missing `appearance-none`, so the browser drew its own chevron inside
+  the `rounded-full` pill — was fixed first on its **own no-dependency commit** (an interim
+  `SelectShell` native wrapper) so it stayed separable from the library. All three selects
+  (checkout region + township, and the shop **sort**, which had the identical defect) then
+  landed on the Radix `Select` below; a **review round** moved the sort over too, so once
+  nothing used `SelectShell` it was **removed**. Net: the storefront has **no native
+  `<select>` left**, and the appearance-none fix lives on only in git history.
+- **One Radix primitive, project-styled — not shadcn's token layer.** The checkout
+  region/township selects **and the shop sort** become a Radix `Select`
+  (`@radix-ui/react-select`, the **one** runtime dependency added). Authored in shadcn's **copy-in spirit** (we own and restyle the
+  source) but **without** its CLI, `components.json`, OKLCH token layer,
+  `cn()`/`clsx`/`tailwind-merge`, or `lucide` — a half-configured `components.json` with
+  no CLI in the loop is a landmine and §3's hex palette is fixed. `globals.css`'s
+  `@theme` block stays **byte-identical**. Highlight is `pine-soft`, selected is `pine`,
+  icons are the inline SVG chevron; the popup carries the **only shadow in the codebase**
+  (soft, pine-tinted) because a dropdown floats over live content with no scrim and a
+  hairline alone can't lift it — every other surface here separates by border + tone.
+  See `prompts/31 §4a`.
+- **≥16px is a hard rule any copied-in component must meet.** v5 locked `text-base`
+  (16px) on real controls because iOS Safari zooms the viewport when a sub-16px control
+  takes focus — worst on checkout. shadcn primitives default to `text-sm` (14px); the
+  trigger, value, and items here are all `text-base`, and "zero `text-sm` in the Select"
+  is a check every future copy-in must pass. This is also why the project's own
+  `Button`/`Pill`/`Input`/`Textarea`/`Label`/`Skeleton` were **not** replaced — they
+  already satisfy the rule and carry §3's motifs.
+- Radix's built-in type-ahead covers Yangon's ~45 townships, so no Combobox (`Popover` +
+  `Command`) was pulled — a third dependency and a second interaction model this list
+  doesn't need. No dark mode. No motion beyond Radix's open/close, kept instant (the
+  popup isn't animated), so `prefers-reduced-motion` is honoured by construction.
+
+## 0.1 What changed in v21
+
+**v21** makes the delivery destination structured data and derives the fee from
+it (Step 30, `prompts/30-delivery-zones-and-fees.md`, issue #80) — the first
+step since v14 to touch checkout on both sides, and the step that makes the
+P&L's delivery-fees line mean something:
+
+- **A `Region` enum (15 states/regions + Naypyidaw) + `delivery_townships`
+  table**, seeded from **Royal Express's official coverage chart** ("Last
+  Updated 1/8/2026", committed as `backend/database/data/preview.webp` beside
+  the two CSVs — the chart is perishable; re-check it when fees are reviewed).
+  196 in-service + 32 suspended destinations, plus Yangon's city townships
+  restored (the chart prices the whole city as one destination; customers pick
+  a township, so the seed carries all 45 + the chart's sub-township points).
+  **Every row seeds inactive at fee 0** — the seed is geography, not a shipping
+  promise, and the seeder never invents a fee. The demo path alone activates
+  Yangon at a placeholder; `decant:fresh-start` resets every zone to inactive/0.
+- **Per-courier coverage in a child table** (`delivery_township_couriers`, the
+  DecantPrice shape): Royal Express and BeeXprss as an enum, each row carrying
+  **that courier's own spelling** (the reconciliation alias — both couriers
+  romanise the same townships differently), an optional **reference cost**
+  (never in any money figure — the P&L's courier-paid line stays the `delivery`
+  expense category alone, the §0-v20 no-double-count rule), and `is_available`
+  (suspended ≠ unserved: only one reverses). Serviceable = active + an open
+  route, one definition (`scopeServiceable`). **Nothing about couriers crosses
+  the public API** — the v19 cost rule extended to supplier data, pinned by test.
+- **Checkout collects a structured address**: region → township selects (from
+  `GET /api/v1/delivery-zones`, cached, serviceable rows only), a street line,
+  an optional extra line. The fee is read off the township row server-side —
+  a client-sent fee is ignored, the §7 price-trust rule extended verbatim.
+  `orders.address` stays canonical, composed once at creation
+  (`Order::composeAddress()`, smallest-to-largest, Burmese township name
+  included for the rider) — so the invoice, receipt, Telegram alert, and admin
+  textarea needed zero changes; region/township are snapshotted like
+  `fragrance_name_snapshot`; legacy orders keep null structured columns.
+  **Breaking API change, deliberately clean** (the storefront is the only
+  client): `POST /orders` now takes `delivery_township_id` + `address_line`
+  (+`address_extra`) and no longer accepts `address`. **The online prepay
+  amount does not change** — the fee stays cash-to-courier (v14's Option B;
+  #67 owns the balance arithmetic), and the checkout copy says so out loud.
+- **Admin: Delivery zones** (Settings group) — region-grouped table with
+  courier-coverage pills, cheapest recorded cost and a blank-never-0 best-case
+  margin, bulk set-fee / set-cost / activate (a district filter + one action
+  prices an area), CSV import + template on the v9 `CatalogImport` idiom. The
+  order form gains an optional township pick that pre-fills the editable fee;
+  **Accept** offers the courier choice with each courier's recorded cost as
+  helper text, snapshotted to `orders.delivery_courier` — no cost ever copied.
+- **Post-promotion obligation:** production starts with every zone inactive, so
+  the decanter must price + activate townships (bulk actions) as part of going
+  live, or checkout has nothing to offer.
+
+## 0.1 What changed in v20
+
+**v20** adds **expenses and a monthly net P&L** (Step 29,
+`prompts/29-expenses-and-net-pnl.md`, issue #76) — the FINANCE.md fork, taken
+deliberately: the decanter chose in-app books with the caveat presented that a
+P&L missing expenses is worse than none, because it gets believed. The design
+carries that discipline instead of hiding it:
+
+- **An `expenses` table + ExpenseCategory'd CRUD** (Finance nav group, entry in
+  seconds — date, category, integer-Kyat amount, note). The category enum owns
+  the one accounting rule that matters most here: `stock_purchase` is
+  **inventory, never an operating expense** — v19's margin already expenses that
+  juice as COGS when it pours, so expensing the bottle too would count it twice
+  (`ExpenseCategory::isOperating()`). Stock cash surfaces below the line.
+- **A Profit & loss page** (Finance group), one month at a time with prev/next
+  stepping: sales income from line snapshots − discounts (never `total_mmk`,
+  which holds the courier's fee), liquid COGS with N-of-M coverage, gross
+  margin, operating expenses **as entered** (delivery excluded — it lives in its
+  own line, one subtraction in one place), a **delivery result** line (fees
+  collected − courier paid) that finally measures FINANCE.md gap 4 at month
+  level, and a net labelled with its own limits: "Net operating profit (liquid
+  COGS; expenses as entered)".
+- Accrual-lite by order-created month, matching every existing figure; §4
+  exclusions everywhere, asserted by test; month boundaries via date columns
+  and half-open ranges, no timezone math (the v17 lesson).
+
+## 0.1 What changed in v19
+
+**v19** adds **bottle cost and a liquid-only gross margin** (Step 28,
+`prompts/28-cost-and-margin-tracking.md`, issue #66) — §8's "cost/margin
+accounting" exclusion, reversed by explicit ask in the v8/v13 scoped pattern: a
+reference cost and one honest margin figure come in; per-bottle tracking, batch
+identity, FIFO/weighted-average COGS, and real accounting stay out.
+
+- **A reference pair on `fragrances`** — `bottle_cost_mmk` + `bottle_volume_ml`,
+  nullable, both-or-neither, independent of the `stock_ml` opt-in — feeds one
+  derivation site, `Fragrance::liquidCostMmk()`: pure-integer **ceiling**
+  division, deliberately the project's second rounding rule beside the promo
+  floor, because the directions of safety differ — flooring a cost would flatter
+  every margin figure. Liquid only: vial, label, and spillage are not in the
+  number, and every label that shows it says so.
+- **Order items snapshot cost exactly as they snapshot price** —
+  `unit_cost_mmk`/`line_cost_mmk`, written once at creation (one creating-only
+  model hook covers checkout, manual admin entry, and late-added lines), never
+  refreshed; legacy rows stay null forever, no backfill — null means unknown,
+  excluded and counted, never coalesced to zero.
+- **`Order::liquidGrossMarginMmk()`** — Σ line_total − discount − Σ line_cost,
+  the delivery fee on neither side (courier pass-through, unmeasured not zero) —
+  is null unless *every* line is costed. The dashboard's **"Gross margin (liquid
+  only)"** stat (same window and status exclusions as its revenue neighbour)
+  sums it over fully-costed orders only, in PHP: a SQL `SUM(line_cost_mmk)`
+  would count partially-costed orders' non-null lines and overstate margin. The
+  CSV export gains blank-not-zero cost/margin columns; cost never crosses the
+  public API, the A5 invoice, or the fragrances CSV export — pinned by tests.
+- Accepted limit (v8's register): a rebuy between order creation and the pour
+  isn't reflected in that order's cost.
+
+## 0.1 What changed in v18
+
+**v18** vendors two advisory **business-finance skills** into `.claude/skills/`
+(issue #64) — agent guidance only; no app code, config, or behavior changes.
+`accounting` (bookkeeping setup, chart of accounts, weekly reconciliation, P&L
+review) and `finances` (unit economics, margin, cash-flow modeling) are copied —
+not symlinked — from `whawkinsiv/claude-code-skills`, pinned by hash in
+`skills-lock.json` (the vendored-asset precedent: Padauk, FullCalendar). Chosen
+after content review over higher-ranked registry hits, which turned out to be
+institutional equity research or robo-advisor scaffolding — wrong domain for a
+one-person decant shop. Both speak in US/SaaS examples (Stripe, QuickBooks, USD,
+MRR): they are advice for the decanter's *books*, and none of it licenses code
+changes — integer-Kyat rules, server-side pricing, and §8's no-gateway line stay
+governed by the `decant-money` skill and this file.
+
+## 0.1 What changed in v17
+
+**v17** rebuilds the production schedule around a **month calendar** (Step 23,
+`prompts/23-production-schedule-calendar.md`, issue #61) — the overview the
+day-card list never provided, so delivery dates stop being committed blind to the
+week they land on. After a review round, the calendar is the page's only content;
+the worklist moved to a per-day detail page, `/admin/production-schedule/{date}`,
+which is also the printable bench sheet. (Step numbering: the open #58
+multi-tenancy PR also claims 23–25 for its spec files; the two collide only in
+name, and whichever merges second renumbers.)
+
+- **Approach A of the spec, deliberately.** FullCalendar v6 (MIT) is **vendored as
+  a committed static asset** (`backend/public/vendor/fullcalendar/`, the
+  Padauk-font precedent) and embedded in the existing Blade page — **not**
+  `saade/filament-fullcalendar`, which would need a Vite-compiled Filament custom
+  theme in a Heroku build path that has no Node (monorepo + `heroku/php`
+  buildpacks, whose ordering already caused one production-only failure), to buy
+  event-CRUD features this page cannot use (dates change only through order
+  Accept). Deploy path unchanged; `DEPLOY.md` untouched.
+- **One aggregation, one place.** The per-day grouping moved off the page class
+  into `Order::productionScheduleFor($from, $to)`; the calendar's event feed and
+  the day page (called with `$date, $date`) both read it. When multi-tenancy's
+  seam step lands, shop scoping happens there once — a custom Filament page sits
+  outside Filament's tenancy scoping. The move also made the date window engine-proof (`whereDate`):
+  the old `whereBetween` silently missed a window's last day under SQLite (the
+  test engine compares the date cast's stored `Y-m-d 00:00:00` textually) while
+  Postgres's DATE column truncates — the v6 lesson pointing the other way.
+- **One chip per day, all-day, plain strings.** A busy day renders a single
+  `12 vials` aggregate (a month cell truncates past ~2 chips, so per-line entries
+  would show less than the worklist does); a past day still holding unpoured
+  vials renders it in the overdue style — overdue is not history. Every date
+  crossing the wire is a bare `Y-m-d` string: Myanmar is UTC+6:30, and any
+  timezone-bearing value can shift a day cell — pinned by tests that run the
+  feed under both UTC and Asia/Yangon.
+- **The worklist is a page per day.** Clicking any day — chip or empty cell —
+  opens `/admin/production-schedule/{date}`: the old day card's grouped lines
+  plus prev/next stepping, a real empty state, and `@media print` A5 styles
+  matching the invoice conventions (this sheet goes to the decant bench). The
+  `{date}` param is a strictly-validated plain `Y-m-d`; anything else 404s,
+  because a lenient parse would invite datetime/timezone math. Not in the
+  sidebar (`shouldRegisterNavigation()` false) — it needs a date.
+- `phpunit.xml` now pins **blank Telegram env**: a real bot token in a developer's
+  `.env` was inherited by the suite and failed the four "unconfigured" alert
+  tests. Same `env`+`server` pairing (and reason) as the DB overrides.
+
+## 0.1 What changed in v16
+
+**v16** widens step 21's Telegram layer (issue #59): the decanter now sees **how the
+customer chose to pay** the moment an order lands, and gets buzzed when a transfer
+slip arrives later. (v15 is the multi-tenancy spec on the open #57 branch, landing
+separately — the number is skipped here deliberately, not lost.)
+
+- **The new-order alert names the payment method.** One added line — `Payment: Cash
+  on delivery`, or `Payment: Online transfer — slip attached|awaited`. "Attached"
+  is the normal online case (a v14 checkout slip rides in with the order, and the
+  proof is attached before `OrderPlaced` dispatches); "awaited" is defensive — the
+  listener doesn't assume its dispatcher. Deliberately **no `payment_status`**:
+  every order is `unpaid` at placement, so it carries no signal there.
+- **A second event on the same layer.** `PaymentProofUploaded` (the order + an
+  `isReplacement` flag), dispatched from the standalone proof endpoint only, after
+  the write commits — never from checkout, whose slip the new-order alert already
+  reports (dispatching from both would double-send, the #52 lesson). Its listener
+  `NotifyAdminOfPaymentProof` is wired explicitly in `AppServiceProvider` —
+  required, since event discovery is off.
+- **The slip message** carries order number, customer, total + balance due, track
+  code, and the admin order URL — and distinguishes a **first upload** ("slip
+  uploaded") from a **replacement** ("slip replaced"): the endpoint overwrites, so
+  a customer retrying a blurry photo shouldn't buzz identically several times.
+  **Link only, never the image**: proofs are private by design (#47), and a 4MB
+  multipart doesn't fit the notifier's 5s bound.
+- Same two hard rules as v11: never throws, no-op when unconfigured — a Telegram
+  outage can't fail a slip upload. Tests assert send **counts**
+  (`Http::assertSentCount`), not just content — `assertSent` alone passes on a
+  double-send, which is exactly how #52 shipped.
 
 ## 0.1 What changed in v14
 
@@ -245,8 +476,9 @@ inventory — chosen after weighing it against the simplicity the tool is built 
 There is a separate, fuller **per-bottle** implementation on branch
 `40-decant-bottle-stock` (its own `bottles` table, auto-`in_stock`, drawdown at
 accept-time). v8 deliberately did **not** use it — it reverses the three choices
-above. If per-bottle tracking, batch identity, or cost/margin ever become real needs,
-that branch is the reference, not this.
+above. If per-bottle tracking or batch identity ever become real needs, that branch
+is the reference, not this; cost/margin landed fragrance-level in v19 — the branch
+contains no cost fields.
 
 Files new/changed in v8: this section and §6/§8 below; migration
 `…add_stock_to_fragrances_table`; `Fragrance` + `Order` models; `FragranceForm`,
@@ -474,6 +706,16 @@ Delivered. Everything else stays quiet.
 **Layout:** generous whitespace, mobile-first, near-black text on `mist`, pine used
 sparingly (never as a large fill except buttons and the vial-fill status track).
 
+**Component library note (v22):** the storefront's own primitives (`Button`, `Pill`,
+`QuantityStepper`, `ImagePlate`, `Skeleton`) carry these tokens directly. The one library
+component is the **`Select`** (checkout region/township and the shop sort), which wraps
+`@radix-ui/react-select` for a stylable option list — but restyled entirely to the tokens
+above (`pine-soft` highlight, `pine` selected, hairline `rule` border, `rounded-full`
+trigger). shadcn's own token/OKLCH layer was **not** adopted and the `@theme` block is
+unchanged. There are no native `<select>` elements left in the storefront. Any copied-in
+component must be patched to **≥16px (`text-base`)** on every control — below 16px, iOS
+Safari zooms the viewport on focus (the v5 rule).
+
 ## 4. Domain model (source of truth)
 
 ### Brand — unchanged from v1
@@ -490,6 +732,14 @@ sparingly (never as a large fill except buttons and the vial-fill status track).
 
 ### Order — **changed in v2**
 - `customer_name`, `phone`, `address`
+- `delivery_township_id` (nullable FK, `nullOnDelete`), `region_snapshot`,
+  `township_snapshot`, `address_line`, `address_extra` — **new in v21.**
+  Checkout writes them and composes `address` from them once; snapshots follow
+  the `fragrance_name_snapshot` rule (copied at write, never recomputed — a
+  township rename/reprice/delete leaves placed orders untouched). Null on
+  legacy and DM orders, where `address` stays whatever was typed.
+- `delivery_courier` — **new in v21.** Nullable `Courier` enum value recorded at
+  Accept (or on the form): who actually carried it. A snapshot; no cost copied.
 - `order_from`: `website` \| `tiktok` \| `facebook` \| `other` — **`website` is new**;
   the other three remain for orders the decanter still logs manually from a DM
 - `tracking_code` — **new.** Unique random alphanumeric (~10 chars), generated on
@@ -533,8 +783,12 @@ client on checkout (see `05-api-layer.md`).
 4. **Cart** — a slide-in drawer, not a separate page. Client-side only
    (React context + `localStorage`), guest, no account. Quantity per line, remove
    line, subtotal for display only (server re-derives the real total at checkout).
-5. **Checkout** — cart summary + contact form (name, phone, address, optional
-   note). No payment fields. Submits to a new public write endpoint.
+5. **Checkout** — cart summary + contact form (name, phone, optional note) and,
+   since v21, a **structured address**: region → township selects (serviceable
+   townships only, fee shown as its own summary line the moment one is picked),
+   a street line, an optional extra line. No payment fields. Submits to a
+   public write endpoint; the delivery fee is derived server-side from the
+   township, never sent by the client.
 6. **Order complete** — shows the tracking code prominently, order summary, and a
    link to the tracking page. URL carries the code so it survives a refresh.
 7. **Track order** — form (tracking code + phone) → status timeline. No login.
@@ -554,15 +808,34 @@ client on checkout (see `05-api-layer.md`).
    showing, per upcoming day, which fragrances + sizes need decanting and in what
    quantity, aggregated across all non-cancelled/non-rejected orders due that day.
    This is the "automatically generate a schedule" requirement from the brief.
+   **v17:** the page is the month calendar — one aggregate vial-count chip per
+   day, overdue flagged distinctly — and every day clicks through to
+   `/admin/production-schedule/{date}`, the per-day worklist and printable (A5)
+   bench sheet. See §0.
 5. Dashboard widgets: revenue this month, orders by status, **awaiting confirmation**
-   count, decants due today, top fragrances, and **low stock — reorder soon** (v8).
+   count, decants due today, top fragrances, **low stock — reorder soon** (v8),
+   **gross margin (liquid only)** (v19 — fully-costed orders only, with the
+   exclusions and N-of-M coverage named in its description), **discount cost by
+   code** (#75 — from the order snapshots, never `times_used`), and **cash with
+   couriers** (#77 — the COD float, snapshotted at handoff, immune to markPaid
+   timing and the payment-method conflation).
    **Decant stock (v8):** per-fragrance total-ml stock, opt-in and warn-only —
    drawn down when an order is decanted, surfaced on the fragrance table + low-stock
    widget, never touching the manual `in_stock` toggle. See §0.
 6. **Printable A5 invoices (v7)** — print/download per order (fulfillable statuses
    only) and a bulk PDF for the filtered view, one order per page, with an
    emphasized balance-due figure. Never cached; Burmese-safe via bundled Padauk.
-7. Everything remains notes + financials + fulfillment only — no messaging, no
+7. **Expenses & monthly P&L (v20)** — category'd expense entry (Finance group,
+   seconds per row) and a Profit & loss page: income from line snapshots −
+   discounts, liquid COGS with coverage, operating expenses as entered, a
+   delivery result line, an honestly-labelled net; stock purchases below the
+   line — inventory, never expensed (they become COGS as poured).
+8. **Delivery zones (v21)** — a Settings resource over the township rate table:
+   region-grouped, courier-coverage pills (suspended and no-courier states
+   distinct), reference costs with a blank-never-0 best-case margin, bulk
+   set-fee/set-cost/activate, CSV import + template. Courier data is
+   admin-eyes only; the Accept modal records who carries each parcel.
+9. Everything remains notes + financials + fulfillment only — no messaging, no
    customer portal, no payment processing.
 
 ## 7. Conventions
@@ -586,7 +859,9 @@ client on checkout (see `05-api-layer.md`).
 - **Checkout-specific:** the server re-derives `unit_price_mmk` and validates
   `is_active`/`in_stock` from the current catalog at submission time — the client
   only ever sends `fragrance_id`, `size_ml`, and `quantity`. Never trust a
-  client-submitted price.
+  client-submitted price. **v21 extends this verbatim to the delivery fee:** the
+  client sends `delivery_township_id`; the server reads `fee_mmk` off the
+  serviceable row and ignores any client-sent fee or free-text `address`.
 - **Tracking lookup** requires an exact `tracking_code` + `phone` match; a mismatch on
   either returns the same generic "not found," so the endpoint isn't a guessing
   oracle for either field.
@@ -596,6 +871,10 @@ client on checkout (see `05-api-layer.md`).
 - Slugs auto-generated; images stored via Laravel `storage` and served publicly.
 - All list endpoints paginated.
 - Keep code simple and readable — this is a small business tool, not enterprise SaaS.
+- **Process:** every step ships through the loop in `prompts/WORKFLOW.md` — issue →
+  branch (named by issue number, off fresh `develop`) → implement → docs in the same
+  branch → PR into `develop` → **stop**. PRs are never merged by Claude Code, and
+  `main` changes only through the promotion PR described there.
 - Your Claude Code environment already has `frontend-design`, the `vercel-*` skills,
   and `web-design-guidelines` active — consult those for implementation-level
   Next.js/Vercel patterns (view transitions, composition, React best practices)
@@ -612,7 +891,7 @@ client on checkout (see `05-api-layer.md`).
 - Chat/messaging features
 - **Marketplace — product scope.** No customer-visible multi-shop anything: a
   storefront shows exactly one decanter's catalog, and no customer ever sees two
-  shops. Unchanged from v1. *Split in v15 along design-doc §12's axis:*
+  shops. Unchanged from v1. *Split in v23 along design-doc §12's axis:*
   **infrastructure scope** — how many shops one deployment serves — is no longer
   excluded. Multi-tenancy is specified in `prompts/multi-tenancy-design.md` +
   `prompts/23`–`25` (nothing built yet; each step runs only when explicitly asked,
@@ -621,9 +900,14 @@ client on checkout (see `05-api-layer.md`).
   permission to put two shops in front of one customer.
 - Inventory tracking of bottle *volumes* per physical bottle. **v8 added total-ml
   stock per fragrance** (warn-only, opt-in — see §0) as a deliberate scoped
-  reversal; what stays out of scope is *per-bottle* tracking, batch identity, and
-  cost/margin accounting. The customer-facing `in_stock` flag stays manual — v8's
-  stock warns, it never flips it.
+  reversal, **v19 added reference-cost, liquid-only margin visibility** (step
+  28), and **v20 added expenses + a monthly net P&L** (step 29 — the FINANCE.md
+  fork, chosen deliberately with its truth-discipline caveat accepted); what
+  stays out of scope is *per-bottle* tracking, batch identity, FIFO/weighted-
+  average COGS, consumables costing (vial, label, spillage — undecided, and
+  deciding it changes the stat's label), double-entry books, a balance sheet,
+  budgets, drawings/capital, and tax automation. The customer-facing `in_stock`
+  flag stays manual — v8's stock warns, it never flips it.
 - **Customer-facing** notifications — email, SMS, or messaging apps. *Amended in
   v13: admin-side alerts are no longer excluded — v11 (step 21, `prompts/21`)
   shipped Telegram order alerts to the decanter.* The boundary sits where

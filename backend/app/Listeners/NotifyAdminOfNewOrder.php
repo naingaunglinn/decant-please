@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Enums\PaymentMethod;
 use App\Events\OrderPlaced;
 use App\Support\Money;
 use App\Support\TelegramNotifier;
@@ -29,11 +30,23 @@ class NotifyAdminOfNewOrder
 
         $adminUrl = rtrim((string) config('app.url'), '/')."/admin/orders/{$order->id}/edit";
 
+        // The method, never payment_status — every order is unpaid at placement,
+        // so status carries no signal here. For online, say whether the checkout
+        // slip already rode in ("awaited" is defensive: checkout validation
+        // requires the slip today, but the listener shouldn't assume its caller).
+        $method = $order->payment_method ?? PaymentMethod::Cod;
+        $payment = 'Payment: '.$method->label();
+
+        if ($method !== PaymentMethod::Cod) {
+            $payment .= $order->payment_proof_path ? ' — slip attached' : ' — slip awaited';
+        }
+
         $message = implode("\n", [
             "🆕 New order #{$order->id}",
             "{$order->customer_name} · {$order->phone}",
             $items,
             'Total: '.Money::kyat($order->total_mmk),
+            $payment,
             "Track: {$order->tracking_code}",
             $adminUrl,
         ]);

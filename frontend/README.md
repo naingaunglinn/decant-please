@@ -46,7 +46,7 @@ checkout/tracking calls fail CORS.
 | `/` | static, 60s revalidate | Home — hero, featured rail, how-it-works, category tiles |
 | `/shop` | dynamic | Filterable catalog; all filter state lives in the URL query string |
 | `/fragrance/{slug}` | dynamic | Fragrance detail + size selector + add to cart (404s on unknown/inactive slugs) |
-| `/checkout` | static shell | Cart summary + promo code + contact form (cart itself is client-side) |
+| `/checkout` | static shell | Cart summary + promo code + contact form with region → township selects — the delivery fee line comes from `/delivery-zones` and is re-derived server-side at submit (cart itself is client-side) |
 | `/order/complete?code=…` | dynamic | Full receipt (fetched by code + phone), printable, survives refresh via the URL |
 | `/track` | dynamic | Tracking code + phone → the same receipt, with the vial-fill timeline |
 | `/sitemap.xml` | static, 60s revalidate | Home, shop, and every active fragrance |
@@ -71,7 +71,7 @@ frontend/
 │   │   ├── robots.ts · sitemap.ts · icon.svg # /robots.txt, /sitemap.xml, favicon
 │   │   └── error.tsx · not-found.tsx       # branded error/404 pages
 │   ├── components/
-│   │   ├── ui/                             # primitives: Pill, Button, ImagePlate, QuantityStepper, Skeleton
+│   │   ├── ui/                             # primitives: Pill, Button, ImagePlate, QuantityStepper, Skeleton; Select (Radix, restyled to tokens)
 │   │   ├── layout/                         # Navbar, Footer (social links from /meta), MobileNav, CartButton
 │   │   ├── catalog/                        # FragranceCard/Grid, filters, Pagination, RecentlyViewed
 │   │   ├── product/                        # SizeSelector, PurchasePanel (add to cart)
@@ -87,7 +87,7 @@ frontend/
 │   └── hooks/useCart.ts
 ├── next.config.ts                          # ← allowed image hosts: the NEXT_PUBLIC_API_URL host + NEXT_PUBLIC_IMAGE_URL (R2) in production
 ├── .env.local.example                      # ← template: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_IMAGE_URL
-└── package.json                            # Node 24 LTS, Next.js 16, Tailwind v4, GSAP, Motion
+└── package.json                            # Node 24 LTS, Next.js 16, Tailwind v4, GSAP, Motion, @radix-ui/react-select
 ```
 
 ## Conventions worth knowing
@@ -102,6 +102,13 @@ frontend/
 - **Server components fetch; client components animate.** Catalog data is fetched on the
   server (60s revalidation); GSAP/Motion run only in client components, and all motion
   respects `prefers-reduced-motion`.
+- **One library UI primitive, restyled.** The `Select` (checkout region/township and the
+  shop sort) wraps `@radix-ui/react-select` — the only non-motion runtime dependency — so
+  the option list can be styled (native `<option>` popups can't be). It's restyled entirely
+  to the `globals.css` tokens; shadcn's token layer was **not** adopted, and the `@theme`
+  block is unchanged. Any copied-in component must use `text-base` (≥16px) on every control,
+  or iOS Safari zooms the viewport on focus. There are no native `<select>` elements left;
+  everything else (`Button`, `Pill`, `QuantityStepper`, …) is the project's own.
 
 ## Deployment
 

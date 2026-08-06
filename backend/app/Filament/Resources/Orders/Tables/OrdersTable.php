@@ -106,6 +106,8 @@ class OrdersTable
                 OrderResource::rejectAction(),
                 OrderResource::markPaidAction(),
                 OrderResource::markUnpaidAction(),
+                OrderResource::handedToCourierAction(),
+                OrderResource::courierSettledAction(),
                 OrderResource::printInvoiceAction(),
                 OrderResource::downloadInvoiceAction(),
                 EditAction::make(),
@@ -123,9 +125,13 @@ class OrdersTable
 
                         return response()->streamDownload(function () use ($orders): void {
                             $out = fopen('php://output', 'w');
-                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', 'Decant date', 'Delivery date', 'Status', 'Payment', 'Total (Ks)', 'Balance due (Ks)']);
+                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', 'Decant date', 'Delivery date', 'Status', 'Payment', 'Total (Ks)', 'Balance due (Ks)', 'Cost (liquid only, Ks)', 'Gross margin (liquid only, Ks)']);
 
                             foreach ($orders as $order) {
+                                // Fully-costed orders only, for cost and margin alike —
+                                // blank when unknown, never 0 (a zero is a claim).
+                                $margin = $order->liquidGrossMarginMmk();
+
                                 fputcsv($out, [
                                     $order->created_at->format('Y-m-d'),
                                     $order->customer_name,
@@ -140,6 +146,8 @@ class OrdersTable
                                     $order->payment_status->label(),
                                     $order->total_mmk,
                                     $order->balanceDue(),
+                                    $margin === null ? '' : (int) $order->items->sum('line_cost_mmk'),
+                                    $margin ?? '',
                                 ]);
                             }
 

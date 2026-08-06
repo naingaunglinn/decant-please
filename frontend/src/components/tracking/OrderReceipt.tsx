@@ -99,10 +99,14 @@ function ReceiptBody({ order, note }: { order: OrderStatusResponse; note: string
             <SummaryRow label="Deposit received" amount={formatKyat(order.deposit_mmk)} />
           )}
           <SummaryRow label="Total" amount={order.total_formatted} strong />
-          {/* payment state — the one line the printed receipt keeps of it */}
-          {order.payment_status === "paid" ? (
-            <SummaryRow label="Payment" amount="Paid" />
+          {/* payment state — the one line the printed receipt keeps of it. A
+              negative balance is #67's signed contract: overpaid, shown for paid
+              and unpaid alike; non-negative rendering is unchanged. */}
+          {order.payment_status === "paid" && <SummaryRow label="Payment" amount="Paid" />}
+          {order.balance_due_mmk < 0 ? (
+            <SummaryRow label="Overpaid" amount={formatKyat(-order.balance_due_mmk)} strong />
           ) : (
+            order.payment_status !== "paid" &&
             order.deposit_mmk !== 0 && (
               <SummaryRow label="Balance due" amount={formatKyat(order.balance_due_mmk)} strong />
             )

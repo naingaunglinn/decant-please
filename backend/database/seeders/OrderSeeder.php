@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Models\DecantPrice;
+use App\Models\DeliveryTownship;
 use App\Models\Order;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -15,23 +16,24 @@ class OrderSeeder extends Seeder
     {
         $today = CarbonImmutable::today();
 
-        // Website checkouts, through the real checkout path — land as awaiting_confirmation.
-        $this->checkout('Aung Kyaw', '09-771234561', 'No. 12, Baho Road, Sanchaung, Yangon',
+        // Website checkouts, through the real checkout path — land as
+        // awaiting_confirmation with a structured township + demo fee.
+        $this->checkout('Aung Kyaw', '09-771234561', 'Sanchaung', 'No. 12, Baho Road',
             [['Sauvage', 10, 1], ['Baccarat Rouge 540', 5, 1]], 'Please decant from a fresh batch.');
-        $this->checkout('Su Myat Noe', '09-952345672', 'Room 502, Diamond Condo, Kamayut, Yangon',
+        $this->checkout('Su Myat Noe', '09-952345672', 'Kamayut', 'Room 502, Diamond Condo',
             [['Delina', 5, 2]]);
-        $this->checkout('Thiha Zaw', '09-421987653', '88 Strand Road, Kyauktada, Yangon',
+        $this->checkout('Thiha Zaw', '09-421987653', 'Kyauktada', '88 Strand Road',
             [['Aventus', 10, 1], ['Layton', 5, 1]]);
 
         // A rejected website order, through the real transition.
-        $this->checkout('Nay Lin Aung', '09-799887766', '45 Inya Road, Bahan, Yangon', [['Eros', 5, 1]])
+        $this->checkout('Nay Lin Aung', '09-799887766', 'Bahan', '45 Inya Road', [['Eros', 5, 1]])
             ->reject('Bottle ran out this week — restocking next month.');
 
         // Accepted website orders (now pending), one decanting today for the production schedule.
-        $this->checkout('Khin Thandar', '09-263748596', '23 U Wisara Road, Dagon, Yangon',
+        $this->checkout('Khin Thandar', '09-263748596', 'Dagon', '23 U Wisara Road',
             [['Coco Mademoiselle', 10, 1], ['Libre', 5, 1]])
             ->accept($today->addDay(), $today->addDays(3));
-        $this->checkout('Hnin Wai', '09-450012389', '7 Mile, Pyay Road, Mayangone, Yangon',
+        $this->checkout('Hnin Wai', '09-450012389', 'Mayangon', '7 Mile, Pyay Road',
             [['Allure Homme Sport', 10, 2], ['Grand Soir', 5, 1]])
             ->accept($today, $today->addDays(2));
 
@@ -88,12 +90,14 @@ class OrderSeeder extends Seeder
     /**
      * @param  array<array{0: string, 1: int, 2: int}>  $items  [fragrance name, size_ml, quantity]
      */
-    private function checkout(string $name, string $phone, string $address, array $items, ?string $note = null): Order
+    private function checkout(string $name, string $phone, string $township, string $addressLine, array $items, ?string $note = null): Order
     {
         return Order::newFromCheckout([
             'customer_name' => $name,
             'phone' => $phone,
-            'address' => $address,
+            'delivery_township' => DeliveryTownship::query()
+                ->where('region', 'yangon')->where('name', $township)->firstOrFail(),
+            'address_line' => $addressLine,
             'notes' => $note,
             'items' => collect($items)->map(fn (array $item) => [
                 'fragrance_id' => $this->price($item[0], $item[1])->fragrance_id,

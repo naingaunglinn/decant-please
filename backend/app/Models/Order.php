@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Enums\Courier;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -18,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at', 'delivery_township_id', 'region_snapshot', 'township_snapshot', 'address_line', 'address_extra', 'delivery_courier'])]
 class Order extends Model
 {
     /** No 0/O/1/I — codes get read out loud over the phone. */
@@ -34,6 +38,22 @@ class Order extends Model
     {
         static::creating(function (self $order) {
             $order->tracking_code ??= self::generateTrackingCode();
+        });
+
+        // Region/township are snapshotted the way fragrance_name_snapshot is:
+        // copied whenever the township association is set or changed (checkout
+        // and the admin form both pass through here), then never rewritten — a
+        // rename, reprice, or delete of the township leaves placed orders
+        // reading what was true when they were placed.
+        static::saving(function (self $order) {
+            if ($order->isDirty('delivery_township_id') && $order->delivery_township_id !== null) {
+                $township = DeliveryTownship::find($order->delivery_township_id);
+
+                if ($township) {
+                    $order->region_snapshot = $township->region->label();
+                    $order->township_snapshot = $township->name;
+                }
+            }
         });
 
         // Stock is drawn down when the vials are physically filled — i.e. the
@@ -84,19 +104,54 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function deliveryTownship(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryTownship::class);
+    }
+
+    /**
+     * The one place a checkout address is assembled — smallest to largest, the
+     * way a Myanmar address is written and the way the invoice prints one. The
+     * township line carries the Burmese name when recorded, because that line
+     * is for the courier's rider. Called from the checkout path only: Filament
+     * keeps writing `address` directly (a DM address is whatever the customer
+     * typed in a DM), and a composed address is never re-derived later.
+     */
+    public static function composeAddress(string $addressLine, DeliveryTownship $township, ?string $extra): string
+    {
+        $lines = [
+            trim($addressLine),
+            "{$township->optionLabel()}, {$township->region->label()}",
+        ];
+
+        if (filled($extra)) {
+            $lines[] = trim($extra);
+        }
+
+        return implode("\n", $lines);
+    }
+
     /**
      * The only path website checkouts take. Prices and availability are re-derived
-     * from the current catalog — anything price-like in $data['items'] is ignored.
+     * from the current catalog — anything price-like in $data['items'] is ignored,
+     * and the delivery fee is read off the validated township row, never from the
+     * client (the price-trust rule, extended to the fee).
      *
-     * @param  array{customer_name: string, phone: string, address: string, notes?: ?string, items: array<array{fragrance_id: int, size_ml: int, quantity: int}>}  $data
+     * @param  array{customer_name: string, phone: string, delivery_township: DeliveryTownship, address_line: string, address_extra?: ?string, notes?: ?string, items: array<array{fragrance_id: int, size_ml: int, quantity: int}>}  $data
      */
     public static function newFromCheckout(array $data): self
     {
         return DB::transaction(function () use ($data) {
+            $township = $data['delivery_township'];
+
             $order = self::create([
                 'customer_name' => $data['customer_name'],
                 'phone' => $data['phone'],
-                'address' => $data['address'],
+                'address' => self::composeAddress($data['address_line'], $township, $data['address_extra'] ?? null),
+                'address_line' => $data['address_line'],
+                'address_extra' => $data['address_extra'] ?? null,
+                'delivery_township_id' => $township->id,
+                'delivery_fee_mmk' => $township->fee_mmk,
                 'notes' => $data['notes'] ?? null,
                 'order_from' => OrderSource::Website,
                 'status' => OrderStatus::AwaitingConfirmation,
@@ -253,6 +308,34 @@ class Order extends Model
         $this->save();
     }
 
+    /**
+     * Cash leaves with the courier: stamps the handoff and SNAPSHOTS what they
+     * carry — by default the balance due right now, editable, because a courier
+     * sometimes carries an agreed different amount. A snapshot, deliberately
+     * (decant-money §2): a live balance would shrink the float the moment the
+     * order is marked paid, before the cash physically arrives — and scoping the
+     * float by this marking sidesteps the payment_method conflation entirely.
+     * Handing off again (a re-delivery) restarts the float for this order.
+     */
+    public function handToCourier(CarbonInterface $date, int $carryingMmk): void
+    {
+        $this->handed_to_courier_at = $date;
+        $this->courier_carrying_mmk = max(0, $carryingMmk);
+        $this->courier_settled_at = null;
+        $this->save();
+    }
+
+    /** The courier handed the cash over — the float lets go of this order. */
+    public function settleCourier(CarbonInterface $date): void
+    {
+        if ($this->handed_to_courier_at === null) {
+            throw new LogicException('Only orders handed to a courier can be settled.');
+        }
+
+        $this->courier_settled_at = $date;
+        $this->save();
+    }
+
     /** Store the customer's transfer screenshot; does NOT mark paid — the
      *  decanter still eyeballs it and confirms. */
     public function attachPaymentProof(string $path): void
@@ -281,6 +364,31 @@ class Order extends Model
     public function balanceDue(): int
     {
         return max(0, $this->total_mmk - $this->deposit_mmk);
+    }
+
+    /**
+     * Liquid-only gross margin: Σ line_total − discount − Σ line_cost, with the
+     * delivery fee on neither side — it's courier pass-through, unmeasured, not
+     * zero (FINANCE.md gap 4) — which is also why this is never computed off
+     * total_mmk, which contains that fee.
+     *
+     * Null unless EVERY line carries a cost snapshot: a partially-costed order
+     * reports unknown, because a partial cost sum understates cost silently.
+     * Vial, label, and spillage are not in line costs; every surface that shows
+     * this figure labels it "liquid only".
+     */
+    public function liquidGrossMarginMmk(): ?int
+    {
+        $this->loadMissing('items');
+
+        if ($this->items->isEmpty()
+            || $this->items->contains(fn (OrderItem $item): bool => $item->line_cost_mmk === null)) {
+            return null;
+        }
+
+        return (int) $this->items->sum('line_total_mmk')
+            - $this->discount_mmk
+            - (int) $this->items->sum('line_cost_mmk');
     }
 
     /**
@@ -313,6 +421,63 @@ class Order extends Model
         }
 
         return $short;
+    }
+
+    /**
+     * The production schedule's one source of truth: the window's order items,
+     * grouped per day into fragrance+size production lines. Both schedule views
+     * (day-card list and month calendar) read this — the grouping must never
+     * fork, and when multi-tenancy lands, shop scoping happens here, once
+     * (a custom Filament page is outside Filament's tenancy scoping). Days
+     * without work are kept (confirmed-empty); cancelled/rejected orders never
+     * count. Dates compare via whereDate: the date cast stores a datetime
+     * string, which SQLite matches textually against a bare Y-m-d bound
+     * (silently missing the window's last day) while Postgres's DATE column
+     * truncates — whereDate reads identically on both engines.
+     *
+     * @return array<int, array{date: CarbonImmutable, groups: Collection}>
+     */
+    public static function productionScheduleFor(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $from = $from->startOfDay();
+        $to = $to->startOfDay();
+
+        if ($to->lessThan($from)) {
+            $to = $from;
+        }
+
+        $items = OrderItem::query()
+            ->whereHas('order', fn ($query) => $query
+                ->whereDate('decant_date', '>=', $from->toDateString())
+                ->whereDate('decant_date', '<=', $to->toDateString())
+                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
+            ->with(['order', 'fragrance.brand'])
+            ->get();
+
+        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
+
+        $days = [];
+
+        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
+            $groups = ($byDay->get($day->toDateString()) ?? collect())
+                ->groupBy(fn (OrderItem $item) => "{$item->fragrance_id}:{$item->size_ml}")
+                ->map(function (Collection $group): array {
+                    $first = $group->first();
+
+                    return [
+                        'label' => "{$first->fragrance->brand->name} — {$first->fragrance->name}",
+                        'size_ml' => $first->size_ml,
+                        'quantity' => $group->sum('quantity'),
+                        'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
+                    ];
+                })
+                ->sortBy([['label', 'asc'], ['size_ml', 'asc']])
+                ->values();
+
+            $days[] = ['date' => $day, 'groups' => $groups];
+        }
+
+        return $days;
     }
 
     /** The one lookup both public tracking endpoints share: exact pair or nothing. */
@@ -372,13 +537,17 @@ class Order extends Model
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
+            'delivery_courier' => Courier::class,
             'decant_date' => 'date',
             'delivery_date' => 'date',
+            'handed_to_courier_at' => 'date',
+            'courier_settled_at' => 'date',
             'paid_at' => 'datetime',
             'deposit_mmk' => 'integer',
             'delivery_fee_mmk' => 'integer',
             'discount_mmk' => 'integer',
             'total_mmk' => 'integer',
+            'courier_carrying_mmk' => 'integer',
         ];
     }
 }

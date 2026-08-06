@@ -10,14 +10,17 @@ use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
+use App\Models\DeliveryTownship;
 use App\Models\Order;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions\Action;
+use App\Support\Money;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Resource;
@@ -78,8 +81,18 @@ class OrderResource extends Resource
                     ->required()
                     ->default(today()->addDays(2))
                     ->afterOrEqual('decant_date'),
+                Select::make('delivery_courier')
+                    ->label('Courier')
+                    ->options(fn (Order $record): array => DeliveryTownship::courierOptionsFor($record->delivery_township_id))
+                    ->placeholder('Decide later')
+                    ->helperText('Who carries this parcel — each option shows its recorded cost. A snapshot: no cost is ever copied onto the order.'),
             ])
             ->action(function (Order $record, array $data): void {
+                // set before accept() so its save() persists both in one write
+                if (filled($data['delivery_courier'] ?? null)) {
+                    $record->delivery_courier = $data['delivery_courier'];
+                }
+
                 $record->accept(Carbon::parse($data['decant_date']), Carbon::parse($data['delivery_date']));
 
                 Notification::make()
@@ -190,6 +203,67 @@ class OrderResource extends Resource
                 $record->markUnpaid();
 
                 Notification::make()->success()->title('Marked unpaid.')->send();
+            })
+            ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /**
+     * Cash out the door: stamps the handoff and snapshots what the courier
+     * carries. The float widget holds the sum until the courier settles.
+     */
+    public static function handedToCourierAction(): Action
+    {
+        return Action::make('handedToCourier')
+            ->label('Handed to courier')
+            ->icon(Heroicon::OutlinedTruck)
+            ->color('warning')
+            ->visible(fn (Order $record): bool => in_array($record->status, [OrderStatus::Decanted, OrderStatus::Delivered], true)
+                && $record->handed_to_courier_at === null)
+            ->modalHeading('Handed to courier')
+            ->modalDescription('Snapshots the cash this courier is carrying — the float holds it until you mark them settled. Marking the order paid later does not shrink the float.')
+            ->modalSubmitActionLabel('Record handoff')
+            ->schema([
+                DatePicker::make('date')
+                    ->default(today())
+                    ->required(),
+                TextInput::make('carrying_mmk')
+                    ->label('Courier carries')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->default(fn (Order $record): int => $record->balanceDue())
+                    ->required()
+                    ->helperText('Defaults to the balance due right now — edit if you agreed something different.'),
+            ])
+            ->action(function (Order $record, array $data): void {
+                $record->handToCourier(Carbon::parse($data['date']), (int) $data['carrying_mmk']);
+
+                Notification::make()->success()->title('Handoff recorded.')->send();
+            })
+            ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
+    }
+
+    /** The courier handed the cash over — releases this order from the float. */
+    public static function courierSettledAction(): Action
+    {
+        return Action::make('courierSettled')
+            ->label('Courier settled')
+            ->icon(Heroicon::OutlinedCheckBadge)
+            ->color('success')
+            ->visible(fn (Order $record): bool => $record->handed_to_courier_at !== null
+                && $record->courier_settled_at === null)
+            ->modalHeading('Courier settled')
+            ->modalDescription(fn (Order $record): string => 'Confirms '.Money::kyat((int) $record->courier_carrying_mmk).' reached you — the float lets go of this order.')
+            ->modalSubmitActionLabel('Settled')
+            ->schema([
+                DatePicker::make('date')
+                    ->default(today())
+                    ->required(),
+            ])
+            ->action(function (Order $record, array $data): void {
+                $record->settleCourier(Carbon::parse($data['date']));
+
+                Notification::make()->success()->title('Courier settled.')->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
     }

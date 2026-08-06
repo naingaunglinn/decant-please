@@ -90,10 +90,36 @@ export interface CheckoutItem {
   quantity: number;
 }
 
+/** One township the shop delivers to — the fee is display-only here; the
+ *  server re-derives it from the id at submission. */
+export interface DeliveryTownshipOption {
+  id: number;
+  name: string;
+  name_mm: string | null;
+  label: string;
+  fee_mmk: number;
+  fee_formatted: string;
+}
+
+export interface DeliveryRegion {
+  value: string;
+  label: string;
+  townships: DeliveryTownshipOption[];
+}
+
+/** The whole serviceable tree in one response — the township select filters
+ *  client-side, no request between the two selects. */
+export interface DeliveryZones {
+  regions: DeliveryRegion[];
+}
+
 export interface CheckoutPayload {
   customer_name: string;
   phone: string;
-  address: string;
+  /** The address is structured: township drives the delivery fee server-side. */
+  delivery_township_id: number;
+  address_line: string;
+  address_extra?: string;
   note?: string;
   promo_code?: string;
   payment_method?: PaymentMethod; // defaults to cod server-side
@@ -105,6 +131,9 @@ export interface CheckoutResponse {
   tracking_code: string;
   total_mmk: number;
   total_formatted: string;
+  /** What was actually charged for delivery — cash to the courier. */
+  delivery_fee_mmk: number;
+  delivery_fee_formatted: string;
   /** Set only when a promo lapsed between preview and submission. */
   promo_note: string | null;
 }

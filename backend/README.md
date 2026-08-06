@@ -55,7 +55,8 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 | GET | `/api/v1/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
 | GET | `/api/v1/brands` | Active brands | 120/min |
 | GET | `/api/v1/meta` | Filter options, price bounds, social links, payment details | 120/min |
-| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices | 10/min |
+| GET | `/api/v1/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
+| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices and the delivery fee (structured address since step 30) | 10/min |
 | GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
 | POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
 | POST | `/api/v1/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |
@@ -74,7 +75,8 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 | `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
 | `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
-| `/admin/production-schedule` | Aggregated daily decant schedule |
+| `/admin/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
+| `/admin/production-schedule/{date}` | One day's aggregated worklist, printable as an A5 bench sheet — strict `Y-m-d` param, 404 otherwise |
 
 **Utility**
 
@@ -93,10 +95,10 @@ Trimmed to the files you'd look for first. Deployment-relevant paths are marked 
 backend/
 ├── app/
 │   ├── Console/Commands/                   # FreshStart (decant:fresh-start handover wipe), TelegramTest (telegram:test)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentStatus, PromoType
-│   ├── Events/ + Listeners/                # OrderPlaced (website checkout) → NotifyAdminOfNewOrder (Telegram)
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, PromoType
+│   ├── Events/ + Listeners/                # OrderPlaced, PaymentProofUploaded → Telegram admin alerts (NotifyAdminOf*)
 │   ├── Filament/
-│   │   ├── Pages/ProductionSchedule.php    # /admin/production-schedule (+ Blade view in resources/)
+│   │   ├── Pages/                          # ProductionSchedule (month calendar), ProductionScheduleDay (printable day worklist), ManagePayment (MMQR settings)
 │   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
@@ -116,10 +118,11 @@ backend/
 │   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
-├── resources/views/filament/               # production schedule Blade view
+│   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git
+├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 104 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices
+├── tests/Feature/                          # 143 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -148,7 +151,7 @@ backend/
 php artisan test
 ```
 
-104 tests / 529 assertions on an in-memory SQLite database — your dev Postgres data is
+143 tests / 659 assertions on an in-memory SQLite database — your dev Postgres data is
 never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`

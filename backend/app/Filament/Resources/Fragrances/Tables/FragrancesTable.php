@@ -84,6 +84,13 @@ class FragrancesTable
                         ? "Low — reorder at {$record->low_stock_threshold_ml}ml"
                         : null)
                     ->sortable(),
+                TextColumn::make('cost_per_ml')
+                    ->label('Cost/ml')
+                    ->state(fn (Fragrance $record): string => $record->liquidCostMmk(1) !== null
+                        ? Money::kyat((int) $record->liquidCostMmk(1))
+                        : '—')
+                    ->tooltip('Liquid only — ceiling-rounded per ml')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 ToggleColumn::make('is_active'),
                 IconColumn::make('is_featured')
                     ->label('Featured')

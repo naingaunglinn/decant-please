@@ -6,7 +6,9 @@ use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\Region;
 use App\Models\DecantPrice;
+use App\Models\DeliveryTownship;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Support\Money;
@@ -42,7 +44,32 @@ class OrderForm
                             ->maxLength(255),
                         Textarea::make('address')
                             ->rows(2)
-                            ->required(),
+                            ->required()
+                            ->helperText('Checkout composes this from the structured fields; for a DM order it\'s whatever the customer typed.'),
+                        Select::make('delivery_region')
+                            ->label('Region')
+                            ->options(Region::class)
+                            // pure UI — narrows the township list, never stored
+                            ->dehydrated(false)
+                            ->live()
+                            ->afterStateHydrated(function (Select $component, ?Order $record): void {
+                                if ($record?->deliveryTownship) {
+                                    $component->state($record->deliveryTownship->region->value);
+                                }
+                            }),
+                        Select::make('delivery_township_id')
+                            ->label('Township')
+                            ->options(fn (Get $get): array => self::townshipOptions($get('delivery_region')))
+                            ->searchable()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                if ($state && ($fee = DeliveryTownship::query()->find($state)?->fee_mmk) !== null) {
+                                    $set('delivery_fee_mmk', $fee);
+                                }
+                            })
+                            // optional, deliberately: a DM order whose township is
+                            // ambiguous must still be saveable with a plain address
+                            ->helperText('Optional — picking one pre-fills the delivery fee in Financials, editable there like the discount.'),
                         Select::make('order_from')
                             ->options(OrderSource::class)
                             ->default(OrderSource::Tiktok->value)
@@ -62,6 +89,14 @@ class OrderForm
                         DatePicker::make('delivery_date')
                             ->afterOrEqual('decant_date')
                             ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value),
+                        Select::make('delivery_courier')
+                            ->label('Courier')
+                            ->options(fn (Get $get): array => DeliveryTownship::courierOptionsFor(
+                                $get('delivery_township_id') ? (int) $get('delivery_township_id') : null,
+                            ))
+                            ->placeholder('Not decided')
+                            ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value)
+                            ->helperText('Who carries this parcel — each option shows its recorded cost. Also settable on Accept.'),
                         Placeholder::make('awaiting_hint')
                             ->hiddenLabel()
                             ->content('Dates are set by the Accept action while an order awaits confirmation.')
@@ -83,7 +118,7 @@ class OrderForm
                         Repeater::make('items')
                             ->relationship()
                             ->hiddenLabel()
-                            ->columns(4)
+                            ->columns(5)
                             ->minItems(1)
                             ->defaultItems(1)
                             ->addActionLabel('Add item')
@@ -125,6 +160,13 @@ class OrderForm
                                     ->required()
                                     ->live(onBlur: true)
                                     ->helperText('Auto-filled from the catalog — edit freely.'),
+                                TextInput::make('unit_cost_mmk')
+                                    ->label('Unit cost')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->suffix('Ks')
+                                    ->live(onBlur: true)
+                                    ->helperText('Liquid only — auto-filled from the fragrance cost; edit freely. Blank = unknown.'),
                                 TextInput::make('quantity')
                                     ->numeric()
                                     ->minValue(1)
@@ -169,6 +211,28 @@ class OrderForm
                             ->content(fn (Get $get): string => Money::kyat(
                                 max(0, self::liveTotal($get) - (int) ($get('deposit_mmk') ?: 0))
                             )),
+                        Placeholder::make('gross_margin')
+                            ->label('Gross margin (liquid only)')
+                            // Saved-state figure, from the stored snapshots — unsaved
+                            // line edits show after save. Admin-eyes only.
+                            ->content(function (?Order $record): string {
+                                if (! $record) {
+                                    return '—';
+                                }
+
+                                $record->loadMissing('items');
+                                $margin = $record->liquidGrossMarginMmk();
+
+                                if ($margin === null) {
+                                    $uncosted = $record->items
+                                        ->filter(fn ($item): bool => $item->line_cost_mmk === null)
+                                        ->count();
+
+                                    return $uncosted > 0 ? "unknown — {$uncosted} line(s) uncosted" : '—';
+                                }
+
+                                return Money::kyat($margin).' — excludes vial, label, spillage & delivery';
+                            }),
                         Textarea::make('notes')
                             ->rows(2)
                             ->columnSpanFull(),
@@ -255,6 +319,36 @@ class OrderForm
         if ($price !== null) {
             $set('unit_price_mmk', $price);
         }
+
+        // Cost mirrors price: pre-filled from the live reference, hand-correctable.
+        // Only a real value overwrites — an uncosted fragrance keeps whatever's typed.
+        $cost = Fragrance::query()->find($get('fragrance_id'))
+            ?->liquidCostMmk((int) $get('size_ml'));
+
+        if ($cost !== null) {
+            $set('unit_cost_mmk', $cost);
+        }
+    }
+
+    /**
+     * Every township (active or not — the admin can point an order anywhere),
+     * region-filtered when one is picked, suffixed with the region when not,
+     * so two same-named townships stay tellable apart.
+     */
+    protected static function townshipOptions(?string $region): array
+    {
+        return DeliveryTownship::query()
+            ->when($region, fn ($query, string $value) => $query->where('region', $value))
+            ->orderBy('region')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (DeliveryTownship $township): array => [
+                $township->id => $region
+                    ? $township->optionLabel()
+                    : "{$township->optionLabel()} — {$township->region->label()}",
+            ])
+            ->all();
     }
 
     /**

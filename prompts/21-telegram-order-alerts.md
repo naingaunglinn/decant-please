@@ -32,6 +32,14 @@ now disabled — `->withEvents(discover: false)` in `bootstrap/app.php`; note `f
 not `[]`, which falls back to the default scan path. Consequence: every future
 listener must be wired explicitly in `AppServiceProvider`, or it won't run.)*
 
+*(Amended by #59.)* A second event rides the same layer: `PaymentProofUploaded`
+(the `Order` + an `isReplacement` flag) → dispatched from `PaymentProofController`
+only, after the proof write commits — deliberately **not** from checkout, whose slip
+is already reported inside the new-order alert; dispatching from both paths would
+double-send the same slip. Its listener, `NotifyAdminOfPaymentProof`, is wired in
+`AppServiceProvider` next to the first — mandatory, not stylistic, given discovery
+is off.
+
 Adding SMS/Viber later is another listener on the same event — no checkout changes.
 This matches the v5 rule: the trigger lives in the API, reusable by a future client.
 
@@ -48,11 +56,22 @@ Two hard rules, because it runs in the checkout request path:
 Config: `config/services.php` `telegram` block ← `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_ADMIN_CHAT_ID`.
 
-## 4. The message
+## 4. The messages
 
-Plain text: `🆕 New order #{id}` / `{customer} · {phone}` / items summary
-(`{size}ml × {qty} {name}`) / `Total: {kyat}` / `Track: {code}` / the admin order URL
-(`{APP_URL}/admin/orders/{id}/edit`).
+**New order** — plain text: `🆕 New order #{id}` / `{customer} · {phone}` / items
+summary (`{size}ml × {qty} {name}`) / `Total: {kyat}` / `Payment: {method}` (#59) /
+`Track: {code}` / the admin order URL (`{APP_URL}/admin/orders/{id}/edit`). For
+non-COD the payment line says whether the slip is ` — slip attached` or
+` — slip awaited` (checkout attaches the slip before dispatching, so "awaited" is
+defensive — the listener doesn't assume its dispatcher). Never `payment_status`:
+every order is `unpaid` at OrderPlaced, so it carries no signal.
+
+**Payment slip** (#59) — `🧾 Payment slip uploaded — order #{id}`, or `… slip
+replaced …` on a re-upload (the endpoint overwrites, so a customer retrying a blurry
+photo doesn't buzz the decanter identically several times) / `{customer} · {phone}` /
+`Total: {kyat} · Balance due: {kyat}` / `Track: {code}` / the admin order URL.
+**Link only, never the image**: proofs live on the private bucket by design (#47),
+and a multi-MB `sendPhoto` upload doesn't fit the notifier's 5s bound.
 
 ## 5. Onboarding aid
 

@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             CatalogSeeder::class,
+            DeliveryZoneSeeder::class, // before orders — demo checkouts pick a township
             OrderSeeder::class,
             PromoCodeSeeder::class,
         ]);
