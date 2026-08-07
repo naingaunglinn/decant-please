@@ -21,7 +21,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Read by BelongsToShop's global scope and creating hook. Registered as a
+        // plain singleton: FPM builds a fresh container per request, so this is
+        // already per-request (no cross-request leak), and unlike a scoped binding it
+        // survives the container's scoped-instance flush that Livewire/HTTP test
+        // helpers trigger mid-test — where nothing re-runs the resolver middleware.
+        // If this app ever moves to Octane (persistent container), switch to scoped()
+        // and reset it in an Octane RequestReceived listener.
+        $this->app->singleton(\App\Support\TenantContext::class);
     }
 
     /**

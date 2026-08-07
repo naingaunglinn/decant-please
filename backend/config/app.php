@@ -56,6 +56,11 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3001'),
 
+    // Multi-tenancy (Step 23): the slug of the sole shop this deployment serves.
+    // The interim tenant resolver (SetDefaultTenant) pins it; the backfill migration
+    // creates it; Step 24's storefront must set NEXT_PUBLIC_SHOP_SLUG to the same value.
+    'shop_slug' => env('SHOP_SLUG', 'decant-please'),
+
     'social' => [
         'tiktok' => env('SOCIAL_TIKTOK_URL'),
         'facebook' => env('SOCIAL_FACEBOOK_URL'),

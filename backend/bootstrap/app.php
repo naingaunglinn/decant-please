@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // (AppServiceProvider) into one global bucket, and $request->isSecure() is false,
         // which can loop Filament login under SESSION_SECURE_COOKIE=true.
         $middleware->trustProxies(at: '*');
+
+        // Interim tenant resolution (multi-tenancy Step 23 §5): pin the sole shop on
+        // every API request so tenant-owned queries have a context. Replaced by
+        // ResolveTenant (path {shop}) in Step 24.
+        $middleware->api(prepend: [\App\Http\Middleware\SetDefaultTenant::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

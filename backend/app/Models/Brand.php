@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BrandType;
+use App\Models\Concerns\BelongsToShop;
 use App\Models\Concerns\HasSlug;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'slug', 'type', 'logo_path', 'is_active'])]
 class Brand extends Model
 {
+    use BelongsToShop;
     use HasSlug;
 
     public function fragrances(): HasMany

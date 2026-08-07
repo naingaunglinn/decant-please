@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\Courier;
 use App\Enums\Region;
 use App\Models\DeliveryTownship;
+use App\Support\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
 
@@ -56,7 +57,7 @@ class DeliveryZoneSeeder extends Seeder
 
         $this->activateYangonForDemo();
 
-        Cache::forget('api.delivery-zones');
+        Cache::forget('api.delivery-zones.'.app(TenantContext::class)->slug());
     }
 
     private function seedFile(string $path, bool $available): void

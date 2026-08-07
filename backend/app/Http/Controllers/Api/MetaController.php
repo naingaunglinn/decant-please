@@ -8,6 +8,7 @@ use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Models\DecantPrice;
 use App\Models\ShopSetting;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,11 @@ class MetaController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        return response()->json(Cache::remember('api.meta', 600, function (): array {
+        // Per-shop key: /meta carries the DB-backed payment block, so a global key
+        // would serve one shop's KBZPay/Wave numbers to another (findings Q5/A5).
+        $key = 'api.meta.'.app(TenantContext::class)->slug();
+
+        return response()->json(Cache::remember($key, 600, function (): array {
             $available = DecantPrice::query()
                 ->where('in_stock', true)
                 ->whereHas('fragrance', fn (Builder $query) => $query

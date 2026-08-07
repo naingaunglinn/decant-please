@@ -88,6 +88,11 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Interim tenant resolution for the panel (multi-tenancy Step 23 §5).
+            // isPersistent so Livewire's widget-refresh AJAX carries the tenant too —
+            // the vendor's own tenancy warning (findings Q3). Replaced by Filament
+            // tenancy in Step 25.
+            ->middleware([\App\Http\Middleware\SetDefaultTenant::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

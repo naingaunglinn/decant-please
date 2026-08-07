@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Shop;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use RuntimeException;
@@ -24,6 +26,15 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin@decantplease.local'],
             ['name' => 'Admin', 'password' => Hash::make($password)],
         );
+
+        // Pin the default shop before any tenant-owned seeding — the child seeders
+        // (catalog, zones, orders, promos) all create scoped rows and the creating
+        // hook fills shop_id from this context (multi-tenancy Step 23 §7).
+        $shop = Shop::firstOrCreate(
+            ['slug' => config('app.shop_slug')],
+            ['name' => config('app.name'), 'is_active' => true],
+        );
+        app(TenantContext::class)->set($shop);
 
         $this->call([
             CatalogSeeder::class,

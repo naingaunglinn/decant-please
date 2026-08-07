@@ -6,6 +6,7 @@ use App\Enums\Region;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryTownship;
 use App\Support\Money;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 
@@ -25,7 +26,10 @@ class DeliveryZoneController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        return response()->json(Cache::remember('api.delivery-zones', 600, function (): array {
+        // Per-shop key: each shop prices + activates its own townships (findings A5).
+        $key = 'api.delivery-zones.'.app(TenantContext::class)->slug();
+
+        return response()->json(Cache::remember($key, 600, function (): array {
             $townships = DeliveryTownship::query()
                 ->serviceable()
                 ->orderBy('sort_order')

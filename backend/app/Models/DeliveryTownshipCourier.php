@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\Courier;
+use App\Models\Concerns\BelongsToShop;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,13 +20,16 @@ use Illuminate\Support\Facades\Cache;
 #[Fillable(['delivery_township_id', 'courier', 'courier_name', 'cost_mmk', 'is_available'])]
 class DeliveryTownshipCourier extends Model
 {
+    use BelongsToShop;
+
     protected static function booted(): void
     {
         // A courier row appearing, closing, or reopening flips the parent
         // township's serviceability — which is exactly what /delivery-zones
         // filters on, so it busts the same cache the township does.
-        static::saved(fn () => Cache::forget('api.delivery-zones'));
-        static::deleted(fn () => Cache::forget('api.delivery-zones'));
+        // Per-shop key, same as the parent township (findings A5).
+        static::saved(fn () => Cache::forget('api.delivery-zones.'.app(TenantContext::class)->slug()));
+        static::deleted(fn () => Cache::forget('api.delivery-zones.'.app(TenantContext::class)->slug()));
     }
 
     public function township(): BelongsTo

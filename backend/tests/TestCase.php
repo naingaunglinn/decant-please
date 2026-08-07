@@ -4,10 +4,33 @@ namespace Tests;
 
 use App\Enums\Courier;
 use App\Models\DeliveryTownship;
+use App\Models\Shop;
+use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Schema;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Every test runs single-shop, mirroring production's interim resolver
+     * (SetDefaultTenant): once BelongsToShop's scope throws without a tenant, an
+     * unscoped test create would error, so pin the default shop here. Tests that
+     * exercise isolation set a different shop on TenantContext directly.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (Schema::hasTable('shops')) {
+            $shop = Shop::firstOrCreate(
+                ['slug' => config('app.shop_slug')],
+                ['name' => 'Test Shop', 'is_active' => true],
+            );
+
+            app(TenantContext::class)->set($shop);
+        }
+    }
+
     /**
      * An active, courier-served township — the gate every checkout must pass
      * since step 30. Fee defaults to 0 (a real free-delivery zone) so existing

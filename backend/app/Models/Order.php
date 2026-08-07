@@ -7,6 +7,8 @@ use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\BelongsToShop;
+use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,6 +27,8 @@ use RuntimeException;
 #[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at', 'delivery_township_id', 'region_snapshot', 'township_snapshot', 'address_line', 'address_extra', 'delivery_courier'])]
 class Order extends Model
 {
+    use BelongsToShop;
+
     /** No 0/O/1/I — codes get read out loud over the phone. */
     private const TRACKING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -522,7 +526,15 @@ class Order extends Model
                 $code .= self::TRACKING_ALPHABET[random_int(0, strlen(self::TRACKING_ALPHABET) - 1)];
             }
 
-            if (! self::where('tracking_code', $code)->exists()) {
+            // Codes stay GLOBALLY unique under multi-tenancy: the dedup check must see
+            // every shop's codes, or a cross-shop collision slips past the tenant-scoped
+            // exists() and dies on the global unique index unretried (findings Q2). The
+            // index stays global; this one read is the justified withoutTenancy() escape.
+            $taken = app(TenantContext::class)->withoutTenancy(
+                fn () => self::where('tracking_code', $code)->exists()
+            );
+
+            if (! $taken) {
                 return $code;
             }
         }
