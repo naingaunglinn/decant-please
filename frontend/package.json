@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "verify": "node scripts/verify-responsive.mjs && node scripts/verify-home-rails.mjs && node scripts/verify-image-fallback.mjs"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.3.7",
