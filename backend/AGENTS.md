@@ -78,12 +78,13 @@ the scope is missed, so **the scope is the isolation boundary**.
 - Is it *both* (shared row, per-shop attributes)? → that is the overlay pattern, and it is
   rejected (rule 5). Duplicate the row per shop instead.
 
-**No foreign key crosses a shop boundary.** A tenant-owned row may reference another row
-of the same shop, or genuinely global reference data (`delivery_townships`) — never
-another shop's row. This is not only a correctness rule: it is what keeps "export one
-shop" a clean operation, and therefore what keeps the option of moving a large shop to its
-own instance affordable (ADR-0002, Ramp 5). Breaking it is expensive in a way that will not
-show up in any test.
+**No foreign key crosses a shop boundary. No exceptions.** A tenant-owned row may
+reference another row of the same shop — never another shop's row, and there is no
+global-reference carve-out, because rule 5 means there is no global tenant data to carve
+out. An order's `delivery_township_id` points at that shop's own township row. This is not
+only a correctness rule: it is what keeps "export one shop" a clean operation, and
+therefore what keeps the option of moving a large shop to its own instance affordable
+(ADR-0002, Ramp 5). Breaking it is expensive in a way that will not show up in any test.
 
 **A natural key that was unique is probably now unique-per-shop.** A slug, a promo code,
 a brand name — two shops must both be able to have "Chanel". Check every `unique()` in
