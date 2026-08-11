@@ -54,7 +54,8 @@ the current seam.
 
 **Pros:** Meets N1/N2 (~$12/mo total). F6 — onboarding is a row insert, not a deployment.
 `api.cornerarea.me` can point at the one app (N7). Cross-shop studio views (F2) are a
-query, not a fan-out. 2,126 lines of it already exist and the isolation test is real.
+query, not a fan-out. PR #58 already carries it — a ~770-line seam commit inside a ~2,100-line PR — and the
+isolation test is real.
 **Cons:** Isolation is enforced by code, not by infrastructure. A noisy shop shares a dyno
 with everyone. A per-shop restore from backup is genuinely hard.
 
@@ -162,9 +163,11 @@ These are already true. Keeping them true is the whole cost of holding the optio
 
 - Every tenant-owned table keeps its `shop_id`. No exceptions, including tables that feel
   obviously single-shop at the time.
-- **No foreign key crosses a shop boundary**, except into genuinely global reference data
-  (`delivery_townships`). This is what makes "select everything for shop N" a clean,
-  self-consistent export. It is the single most important property on this list.
+- **No foreign key crosses a shop boundary. No exceptions.** Not even geography —
+  `delivery_townships` is tenant-owned and duplicated per shop (design-doc §7), so an
+  order's township FK is always same-shop. This is what makes "select everything for shop
+  N" a clean, self-consistent export, and the per-shop-geography decision is what keeps
+  the rule exception-free. It is the single most important property on this list.
 - Storage stays prefixed by shop (`{shop}/...` in R2, public and private).
 - Cache keys, Telegram credentials, and any future third-party credential stay per-shop.
 - The `withoutTenancy()` budget stays enumerated in design-doc §8. Every call site is a

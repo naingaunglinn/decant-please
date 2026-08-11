@@ -56,18 +56,27 @@ the scope is missed, so **the scope is the isolation boundary**.
    an architecture decision — propose it, don't just write it.
 4. **`Shop` itself is not tenant-owned.** It carries no `shop_id` and uses no trait; it is
    what everything else scopes *to*.
-5. **Geography is global, pricing is per-shop.** `delivery_townships` rows are shared;
-   fee and activation are per-shop. Don't "fix" that asymmetry — it's deliberate.
+5. **There is no global tenant data — not even geography.** `delivery_townships` and
+   `delivery_township_couriers` both carry `shop_id` and both use the trait; the unique is
+   `(shop_id, region, name)`. The national township CSV is *copied into each shop* at
+   onboarding. Township identity is genuinely national, so a global reference table with a
+   `(shop_id, township_id)` pricing overlay is the more normalized model — and it was
+   **rejected deliberately** (design-doc §7): the overlay forks the seam's one mechanism
+   into two, adds a read-time join everywhere, and rewrites v21's shipped admin UI,
+   checkout lookup, and public API to buy normalization of ~228 rows. Do not reintroduce
+   it, and do not "fix" the duplication.
 6. **Tracking codes are globally unique** across shops even though lookup is shop-scoped.
 
 **Adding a new model — decide tenancy first, before writing the migration**
 
 - Does a row belong to exactly one shop? → `shop_id` column (indexed, FK to `shops`) +
   `use BelongsToShop` + an isolation test.
-- Is it reference data every shop reads identically? → global, no `shop_id`, and say so in
-  the PR description with a sentence on why.
-- Is it *both* (shared row, per-shop attributes)? → follow the delivery-zones pattern:
-  global entity, per-shop pivot.
+- Does it look like reference data every shop reads identically? → **it still gets
+  `shop_id`.** That case has come up once (delivery townships) and was resolved by
+  duplicating per shop, not by going global. One mechanism, no exceptions. If you think you
+  have found a genuine exception, stop and propose it — do not implement it.
+- Is it *both* (shared row, per-shop attributes)? → that is the overlay pattern, and it is
+  rejected (rule 5). Duplicate the row per shop instead.
 
 **No foreign key crosses a shop boundary.** A tenant-owned row may reference another row
 of the same shop, or genuinely global reference data (`delivery_townships`) — never

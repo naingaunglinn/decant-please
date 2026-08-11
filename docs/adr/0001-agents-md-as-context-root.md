@@ -6,10 +6,16 @@
 
 ## Context
 
-The repo's always-on agent context is a single root `CLAUDE.md`: 893 lines, ~8,600 words.
-Of those, **594 lines (67%) are changelog** — nineteen "What changed in vN" sections from
-v2 through v22. The durable material (what the project is, stack, design language, domain
-model, feature list, conventions, out-of-scope) starts at line 600.
+The repo's always-on agent context is a single root `CLAUDE.md`. At v22 it was 893 lines,
+of which **594 (67%) were changelog** — nineteen "What changed in vN" sections. On the
+multi-tenancy branch (v23) it is 923 lines with 616 of changelog across twenty sections.
+The ratio is stable and the file only grows: **every version adds history to a file that
+loads on every turn.** The durable material — what the project is, stack, design language,
+domain model, feature list, conventions, out-of-scope — begins at the `## 1. What this
+project is` heading, roughly two-thirds of the way down.
+
+(Exact counts are quoted as of v22/v23 and will drift. Anything that needs the split point
+should find it by that heading, never by line number.)
 
 Three consequences follow:
 
@@ -135,7 +141,9 @@ Option C is rejected on proportionality, not principle.
 4. [ ] Extract `PRODUCT.md` from §1, §5, §6, §8 + the domain model
 5. [ ] Write `backend/AGENTS.md`; extend `frontend/AGENTS.md` **below** the
        `<!-- END:nextjs-agent-rules -->` marker (the block above it is regenerated on upgrade)
-6. [ ] Add `typecheck`, `test`, `verify` scripts to `frontend/package.json`
+6. [ ] Add `typecheck` and `verify` scripts to `frontend/package.json`. (Not `test` —
+       there is no unit-test runner on the frontend, and adding an empty one would make
+       a green `npm test` mean nothing. Browser evidence is the frontend's test suite.)
 7. [ ] Add step 4a "plan before implementing" to `prompts/WORKFLOW.md`
 8. [ ] Amend WORKFLOW step 5 to write changelog entries to `CHANGELOG.md`, not `CLAUDE.md`
 9. [ ] Run one existing prompt file end-to-end through the new environment and compare

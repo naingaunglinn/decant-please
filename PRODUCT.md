@@ -67,7 +67,12 @@ expenses/P&L, delivery zones). See `README.md` for the current built list.
 - `TenantContext::withoutTenancy()` is a **budgeted** escape hatch. Every call site is
   listed in the design doc §8 and asserted in `TenantIsolationTest`. Adding one is a
   design decision, not an implementation detail.
-- Geography (townships) is global; **price and activation are per-shop**.
+- **Every tenant table gets `shop_id` + `BelongsToShop`, with no exceptions** — including
+  `delivery_townships`. Township *identity* is national, but the geography is **duplicated
+  per shop** and the national CSV is copied into each shop at onboarding. The more
+  normalized alternative (global geography + a `(shop_id, township_id)` pricing overlay)
+  was considered and **deliberately rejected**: it forks the seam's one mechanism. Do not
+  reintroduce it.
 - Tracking codes stay globally unique across shops, even though lookup is shop-scoped.
 
 **Everything else, unchanged**

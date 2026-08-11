@@ -32,6 +32,27 @@ keep editing. See `AGENTS.md` § 9.
 | A migration | `php artisan migrate:fresh --seed` then `composer test` | seeders feed the browser checks |
 | Money anywhere — including "just formatting" | `composer test` + the money-touching Feature tests, named individually | currency bugs hide in cosmetic changes |
 
+## Known-red baseline — read before you "fix" a failure
+
+`npm run lint` currently exits **1** on four pre-existing `react-hooks/set-state-in-effect`
+errors:
+
+```
+src/components/catalog/FilterControls.tsx:229
+src/components/checkout/OrderCompleteClient.tsx:53
+src/components/checkout/OrderSummaryCard.tsx:86
+src/lib/cart-context.tsx:46
+```
+
+They predate this environment. The Definition of Done says lint passes, so **the bar until
+they are fixed is: no *new* lint errors, and these four unchanged.** Do not "fix" them as a
+side effect of unrelated work — `cart-context.tsx` is the cart's state seam and
+`OrderSummaryCard` touches money display. Clearing them is its own task with its own
+verification, and it is a good first candidate to run through the full loop.
+
+Update this section to say "clean" the day they are gone. A known-red baseline that nobody
+prunes becomes a permanently ignored check.
+
 ## Running the browser checks
 
 They drive real Chromium against a running stack, so bring the stack up first:
