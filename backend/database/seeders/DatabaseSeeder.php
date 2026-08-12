@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
 
         User::updateOrCreate(
             ['email' => 'admin@decantplease.local'],
-            ['name' => 'Admin', 'password' => Hash::make($password)],
+            ['name' => 'Admin', 'password' => Hash::make($password), 'is_studio' => true],
         );
 
         // Pin the default shop before any tenant-owned seeding — the child seeders

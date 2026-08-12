@@ -6,6 +6,8 @@ use App\Events\OrderPlaced;
 use App\Events\PaymentProofUploaded;
 use App\Listeners\NotifyAdminOfNewOrder;
 use App\Listeners\NotifyAdminOfPaymentProof;
+use App\Listeners\SyncTenantContextFromFilament;
+use Filament\Events\TenantSet;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -58,5 +60,9 @@ class AppServiceProvider extends ServiceProvider
         // isn't registered here silently never runs.
         Event::listen(OrderPlaced::class, NotifyAdminOfNewOrder::class);
         Event::listen(PaymentProofUploaded::class, NotifyAdminOfPaymentProof::class);
+
+        // Multi-tenancy Step 25a: mirror Filament's resolved panel tenant into our
+        // own TenantContext so the app scope stays the single source of truth.
+        Event::listen(TenantSet::class, SyncTenantContextFromFilament::class);
     }
 }

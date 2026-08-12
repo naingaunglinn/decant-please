@@ -44,6 +44,12 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            // Multi-tenancy Step 25a: the panel is now tenant-aware. Routes become
+            // /admin/{shop}/…; the shop is resolved from the slug, the switcher is
+            // rendered from the user's getTenants(), and IdentifyTenant enforces
+            // canAccessTenant. Our SyncTenantContextFromFilament listener mirrors the
+            // resolved tenant into TenantContext (AppServiceProvider).
+            ->tenant(\App\Models\Shop::class, slugAttribute: 'slug')
             ->brandName('Decant Please!')
             ->colors([
                 'primary' => Color::Amber,
@@ -88,11 +94,6 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            // Interim tenant resolution for the panel (multi-tenancy Step 23 §5).
-            // isPersistent so Livewire's widget-refresh AJAX carries the tenant too —
-            // the vendor's own tenancy warning (findings Q3). Replaced by Filament
-            // tenancy in Step 25.
-            ->middleware([\App\Http\Middleware\SetDefaultTenant::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);
