@@ -1,12 +1,23 @@
-# Decant Please! — `/api/v1` contract
+# Decant Please! — `/api/v1/{shop}` contract
 
-The complete public API surface: eight endpoints under `https://<api-host>/api/v1`,
-all JSON. This is what the Next.js storefront consumes today and what any future
-client (the decanter's possible Flutter app) would consume as-is — the API is already
-stateless: no cookies, no sessions, no customer accounts, `supports_credentials`
-disabled in CORS. For order endpoints, *possession of the tracking code + phone pair
-is the authentication*. CORS allows only the `FRONTEND_URL` origin, which constrains
-browsers but not native clients.
+The complete public API surface: nine endpoints under
+`https://<api-host>/api/v1/{shop}`, all JSON. This is what the Next.js storefront
+consumes today and what any future client (the decanter's possible Flutter app) would
+consume as-is — the API is already stateless: no cookies, no sessions, no customer
+accounts, `supports_credentials` disabled in CORS. For order endpoints, *possession of
+the tracking code + phone pair is the authentication*. CORS allows only the
+`FRONTEND_URL` origins (comma-separated), which constrains browsers but not native
+clients.
+
+**Tenant in the path (multi-tenancy Step 24).** Every endpoint below is prefixed with
+a `{shop}` slug: `GET /api/v1/{shop}/fragrances`, `POST /api/v1/{shop}/orders`, and so
+on. The slug selects which decant shop the request is for; the storefront pins it once
+(one storefront serves exactly one shop). An unknown or inactive `{shop}` returns the
+same generic **404** as a bad tracking lookup — it is not a shop-enumeration oracle
+beyond what the storefront URL already reveals. Response shapes are unchanged from the
+pre-prefix API; only the path gained the segment. The ninth endpoint is
+`GET /api/v1/{shop}/delivery-zones` (the serviceable township tree). `/up` (health)
+stays unprefixed.
 
 This file documents **current behavior**, verified against the controllers — if the
 code and this file disagree, the code is right and this file needs a PR.

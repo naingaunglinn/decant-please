@@ -77,7 +77,7 @@ class PaymentMethodTest extends TestCase
         $this->checkout($price, method: 'online', proof: UploadedFile::fake()->image('slip.jpg'));
         $order = Order::firstOrFail();
 
-        $this->getJson('/api/v1/orders/track?'.http_build_query([
+        $this->getJson('/api/v1/decant-please/orders/track?'.http_build_query([
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
         ]))
@@ -134,7 +134,7 @@ class PaymentMethodTest extends TestCase
         ]);
         Cache::flush();
 
-        $this->getJson('/api/v1/meta')
+        $this->getJson('/api/v1/decant-please/meta')
             ->assertOk()
             ->assertJsonPath('payment.kbzpay_name', 'Daw Mya')
             ->assertJsonPath('payment.kbzpay_number', '09-777000111') // DB wins over env
@@ -144,11 +144,11 @@ class PaymentMethodTest extends TestCase
     public function test_saving_settings_busts_the_meta_cache(): void
     {
         Cache::flush();
-        $this->getJson('/api/v1/meta')->assertOk(); // primes the cache (payment = null)
+        $this->getJson('/api/v1/decant-please/meta')->assertOk(); // primes the cache (payment = null)
 
         ShopSetting::current()->update(['kbzpay_number' => '09-555']);
 
-        $this->getJson('/api/v1/meta')->assertOk()->assertJsonPath('payment.kbzpay_number', '09-555');
+        $this->getJson('/api/v1/decant-please/meta')->assertOk()->assertJsonPath('payment.kbzpay_number', '09-555');
     }
 
     // ---- Admin: the Payment settings page -----------------------------------
@@ -207,7 +207,7 @@ class PaymentMethodTest extends TestCase
 
         // A slip means multipart; otherwise plain JSON (COD path).
         return $proof
-            ? $this->post('/api/v1/orders', $payload + ['proof' => $proof], ['Accept' => 'application/json'])
-            : $this->postJson('/api/v1/orders', $payload);
+            ? $this->post('/api/v1/decant-please/orders', $payload + ['proof' => $proof], ['Accept' => 'application/json'])
+            : $this->postJson('/api/v1/decant-please/orders', $payload);
     }
 }

@@ -322,7 +322,7 @@ class TelegramAlertTest extends TestCase
 
     private function uploadProof(Order $order)
     {
-        return $this->postJson('/api/v1/orders/payment-proof', [
+        return $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
             'proof' => UploadedFile::fake()->image('slip.jpg'),
@@ -355,7 +355,7 @@ class TelegramAlertTest extends TestCase
 
         // A slip means multipart; otherwise plain JSON — same split real clients make.
         return $proof
-            ? $this->post('/api/v1/orders', $payload + ['proof' => $proof], ['Accept' => 'application/json'])
-            : $this->postJson('/api/v1/orders', $payload);
+            ? $this->post('/api/v1/decant-please/orders', $payload + ['proof' => $proof], ['Accept' => 'application/json'])
+            : $this->postJson('/api/v1/decant-please/orders', $payload);
     }
 }

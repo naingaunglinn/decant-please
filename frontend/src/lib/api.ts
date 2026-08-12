@@ -12,7 +12,18 @@ import type {
   PromoPreview,
 } from "./types";
 
-const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api"}/v1`;
+// Multi-tenancy Step 24: a storefront serves exactly one shop, pinned by its slug
+// in the API path (/api/v1/{shop}/…). Every helper routes through BASE, so this one
+// line is the whole client change.
+//
+// NOTE: the spec calls for failing the build when NEXT_PUBLIC_SHOP_SLUG is unset (a
+// storefront pointed at no shop is a misconfiguration). That flip is deferred until
+// each Vercel storefront has the var provisioned — for now it defaults to the sole
+// shop so an un-provisioned preview still builds. Set NEXT_PUBLIC_SHOP_SLUG per
+// deployment (matching the backend's SHOP_SLUG) once a second storefront exists.
+const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? "decant-please";
+
+const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api"}/v1/${SHOP_SLUG}`;
 
 /** Thrown on 422s so callers can surface per-field / per-item messages. */
 export class ApiValidationError extends Error {

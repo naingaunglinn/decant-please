@@ -39,7 +39,7 @@ class DeliveryZoneTest extends TestCase
     {
         $township = $this->serviceableTownship(fee: 2000, name: 'Sanchaung', nameMm: 'စမ်းချောင်း');
 
-        $response = $this->postJson('/api/v1/orders', $this->payload([
+        $response = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'delivery_township_id' => $township->id,
             'delivery_fee_mmk' => 1,          // smuggled — must be ignored
             'address' => 'smuggled address',  // no longer accepted — must be ignored
@@ -78,7 +78,7 @@ class DeliveryZoneTest extends TestCase
         ]);
 
         foreach ([999999, $inactive->id, $deadZone->id, $suspended->id] as $townshipId) {
-            $this->postJson('/api/v1/orders', $this->payload(['delivery_township_id' => $townshipId]))
+            $this->postJson('/api/v1/decant-please/orders', $this->payload(['delivery_township_id' => $townshipId]))
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors(['delivery_township_id']);
         }
@@ -91,7 +91,7 @@ class DeliveryZoneTest extends TestCase
     {
         $free = $this->serviceableTownship(fee: 0, name: 'Kamayut');
 
-        $this->postJson('/api/v1/orders', $this->payload(['delivery_township_id' => $free->id]))
+        $this->postJson('/api/v1/decant-please/orders', $this->payload(['delivery_township_id' => $free->id]))
             ->assertCreated()
             ->assertJsonPath('delivery_fee_mmk', 0)
             ->assertJsonPath('total_mmk', 55000);
@@ -101,7 +101,7 @@ class DeliveryZoneTest extends TestCase
     {
         $township = $this->serviceableTownship(name: 'Dagon');
 
-        $code = $this->postJson('/api/v1/orders', $this->payload([
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'delivery_township_id' => $township->id,
             'address_extra' => null,
         ]))->assertCreated()->json('tracking_code');
@@ -118,7 +118,7 @@ class DeliveryZoneTest extends TestCase
     {
         $township = $this->serviceableTownship(fee: 2000, name: 'Insein');
 
-        $code = $this->postJson('/api/v1/orders', $this->payload(['delivery_township_id' => $township->id]))
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload(['delivery_township_id' => $township->id]))
             ->assertCreated()->json('tracking_code');
         $order = Order::where('tracking_code', $code)->firstOrFail();
 
@@ -144,19 +144,19 @@ class DeliveryZoneTest extends TestCase
         $township = $this->serviceableTownship(fee: 2000, name: 'Sanchaung');
         $township->couriers()->first()->update(['cost_mmk' => 1500]);
 
-        $zones = $this->getJson('/api/v1/delivery-zones')->assertOk();
+        $zones = $this->getJson('/api/v1/decant-please/delivery-zones')->assertOk();
         foreach (['courier', 'cost', 'Royal', 'Bee', 'district'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $zones->getContent());
         }
 
-        $checkout = $this->postJson('/api/v1/orders', $this->payload(['delivery_township_id' => $township->id]))
+        $checkout = $this->postJson('/api/v1/decant-please/orders', $this->payload(['delivery_township_id' => $township->id]))
             ->assertCreated();
         $this->assertStringNotContainsString('courier', strtolower($checkout->getContent()));
 
         $order = Order::where('tracking_code', $checkout->json('tracking_code'))->firstOrFail();
         $order->update(['delivery_courier' => Courier::RoyalExpress]);
 
-        $track = $this->getJson('/api/v1/orders/track?tracking_code='.$order->tracking_code.'&phone=09-771234561')
+        $track = $this->getJson('/api/v1/decant-please/orders/track?tracking_code='.$order->tracking_code.'&phone=09-771234561')
             ->assertOk();
         $this->assertStringNotContainsString('courier', strtolower($track->getContent()));
 
@@ -221,7 +221,7 @@ class DeliveryZoneTest extends TestCase
     public function test_accept_records_the_courier_choice(): void
     {
         $township = $this->serviceableTownship(name: 'Thaketa');
-        $code = $this->postJson('/api/v1/orders', $this->payload(['delivery_township_id' => $township->id]))
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload(['delivery_township_id' => $township->id]))
             ->assertCreated()->json('tracking_code');
         $order = Order::where('tracking_code', $code)->firstOrFail();
 
@@ -246,7 +246,7 @@ class DeliveryZoneTest extends TestCase
 
         DeliveryTownship::create(['region' => 'yangon', 'name' => 'Cocokyun', 'is_active' => true]);
 
-        $response = $this->getJson('/api/v1/delivery-zones')->assertOk();
+        $response = $this->getJson('/api/v1/decant-please/delivery-zones')->assertOk();
         $this->assertSame(
             [['value' => 'yangon', 'label' => 'Yangon Region']],
             collect($response->json('regions'))->map(fn (array $region) => [
@@ -259,12 +259,12 @@ class DeliveryZoneTest extends TestCase
 
         // a reprice reaches the storefront immediately — the save busts the cache
         $served->update(['fee_mmk' => 2500]);
-        $this->getJson('/api/v1/delivery-zones')
+        $this->getJson('/api/v1/decant-please/delivery-zones')
             ->assertJsonPath('regions.0.townships.0.fee_mmk', 2500);
 
         // ...and so does a courier row change, since it flips serviceability
         $served->couriers()->first()->update(['is_available' => false]);
-        $this->getJson('/api/v1/delivery-zones')->assertJsonPath('regions', []);
+        $this->getJson('/api/v1/decant-please/delivery-zones')->assertJsonPath('regions', []);
     }
 
     // ---- Legacy orders keep rendering ---------------------------------------
@@ -287,7 +287,7 @@ class DeliveryZoneTest extends TestCase
         $html = view('pdf.invoice', ['order' => $legacy->loadMissing('items')])->render();
         $this->assertStringContainsString('Free-text address from a DM', $html);
 
-        $this->getJson('/api/v1/orders/track?tracking_code='.$legacy->tracking_code.'&phone=09-771234561')
+        $this->getJson('/api/v1/decant-please/orders/track?tracking_code='.$legacy->tracking_code.'&phone=09-771234561')
             ->assertOk()
             ->assertJsonPath('address', 'Free-text address from a DM, Yangon');
     }

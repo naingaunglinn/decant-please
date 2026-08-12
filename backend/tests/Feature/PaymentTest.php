@@ -98,7 +98,7 @@ class PaymentTest extends TestCase
         config()->set('app.payment.instructions', 'Note your order number.');
         Cache::flush(); // /meta is cached
 
-        $this->getJson('/api/v1/meta')
+        $this->getJson('/api/v1/decant-please/meta')
             ->assertOk()
             ->assertJsonPath('payment.kbzpay_name', 'Daw Mya')
             ->assertJsonPath('payment.kbzpay_number', '09-777000111')
@@ -113,7 +113,7 @@ class PaymentTest extends TestCase
         }
         Cache::flush();
 
-        $this->getJson('/api/v1/meta')->assertOk()->assertJsonPath('payment', null);
+        $this->getJson('/api/v1/decant-please/meta')->assertOk()->assertJsonPath('payment', null);
     }
 
     public function test_customer_uploads_payment_proof_with_matching_code_and_phone(): void
@@ -122,7 +122,7 @@ class PaymentTest extends TestCase
         Storage::fake(config('filesystems.media_disk'));
         $order = $this->order();
 
-        $this->postJson('/api/v1/orders/payment-proof', [
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
             'proof' => UploadedFile::fake()->image('transfer.jpg'),
@@ -145,13 +145,13 @@ class PaymentTest extends TestCase
         $this->fakeProofsDisk();
         $order = $this->order();
 
-        $upload = $this->postJson('/api/v1/orders/payment-proof', [
+        $upload = $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
             'proof' => UploadedFile::fake()->image('transfer.jpg'),
         ])->assertOk();
 
-        $track = $this->getJson('/api/v1/orders/track?'.http_build_query([
+        $track = $this->getJson('/api/v1/decant-please/orders/track?'.http_build_query([
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
         ]))->assertOk()->assertJsonPath('has_payment_proof', true);
@@ -170,7 +170,7 @@ class PaymentTest extends TestCase
         $this->fakeProofsDisk();
         $order = $this->order();
 
-        $this->postJson('/api/v1/orders/payment-proof', [
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code,
             'phone' => '09-000000000', // wrong phone
             'proof' => UploadedFile::fake()->image('transfer.jpg'),
@@ -184,7 +184,7 @@ class PaymentTest extends TestCase
         $this->fakeProofsDisk();
         $order = $this->order();
 
-        $this->postJson('/api/v1/orders/payment-proof', [
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
             'proof' => UploadedFile::fake()->create('transfer.pdf', 100, 'application/pdf'),
@@ -196,13 +196,13 @@ class PaymentTest extends TestCase
         $disk = $this->fakeProofsDisk();
         $order = $this->order();
 
-        $this->postJson('/api/v1/orders/payment-proof', [
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
             'proof' => UploadedFile::fake()->image('first.jpg'),
         ])->assertOk();
         $first = $order->fresh()->payment_proof_path;
 
-        $this->postJson('/api/v1/orders/payment-proof', [
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
             'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
             'proof' => UploadedFile::fake()->image('second.jpg'),
         ])->assertOk();
@@ -218,7 +218,7 @@ class PaymentTest extends TestCase
         $order = $this->order(total: 55000, deposit: 5000);
         $order->markPaid();
 
-        $this->getJson('/api/v1/orders/track?'.http_build_query([
+        $this->getJson('/api/v1/decant-please/orders/track?'.http_build_query([
             'tracking_code' => $order->tracking_code,
             'phone' => $order->phone,
         ]))
