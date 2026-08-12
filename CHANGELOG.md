@@ -9,7 +9,39 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v23
+## 0. What changed in v24
+
+**v24** *builds* the multi-tenancy seam and routing that v23 specified (issue #57,
+`prompts/23-multi-tenancy-seam.md` + `24-multi-tenancy-routing.md`). The backend is now
+tenant-aware; behaviour is unchanged for the single existing shop.
+
+- **Step 23 — the seam.** A `Shop` model + `shops` table; `shop_id` on all ten
+  tenant-owned tables, backfilled to the one existing shop in-migration;
+  `brands.name`/`.slug`, `fragrances.slug`, and `delivery_townships(region,name)` become
+  shop-scoped composite uniques (so a second shop can sell "Chanel" and ship to "Bahan").
+  `TenantContext` + `BelongsToShop` install a global scope that **throws
+  `TenantNotSetException`** when no tenant is set (never a silent all-shops read), qualifies
+  `shop_id` for the TopFragrances join, and auto-fills `shop_id` on create. Tracking codes
+  stay globally unique via the one budgeted `withoutTenancy()` dedup. Per-shop cache keys
+  (`api.meta`/`brands`/`delivery-zones` → `.{slug}`) and busts; `decant:fresh-start --shop`
+  (now also clears the shop's expenses). `TenantIsolationTest` asserts exact-count isolation
+  across catalog, tracking, expenses, zones, both-shops-"Chanel", unscoped-throws, and
+  per-shop cache busting.
+- **Step 24 — the shop in the path.** All nine public endpoints move under
+  `/api/v1/{shop}/…`; `ResolveTenant` binds the tenant from the slug and 404s (generic) on
+  unknown/inactive — no shop-enumeration oracle beyond the URL. The interim default-tenant
+  middleware is dropped on the API side (the panel keeps its own until Step 25). Storefront
+  `lib/api.ts` folds `NEXT_PUBLIC_SHOP_SLUG` into its base URL; CORS accepts a
+  comma-separated `FRONTEND_URL`. Response shapes unchanged — only the path gained the
+  segment. `verify-postgres-portability.sh` and its CI step target `/api/v1/{shop}`.
+- **Deferred, deliberately:** `{shop}/` storage-path prefixes (inert until a second shop
+  exists — collision is impossible with one shop) and the fail-on-unset guard for
+  `NEXT_PUBLIC_SHOP_SLUG` (until each Vercel storefront provisions it). Step 25 (Filament
+  tenancy, shop CRUD, per-tenant Telegram, theming) stays deferred until a real second client.
+- Both CI jobs exercise the tenant paths: the SQLite suite (incl. `TenantIsolationTest` and
+  `ResolveTenantTest`) and the Postgres portability check.
+
+## 0.1 What changed in v23
 
 **v23** brings the multi-tenancy **spec** (issue #57) onto current develop — docs
 only, nothing built. The design lives in `prompts/multi-tenancy-design.md` (audit

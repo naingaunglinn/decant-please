@@ -5,13 +5,14 @@
 # inside an ORDER BY expression. A green suite over broken search is exactly what this
 # exists to prevent, so it drives the running stack instead.
 #
-#   [API=http://localhost:8010/api/v1] sh backend/scripts/verify-postgres-portability.sh
+#   [API=http://localhost:8010/api/v1/decant-please] sh backend/scripts/verify-postgres-portability.sh
 #
 # Run it against a stack on the real engine (`docker compose up`). Exits non-zero on
-# any failure.
+# any failure. The API base includes the {shop} segment (multi-tenancy Step 24) — the
+# default targets the seeded `decant-please` shop.
 set -u
 
-API="${API:-http://localhost:8010/api/v1}"
+API="${API:-http://localhost:8010/api/v1/decant-please}"
 failures=0
 
 pass() { echo "PASS  $1"; }
