@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -28,6 +29,14 @@ abstract class TestCase extends BaseTestCase
             );
 
             app(TenantContext::class)->set($shop);
+
+            // Under Filament tenancy (Step 25a) every panel route carries {tenant}
+            // (/admin/{shop}/…). A test that renders a panel page generates those URLs,
+            // so the param needs a value — register it as a URL default. Data scoping is
+            // handled separately by TenantContext above; this is URL generation only,
+            // and avoids Filament::setTenant() (which fires TenantSet with a null user
+            // when no one is authenticated).
+            URL::defaults(['tenant' => $shop->slug]);
         }
     }
 
