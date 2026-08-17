@@ -64,11 +64,15 @@ class FreshStart extends Command
             // order_items FK-protects fragrances (restrictOnDelete), so items go first
             OrderItem::query()->delete();
             // Bulk delete fires no model events, so the per-order deleting hook
-            // that removes proof objects never runs here — and every order is
-            // going anyway, so wipe the proofs directory. NOTE: {shop}/ storage
-            // prefixing is deferred (inert until a second shop — Step 25), so this
-            // stays the un-prefixed directory matching the current write sites.
-            Storage::disk(config('filesystems.proofs_disk'))->deleteDirectory('payment-proofs');
+            // that removes proof objects never runs here — delete THIS shop's
+            // proofs by their stored paths (the fragrance-image pattern below).
+            // Never a directory wipe: the proofs tree is shared storage, so a
+            // directory delete would destroy every shop's files (step 32), and
+            // stored paths cover both eras — objects written before the
+            // shops/{id}/ prefix landed as well as after.
+            $proofsDisk = Storage::disk(config('filesystems.proofs_disk'));
+            Order::query()->whereNotNull('payment_proof_path')->pluck('payment_proof_path')
+                ->each(fn (string $path) => $proofsDisk->delete($path));
             Order::query()->delete();
             DecantPrice::query()->delete();
 

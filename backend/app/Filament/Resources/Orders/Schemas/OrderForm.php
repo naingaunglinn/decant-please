@@ -12,6 +12,7 @@ use App\Models\DeliveryTownship;
 use App\Models\Fragrance;
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\TenantContext;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -262,7 +263,8 @@ class OrderForm
                     ->label('Payment proof')
                     ->image()
                     ->disk(config('filesystems.proofs_disk'))
-                    ->directory('payment-proofs')
+                    // shops/{id}/ prefix (step 32) — see BrandForm
+                    ->directory(fn (): string => 'shops/'.app(TenantContext::class)->id().'/payment-proofs')
                     ->visibility('private')
                     ->maxSize(4096)
                     // The proofs disk has no public URL, and Filament's default

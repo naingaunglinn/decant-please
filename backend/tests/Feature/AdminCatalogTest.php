@@ -10,6 +10,7 @@ use App\Filament\Resources\Fragrances\Pages\ListFragrances;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -56,7 +57,8 @@ class AdminCatalogTest extends TestCase
         $brand = Brand::where('name', 'Xerjoff')->firstOrFail();
         $this->assertSame('xerjoff', $brand->slug);
         $this->assertNotNull($brand->logo_path);
-        $this->assertStringStartsWith('brands/', $brand->logo_path);
+        // shops/{id}/ prefix since step 32 — uploads land under the current shop
+        $this->assertStringStartsWith('shops/'.app(TenantContext::class)->id().'/brands/', $brand->logo_path);
         Storage::disk('public')->assertExists($brand->logo_path);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Brands\Schemas;
 
 use App\Enums\BrandType;
+use App\Support\TenantContext;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -42,7 +43,9 @@ class BrandForm
                     ->image()
                     ->imageEditor()
                     ->disk(config('filesystems.media_disk'))
-                    ->directory('brands')
+                    // shops/{id}/ prefix (step 32): per-shop archive/delete stays
+                    // surgical. A closure, so the tenant is read at upload time.
+                    ->directory(fn (): string => 'shops/'.app(TenantContext::class)->id().'/brands')
                     ->maxSize(2048),
                 Toggle::make('is_active')
                     ->default(true),
