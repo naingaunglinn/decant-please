@@ -1,33 +1,34 @@
 <?php
 
-namespace App\Filament\Resources\Shops;
+namespace App\Filament\Studio\Resources\Shops;
 
-use App\Filament\Resources\Shops\Pages\ManageShops;
-use App\Filament\Resources\Shops\Schemas\ShopForm;
-use App\Filament\Resources\Shops\Tables\ShopsTable;
+use App\Filament\Studio\Resources\Shops\Pages\ManageShops;
+use App\Filament\Studio\Resources\Shops\Schemas\ShopForm;
+use App\Filament\Studio\Resources\Shops\Tables\ShopsTable;
 use App\Models\Shop;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use UnitEnum;
 
 /**
- * Multi-tenancy Step 25a: the studio's shop registry. Shop is the tenant *root*, not
- * a tenant-owned model, so this resource is NOT scoped to the current tenant — it
- * lists every shop. Studio founders only (canAccess): a shop owner never sees or
- * manages another shop.
+ * The studio's shop registry, living in the studio panel (/studio) — the
+ * super-admin home that is not inside any shop. Shop is the tenant *root*, not a
+ * tenant-owned model, so this lists every shop. Two gates, belt and braces:
+ * User::canAccessPanel keeps non-studio users out of the whole panel, and
+ * canAccess() below keeps this resource studio-only even if it were ever
+ * re-registered elsewhere.
  */
 class ShopResource extends Resource
 {
     protected static ?string $model = Shop::class;
 
+    // Moot in the (tenant-free) studio panel, but a correct claim wherever this
+    // resource lands: Shop must never be narrowed to a current tenant.
     protected static bool $isScopedToTenant = false;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
-
-    protected static string|UnitEnum|null $navigationGroup = 'Studio';
 
     protected static ?int $navigationSort = 1;
 

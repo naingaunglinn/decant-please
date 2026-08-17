@@ -25,7 +25,14 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // Every user is an operator — customers never get accounts (PRODUCT.md non-goals).
+        // The studio panel (/studio) is the super-admin home — is_studio only.
+        // The tenant panel (/admin/{shop}) admits any operator account; WHICH
+        // shops they can enter is canAccessTenant's job, not this one's.
+        // Customers never get accounts either way (PRODUCT.md non-goals).
+        if ($panel->getId() === 'studio') {
+            return $this->is_studio;
+        }
+
         return true;
     }
 
