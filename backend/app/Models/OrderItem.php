@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToShop;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['order_id', 'fragrance_id', 'fragrance_name_snapshot', 'size_ml', 'unit_price_mmk', 'unit_cost_mmk', 'quantity', 'line_total_mmk', 'line_cost_mmk'])]
 class OrderItem extends Model
 {
+    use BelongsToShop;
+
     protected static function booted(): void
     {
         static::saving(function (self $item) {

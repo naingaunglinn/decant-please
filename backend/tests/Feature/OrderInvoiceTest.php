@@ -23,7 +23,7 @@ class OrderInvoiceTest extends TestCase
     {
         $order = $this->fulfillableOrder();
 
-        $response = $this->get(route('filament.admin.orders.invoice', $order));
+        $response = $this->get(route('filament.admin.orders.invoice', ['order' => $order]));
 
         $response->assertRedirect();
         $this->assertStringContainsString('/admin/login', $response->headers->get('Location'));
@@ -34,7 +34,7 @@ class OrderInvoiceTest extends TestCase
         $this->actingAs($this->admin());
         $order = $this->fulfillableOrder();
 
-        $response = $this->get(route('filament.admin.orders.invoice', $order));
+        $response = $this->get(route('filament.admin.orders.invoice', ['order' => $order]));
 
         $response->assertOk();
         $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
@@ -55,8 +55,8 @@ class OrderInvoiceTest extends TestCase
         $awaiting = $this->fulfillableOrder(OrderStatus::AwaitingConfirmation);
         $rejected = $this->fulfillableOrder(OrderStatus::Rejected);
 
-        $this->get(route('filament.admin.orders.invoice', $awaiting))->assertNotFound();
-        $this->get(route('filament.admin.orders.invoice', $rejected))->assertNotFound();
+        $this->get(route('filament.admin.orders.invoice', ['order' => $awaiting]))->assertNotFound();
+        $this->get(route('filament.admin.orders.invoice', ['order' => $rejected]))->assertNotFound();
     }
 
     public function test_invoice_actions_visible_only_for_fulfillable_orders(): void
@@ -188,11 +188,7 @@ class OrderInvoiceTest extends TestCase
 
     private function admin(): User
     {
-        return User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]);
+        return $this->studioUser();
     }
 
     private function catalogPrice(): DecantPrice

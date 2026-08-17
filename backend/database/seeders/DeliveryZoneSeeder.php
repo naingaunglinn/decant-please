@@ -2,9 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Enums\Courier;
 use App\Enums\Region;
 use App\Models\DeliveryTownship;
+use App\Support\NationalGeography;
+use App\Support\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
 
@@ -13,108 +14,33 @@ use Illuminate\Support\Facades\Cache;
  * ("Last Updated 1/8/2026" — committed as database/data/preview.webp; the
  * chart is perishable, so re-check it when the decanter next reviews fees).
  *
- * - delivery-townships.csv → township + an OPEN RoyalX route row.
- * - delivery-townships-suspended.csv → township + a CLOSED RoyalX route row
- *   (is_available false): suspended is a state that reverses, unserved is not.
- * - Every row lands inactive at fee 0 — the seed is geography, not a shipping
- *   promise, and the seeder must never invent a fee (a number the code
- *   guessed gets believed). The decanter activates and prices per township.
- * - Idempotent by (region, name) firstOrCreate: re-seeding never duplicates a
- *   row, never resets a fee or a courier edit the decanter has made.
+ * The copy mechanics live in App\Support\NationalGeography — the same code
+ * runs when a new shop is registered in the panel (multi-tenancy Step 25a),
+ * so a fresh install and a fresh shop get identical geography: every row
+ * inactive at fee 0, idempotent by (region, name), a suspended route is a
+ * CLOSED row (reversible) while unserved is no row at all.
  *
- * The one demo exception: Yangon activates at a placeholder fee so a fresh
- * `docker compose up` can complete a checkout — the same seam the demo
- * catalog sits behind. `decant:fresh-start` resets every zone to inactive/0.
+ * The one demo exception stays here, out of the shared path: Yangon activates
+ * at a placeholder fee so a fresh `docker compose up` can complete a checkout —
+ * the same seam the demo catalog sits behind. `decant:fresh-start` resets
+ * every zone to inactive/0, so real installs go live with no invented fee.
  */
 class DeliveryZoneSeeder extends Seeder
 {
     private const DEMO_YANGON_FEE_MMK = 2000;
 
-    /**
-     * Yangon City townships restored into the seed (the chart prices the whole
-     * city as one ရန်ကုန် destination): on RoyalX's books each of these is a
-     * "Yangon" parcel, so their route rows carry that as the courier's own
-     * spelling — the reconciliation alias doing exactly its job.
-     */
-    private const YANGON_CITY_ALIAS = [
-        'Ahlone', 'Bahan', 'Botataung', 'Dagon', 'Dagon Seikkan', 'Dawbon',
-        'East Dagon', 'Hlaing', 'Hlaingthaya', 'Insein', 'Kamayut', 'Kyauktada',
-        'Kyimyindaing', 'Lanmadaw', 'Latha', 'Mayangon', 'Mingala Taungnyunt',
-        'Mingaladon', 'North Dagon', 'North Okkalapa', 'Pabedan', 'Pazundaung',
-        'Sanchaung', 'Seikkan', 'Shwepyitha', 'South Dagon', 'South Okkalapa',
-        'Tamwe', 'Thaketa', 'Thingangyun', 'Yankin',
-    ];
-
-    /** Genuinely unserved (boat or plane only) — a township row with no courier
-     *  row at all, which is exactly how a dead zone must read. */
-    private const NO_COURIER = ['Cocokyun'];
-
     public function run(): void
     {
-        $this->seedFile(database_path('data/delivery-townships.csv'), available: true);
-        $this->seedFile(database_path('data/delivery-townships-suspended.csv'), available: false);
+        $context = app(TenantContext::class);
+
+        NationalGeography::seed(
+            $context->get(),
+            fn (string $message) => $this->command?->warn($message),
+        );
 
         $this->activateYangonForDemo();
 
-        Cache::forget('api.delivery-zones');
-    }
-
-    private function seedFile(string $path, bool $available): void
-    {
-        foreach ($this->rows($path) as $row) {
-            [$regionCell, $name, $nameMm, $fee] = array_pad($row, 4, '');
-
-            $region = Region::fromLoose($regionCell);
-            $name = trim($name);
-
-            if (! $region || $name === '') {
-                $this->command?->warn("delivery zone seed: skipped a row with region \"{$regionCell}\", name \"{$name}\"");
-
-                continue;
-            }
-
-            $township = DeliveryTownship::firstOrCreate(
-                ['region' => $region->value, 'name' => $name],
-                ['name_mm' => trim($nameMm) ?: null, 'fee_mmk' => (int) $fee, 'is_active' => false],
-            );
-
-            if (in_array($name, self::NO_COURIER, true)) {
-                continue;
-            }
-
-            $township->couriers()->firstOrCreate(
-                ['courier' => Courier::RoyalExpress->value],
-                [
-                    'courier_name' => in_array($name, self::YANGON_CITY_ALIAS, true) ? 'Yangon' : $name,
-                    'is_available' => $available,
-                ],
-            );
-        }
-    }
-
-    /** @return iterable<array<string>> data rows, header dropped, BOM/CRLF tolerated */
-    private function rows(string $path): iterable
-    {
-        $stream = fopen($path, 'r');
-        $header = true;
-
-        while (($row = fgetcsv($stream, escape: '\\')) !== false) {
-            if ($row === [null]) {
-                continue; // blank line
-            }
-
-            $row = array_map(fn ($cell) => trim((string) $cell, " \t\r\n\u{FEFF}"), $row);
-
-            if ($header) {
-                $header = false;
-
-                continue;
-            }
-
-            yield $row;
-        }
-
-        fclose($stream);
+        Cache::forget('api.delivery-zones.'.$context->slug());
     }
 
     private function activateYangonForDemo(): void

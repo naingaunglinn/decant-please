@@ -2,7 +2,7 @@
 
 Laravel 13 application serving two things:
 
-1. the **public JSON API** (`/api/v1/*`) that the Next.js storefront in
+1. the **public JSON API** (`/api/v1/{shop}/*`) that the Next.js storefront in
    [`../frontend`](../frontend) consumes, and
 2. the **admin panel** (`/admin`, Filament v5) where the decanter manages the catalog,
    reviews orders, and reads the daily production schedule.
@@ -35,8 +35,8 @@ Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
 | `APP_URL` | This app's own URL — image URLs in API responses are built from it |
 | `FRONTEND_URL` | Storefront origin — the CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
-| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/meta` for the storefront footer; blank = hidden |
-| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details exposed via `/api/v1/meta`; blank fields hidden, whole block null when none set |
+| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/{shop}/meta` for the storefront footer; blank = hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details exposed via `/api/v1/{shop}/meta`; blank fields hidden, whole block null when none set |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram (`php artisan telegram:test` verifies); both blank = off |
 | `MEDIA_DISK` | Disk for uploaded images — `public` locally via `storage:link`, `s3` (Cloudflare R2) in production |
 | `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a separate no-public-domain R2 bucket in production |
@@ -47,36 +47,45 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 
 ## Routes
 
-**Public API — `/api/v1`, JSON, rate-limited**
+**Public API — `/api/v1/{shop}`, JSON, rate-limited** — the shop slug resolves via `ResolveTenant`; unknown or inactive shops get a generic 404
 
 | Method | Route | Purpose | Throttle |
 |---|---|---|---|
-| GET | `/api/v1/fragrances` | Filterable, paginated catalog | 120/min |
-| GET | `/api/v1/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
-| GET | `/api/v1/brands` | Active brands | 120/min |
-| GET | `/api/v1/meta` | Filter options, price bounds, social links, payment details | 120/min |
-| GET | `/api/v1/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
-| POST | `/api/v1/orders` | Guest checkout — server re-derives all prices and the delivery fee (structured address since step 30) | 10/min |
-| GET | `/api/v1/orders/track` | Full receipt by tracking code + phone | 20/min |
-| POST | `/api/v1/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
-| POST | `/api/v1/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |
-| POST | `/api/v1/orders/validate-promo` | Preview a promo code — nothing persisted; checkout re-validates | 10/min |
+| GET | `/api/v1/{shop}/fragrances` | Filterable, paginated catalog | 120/min |
+| GET | `/api/v1/{shop}/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
+| GET | `/api/v1/{shop}/brands` | Active brands | 120/min |
+| GET | `/api/v1/{shop}/meta` | Filter options, price bounds, social links, payment details | 120/min |
+| GET | `/api/v1/{shop}/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
+| POST | `/api/v1/{shop}/orders` | Guest checkout — server re-derives all prices and the delivery fee (structured address since step 30) | 10/min |
+| GET | `/api/v1/{shop}/orders/track` | Full receipt by tracking code + phone | 20/min |
+| POST | `/api/v1/{shop}/orders/cancel` | Customer cancel while `awaiting_confirmation` (409 after) | 10/min |
+| POST | `/api/v1/{shop}/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |
+| POST | `/api/v1/{shop}/orders/validate-promo` | Preview a promo code — nothing persisted; checkout re-validates | 10/min |
 
 Each limit is its own per-IP bucket (named limiters in `AppServiceProvider`), so heavy
 catalog browsing can never starve checkout, tracking, or cancellation.
 
-**Admin panel — everything below `/admin` requires login**
+**Admin panel — tenant-aware since Step 25a: everything below `/admin` requires login,
+and every operational URL carries the shop (`/admin/{shop}/…`); the tenant switcher
+moves a studio user between shops**
 
 | Route | What it is |
 |---|---|
 | `/admin/login` | The only public admin route |
-| `/admin` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
-| `/admin/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
-| `/admin/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
-| `/admin/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
-| `/admin/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
-| `/admin/production-schedule/{date}` | One day's aggregated worklist, printable as an A5 bench sheet — strict `Y-m-d` param, 404 otherwise |
+| `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
+| `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
+| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
+| `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
+| `/admin/{shop}/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
+| `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
+| `/admin/{shop}/production-schedule/{date}` | One day's aggregated worklist, printable as an A5 bench sheet — strict `Y-m-d` param, 404 otherwise |
+
+**Studio panel — the super-admin home outside any shop (`is_studio` accounts only)**
+
+| Route | What it is |
+|---|---|
+| `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
+| `/studio/shops` | The shop registry: register a shop (seeds its delivery geography and, by default, creates the owner's shop-confined login), open any shop's panel |
 
 **Utility**
 
@@ -84,7 +93,7 @@ catalog browsing can never starve checkout, tracking, or cancellation.
 |---|---|
 | `/up` | Health check — point uptime monitors / load-balancer probes here |
 | `/storage/{path}` | Uploaded images in local dev (`php artisan storage:link`) — production serves images from Cloudflare R2 instead |
-| `/admin/orders/{id}/payment-proof` | Streams the order's payment screenshot from the private proofs disk — panel-auth only, the one way a proof is ever served |
+| `/admin/{shop}/orders/{id}/payment-proof` | Streams the order's payment screenshot from the private proofs disk — panel-auth + tenant-scoped, the one way a proof is ever served |
 | `/` | Plain Laravel welcome page; the real storefront is the frontend app |
 
 ## File structure
@@ -120,7 +129,7 @@ backend/
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
 │   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
-├── routes/api.php                          # /api/v1/* with per-endpoint throttles
+├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
 ├── tests/Feature/                          # 143 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno

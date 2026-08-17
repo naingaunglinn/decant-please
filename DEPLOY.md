@@ -2,7 +2,9 @@
 
 Two apps, deployed separately: `backend/` (Laravel + Filament admin + JSON API) on
 **Heroku**, and `frontend/` (Next.js storefront) on **Vercel**. The frontend only ever
-talks to the backend over `https://api.cornerarea.me/api/v1/*`.
+talks to the backend over `https://api.cornerarea.me/api/v1/{shop}/*` — the shop slug is
+the first path segment since multi-tenancy Step 24, and each storefront bakes its own in
+via `NEXT_PUBLIC_SHOP_SLUG`.
 
 Production domains:
 
@@ -98,6 +100,7 @@ heroku config:set -a decant-please-api \
   SESSION_SECURE_COOKIE=true \
   APP_URL=https://api.cornerarea.me \
   FRONTEND_URL=https://decant-please.cornerarea.me \
+  SHOP_SLUG=decant-please \
   ADMIN_PASSWORD='<strong password, not reused from elsewhere>' \
   FILESYSTEM_DISK=s3 \
   MEDIA_DISK=s3 \
@@ -194,7 +197,7 @@ Payment-proof screenshots live in `decant-please-payment-proofs` (`PROOFS_DISK=s
 unlike the images bucket — needs **no CORS policy at all**, because the browser never talks
 to it in either direction:
 
-- **Customer upload** POSTs the screenshot to the Laravel API (`/api/v1/orders/payment-proof`),
+- **Customer upload** POSTs the screenshot to the Laravel API (`/api/v1/{shop}/orders/payment-proof`),
   and Laravel writes it to R2 server-side.
 - **Admin upload** rides the same `local` temp-disk flow as images (see "Admin image
   uploads" above); the finished file is written to the proofs bucket server-side.
@@ -315,12 +318,21 @@ replaced image.
    | Variable | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://api.cornerarea.me/api` |
+   | `NEXT_PUBLIC_SHOP_SLUG` | `decant-please` — which shop this storefront is (the `{shop}` API path segment, multi-tenancy Step 24). Each Vercel project sets its own; must match the shop's `slug` and the backend's `SHOP_SLUG` for the default shop. Unset currently falls back to `decant-please` — set it explicitly anyway |
    | `NEXT_PUBLIC_SITE_URL` | `https://decant-please.cornerarea.me` |
    | `NEXT_PUBLIC_IMAGE_URL` | `https://images.cornerarea.me` |
 
 3. Deploy, then point the storefront domain (`decant-please.cornerarea.me`) at Vercel. Make
    sure the backend's `FRONTEND_URL` config var matches it exactly, scheme included — that's
-   the CORS allowlist **and** the admin "View on site" links.
+   the CORS allowlist **and** the admin "View on site" links (comma-separate origins when a
+   second shop's domain arrives).
+
+> **Production Branch — still unverified (ADR-004).** The project's Production Branch is
+> *believed* to be `main` (captured at import, pre-`develop`-split; the Vercel bot labelled
+> a `develop`-head deployment "Preview" on PR #54) but has never been read from the
+> dashboard. Check **Settings → Git → Production Branch** on the next dashboard visit and
+> replace this note with the confirmed value — before a second project multiplies the
+> ambiguity.
 
 > **Fragrance images from R2 (#22).** `next.config.ts` allows images from the host in
 > `NEXT_PUBLIC_IMAGE_URL` (alongside the API host and localhost). Set
@@ -384,8 +396,10 @@ from zero.
 - [ ] `FRONTEND_URL` = exact storefront origin `https://decant-please.cornerarea.me` (CORS +
       admin "View on site" links)
 - [ ] `ADMIN_PASSWORD` strong; admin login verified at `https://api.cornerarea.me/admin`
-- [ ] API routing works past `/`: `curl -I https://api.cornerarea.me/api/v1/meta` returns
-      `200` — a 404 here while `/` serves means the buildpack needs a custom nginx conf (`-C`)
+- [ ] API routing works past `/`: `curl -I https://api.cornerarea.me/api/v1/decant-please/meta`
+      returns `200` — a 404 here while `/` serves means the buildpack needs a custom nginx
+      conf (`-C`); a 404 on this exact path with `/` fine can also mean the `{shop}` slug
+      doesn't match a `shops` row (`SHOP_SLUG`)
 - [ ] `MEDIA_DISK=s3` (+ `FILESYSTEM_DISK=s3` + R2 vars) set — upload a fragrance image in
       `/admin`, confirm its URL resolves under `https://images.cornerarea.me/` (not a
       `local`-disk path), then `heroku ps:restart` and reload it to prove it's served from R2,

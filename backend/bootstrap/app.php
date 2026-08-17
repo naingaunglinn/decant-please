@@ -1,9 +1,11 @@
 <?php
 
+use Filament\Http\Middleware\IdentifyTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -24,6 +26,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // (AppServiceProvider) into one global bucket, and $request->isSecure() is false,
         // which can loop Filament login under SESSION_SECURE_COOKIE=true.
         $middleware->trustProxies(at: '*');
+
+        // Tenant resolution is per-route (Step 24/25a): ResolveTenant on the
+        // /api/v1/{shop} group binds the tenant from the path; the panel resolves
+        // it from /admin/{tenant} via Filament's IdentifyTenant, mirrored into
+        // TenantContext by SyncTenantContextFromFilament.
+
+        // Laravel's default middleware priority runs SubstituteBindings before any
+        // unlisted middleware, which would resolve the invoice/payment-proof
+        // {order} bindings BEFORE IdentifyTenant has set a tenant — every request
+        // would throw TenantNotSetException. Identify the tenant first, so those
+        // implicit bindings run under the tenant scope and a cross-shop id is a
+        // 404, never a leak (TenantIsolationTest pins this).
+        $middleware->prependToPriorityList(SubstituteBindings::class, IdentifyTenant::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

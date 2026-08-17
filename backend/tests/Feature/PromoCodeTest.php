@@ -36,7 +36,7 @@ class PromoCodeTest extends TestCase
         PromoCode::create(['code' => 'SAVE10', 'type' => PromoType::Percent, 'value' => 10]);
 
         // two items → subtotal 110,000; 10% = 11,000; lowercase input matches
-        $this->postJson('/api/v1/orders/validate-promo', [
+        $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'save10',
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
         ])
@@ -58,7 +58,7 @@ class PromoCodeTest extends TestCase
         PromoCode::create(['code' => 'EXPIRED', 'type' => PromoType::Fixed, 'value' => 5000, 'expires_at' => today()->subDay()]);
         PromoCode::create(['code' => 'PAUSED', 'type' => PromoType::Fixed, 'value' => 5000, 'is_active' => false]);
 
-        $preview = fn (string $code) => $this->postJson('/api/v1/orders/validate-promo', [
+        $preview = fn (string $code) => $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => $code,
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', false)->assertJsonPath('discount_mmk', 0);
@@ -77,13 +77,13 @@ class PromoCodeTest extends TestCase
         PromoCode::create(['code' => 'HUGE', 'type' => PromoType::Fixed, 'value' => 999999]);
 
         // 50% of 110,000 = 55,000 → capped at 20,000
-        $this->postJson('/api/v1/orders/validate-promo', [
+        $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'HALF',
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
         ])->assertJsonPath('discount_mmk', 20000);
 
         // fixed amount larger than the cart → clamped to the subtotal, total 0
-        $this->postJson('/api/v1/orders/validate-promo', [
+        $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'HUGE',
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
         ])->assertJsonPath('discount_mmk', 55000)->assertJsonPath('new_total_formatted', '0 Ks');
@@ -93,7 +93,7 @@ class PromoCodeTest extends TestCase
     {
         PromoCode::create(['code' => 'SAVE10', 'type' => PromoType::Percent, 'value' => 10]);
 
-        $response = $this->postJson('/api/v1/orders', $this->payload(['promo_code' => 'save10']))
+        $response = $this->postJson('/api/v1/decant-please/orders', $this->payload(['promo_code' => 'save10']))
             ->assertCreated()
             ->assertJsonPath('total_mmk', 99000)
             ->assertJsonPath('promo_note', null);
@@ -105,7 +105,7 @@ class PromoCodeTest extends TestCase
         $this->assertSame(1, PromoCode::firstOrFail()->times_used);
 
         // the receipt names the code
-        $this->getJson("/api/v1/orders/track?tracking_code={$order->tracking_code}&phone=09-771234561")
+        $this->getJson("/api/v1/decant-please/orders/track?tracking_code={$order->tracking_code}&phone=09-771234561")
             ->assertJsonPath('promo_code', 'SAVE10')
             ->assertJsonPath('discount_mmk', 11000);
     }
@@ -115,12 +115,12 @@ class PromoCodeTest extends TestCase
         PromoCode::create(['code' => 'LASTONE', 'type' => PromoType::Fixed, 'value' => 5000, 'usage_limit' => 1]);
 
         // first customer takes the last use
-        $this->postJson('/api/v1/orders', $this->payload(['promo_code' => 'LASTONE']))
+        $this->postJson('/api/v1/decant-please/orders', $this->payload(['promo_code' => 'LASTONE']))
             ->assertCreated()
             ->assertJsonPath('promo_note', null);
 
         // second customer previewed earlier, submits after it's exhausted
-        $second = $this->postJson('/api/v1/orders', $this->payload(['promo_code' => 'LASTONE']))
+        $second = $this->postJson('/api/v1/decant-please/orders', $this->payload(['promo_code' => 'LASTONE']))
             ->assertCreated()
             ->assertJsonPath('promo_note', "That code was no longer valid, so it wasn't applied — you can still place this order without it.");
 
@@ -134,7 +134,7 @@ class PromoCodeTest extends TestCase
     public function test_manual_discount_edit_leaves_the_promo_snapshot_alone(): void
     {
         PromoCode::create(['code' => 'SAVE10', 'type' => PromoType::Percent, 'value' => 10]);
-        $code = $this->postJson('/api/v1/orders', $this->payload(['promo_code' => 'SAVE10']))->json('tracking_code');
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload(['promo_code' => 'SAVE10']))->json('tracking_code');
 
         $order = Order::where('tracking_code', $code)->firstOrFail();
         $order->update(['discount_mmk' => 25000]); // the decanter's after-the-fact adjustment
@@ -167,6 +167,27 @@ class PromoCodeTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertSame('NEWYEAR25', PromoCode::latest('id')->firstOrFail()->code); // stored uppercase
+    }
+
+    public function test_promo_code_must_be_unique_within_the_shop(): void
+    {
+        // (shop_id, code) composite: the form's scopedUnique goes through the
+        // tenant-scoped PromoCode query, so a duplicate in THIS shop is a form
+        // error — while another shop running the same code is none of our
+        // business (asserted from the other side in TenantIsolationTest).
+        $this->actingAs(User::factory()->create());
+        PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 2500]);
+
+        Livewire::test(CreatePromoCode::class)
+            ->fillForm([
+                'code' => 'SUMMER26',
+                'type' => PromoType::Fixed->value,
+                'value' => 1000,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['code']);
+
+        $this->assertSame(1, PromoCode::count());
     }
 
     private function payload(array $overrides = []): array

@@ -2,7 +2,7 @@
 // fall back to the same vial glyph a photo-less fragrance shows, not the browser's
 // broken-image icon.
 //
-//   [BASE_URL=http://localhost:3001] [API_URL=http://localhost:8010/api] node scripts/verify-image-fallback.mjs
+//   [BASE_URL=http://localhost:3001] [API_URL=http://localhost:8010/api] [NEXT_PUBLIC_SHOP_SLUG=decant-please] node scripts/verify-image-fallback.mjs
 //
 // Picks its own subjects: asks the API for the catalog, then probes each recorded
 // image_url to find one that really loads and one that doesn't. That keeps the check
@@ -13,6 +13,8 @@ import { chromium } from "playwright";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3001";
 const API = process.env.API_URL ?? "http://localhost:8010/api";
+// The shop segment in the path (multi-tenancy Step 24) — same fold as lib/api.ts.
+const SHOP = process.env.NEXT_PUBLIC_SHOP_SLUG ?? "decant-please";
 
 let failures = 0;
 
@@ -36,7 +38,7 @@ async function pickSubjects() {
   let missing = null;
 
   for (let page = 1, lastPage = 1; page <= lastPage; page++) {
-    const response = await fetch(`${API}/v1/fragrances?per_page=50&page=${page}`);
+    const response = await fetch(`${API}/v1/${SHOP}/fragrances?per_page=50&page=${page}`);
     if (!response.ok) throw new Error(`catalog fetch failed: HTTP ${response.status}`);
     const body = await response.json();
     lastPage = body.meta?.last_page ?? 1;

@@ -6,7 +6,13 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:3001')],
+    // Multi-tenancy (Step 24): a second shop's storefront is its own domain, so the
+    // allowlist accepts a comma-separated FRONTEND_URL — still one value today, but
+    // adding shop #2's origin later needs no config-shape change.
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('FRONTEND_URL', 'http://localhost:3001'))
+    ))),
 
     'allowed_origins_patterns' => [],
 

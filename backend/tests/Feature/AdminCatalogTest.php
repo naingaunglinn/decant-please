@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\Brands\Pages\CreateBrand;
+use App\Filament\Resources\Brands\Pages\EditBrand;
 use App\Filament\Resources\Brands\Pages\ListBrands;
 use App\Filament\Resources\Fragrances\Pages\CreateFragrance;
 use App\Filament\Resources\Fragrances\Pages\ListFragrances;
@@ -57,6 +58,33 @@ class AdminCatalogTest extends TestCase
         $this->assertNotNull($brand->logo_path);
         $this->assertStringStartsWith('brands/', $brand->logo_path);
         Storage::disk('public')->assertExists($brand->logo_path);
+    }
+
+    public function test_brand_name_must_be_unique_within_the_shop(): void
+    {
+        // The (shop_id, name) composite used to be reachable: the form had no
+        // unique rule, so a same-shop duplicate hit the index as a raw 500.
+        // scopedUnique turns it into a validation error.
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        Livewire::test(CreateBrand::class)
+            ->fillForm(['name' => 'Chanel', 'type' => 'designer'])
+            ->call('create')
+            ->assertHasFormErrors(['name']);
+
+        $this->assertSame(1, Brand::count());
+    }
+
+    public function test_editing_a_brand_does_not_conflict_with_its_own_name(): void
+    {
+        $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        Livewire::test(EditBrand::class, ['record' => $brand->getRouteKey()])
+            ->fillForm(['name' => 'Chanel'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(1, Brand::count());
     }
 
     public function test_fragrance_can_be_created_with_three_decant_prices(): void

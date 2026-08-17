@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\Region;
+use App\Models\Concerns\BelongsToShop;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -20,14 +22,17 @@ use Illuminate\Support\Facades\Cache;
 #[Fillable(['region', 'district', 'name', 'name_mm', 'fee_mmk', 'is_active', 'sort_order'])]
 class DeliveryTownship extends Model
 {
+    use BelongsToShop;
+
     protected static function booted(): void
     {
         // /delivery-zones caches the serviceable tree for 10 minutes — drop it
         // the moment a township changes, so checkout reflects it right away
         // (the v14 ShopSetting precedent). Courier rows bust it too, from
         // their own model: serviceability is derived from both tables.
-        static::saved(fn () => Cache::forget('api.delivery-zones'));
-        static::deleted(fn () => Cache::forget('api.delivery-zones'));
+        // Per-shop key — each shop prices/activates its own townships (findings A5).
+        static::saved(fn () => Cache::forget('api.delivery-zones.'.app(TenantContext::class)->slug()));
+        static::deleted(fn () => Cache::forget('api.delivery-zones.'.app(TenantContext::class)->slug()));
     }
 
     public function couriers(): HasMany

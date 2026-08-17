@@ -20,7 +20,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class PaymentProofViewController extends Controller
 {
-    public function __invoke(Order $order): StreamedResponse
+    // The route lives under /admin/{tenant} (Step 25a), so the slug arrives as
+    // the first argument; IdentifyTenant has already resolved and authorized it,
+    // and the {order} binding ran under the tenant scope — a cross-shop id 404s.
+    public function __invoke(string $tenant, Order $order): StreamedResponse
     {
         $disk = Storage::disk(config('filesystems.proofs_disk'));
 

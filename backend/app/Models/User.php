@@ -5,29 +5,63 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'is_studio'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // ponytail: every user is the decanter's admin — customers never get accounts (CLAUDE.md §8)
+        // The studio panel (/studio) is the super-admin home — is_studio only.
+        // The tenant panel (/admin/{shop}) admits any operator account; WHICH
+        // shops they can enter is canAccessTenant's job, not this one's.
+        // Customers never get accounts either way (PRODUCT.md non-goals).
+        if ($panel->getId() === 'studio') {
+            return $this->is_studio;
+        }
+
         return true;
     }
 
+    /** Shops this user owns/operates (Step 25a). Studio founders bypass this list. */
+    public function shops(): BelongsToMany
+    {
+        return $this->belongsToMany(Shop::class);
+    }
+
     /**
-     * Get the attributes that should be cast.
+     * Filament tenancy: the shops selectable in the switcher. A studio founder
+     * (is_studio) sees every shop; a shop owner sees only the ones they belong to.
      *
+     * @return Collection<int, Shop>
+     */
+    public function getTenants(Panel $panel): Collection
+    {
+        return $this->is_studio
+            ? Shop::query()->orderBy('name')->get()
+            : $this->shops()->orderBy('name')->get();
+    }
+
+    /** Filament tenancy: may this user operate $tenant? Studio sees all. */
+    public function canAccessTenant(Model $tenant): bool
+    {
+        return $this->is_studio || $this->shops()->whereKey($tenant->getKey())->exists();
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -35,6 +69,7 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_studio' => 'boolean',
         ];
     }
 }

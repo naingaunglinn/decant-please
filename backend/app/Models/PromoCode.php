@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PromoType;
+use App\Models\Concerns\BelongsToShop;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 #[Fillable(['code', 'type', 'value', 'max_discount_mmk', 'min_order_mmk', 'usage_limit', 'times_used', 'starts_at', 'expires_at', 'is_active'])]
 class PromoCode extends Model
 {
+    use BelongsToShop;
+
     /** Codes are stored uppercase so matching is case-insensitive by construction. */
     protected function code(): Attribute
     {

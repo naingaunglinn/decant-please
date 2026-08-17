@@ -1,0 +1,579 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\Courier;
+use App\Enums\OrderStatus;
+use App\Enums\PromoType;
+use App\Exceptions\TenantNotSetException;
+use App\Filament\Resources\Brands\Pages\CreateBrand;
+use App\Filament\Resources\Orders\Pages\ListOrders;
+use App\Filament\Resources\PromoCodes\Pages\CreatePromoCode;
+use App\Filament\Widgets\OrderStats;
+use App\Models\Brand;
+use App\Models\DeliveryTownship;
+use App\Models\DeliveryTownshipCourier;
+use App\Models\Expense;
+use App\Models\Fragrance;
+use App\Models\Order;
+use App\Models\PromoCode;
+use App\Models\Shop;
+use App\Models\ShopSetting;
+use App\Support\MonthlyPnl;
+use App\Support\TenantContext;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * The two-shop isolation suite (multi-tenancy design-doc §8). Every assertion checks
+ * a COUNT, never mere presence — "returns A's rows" also passes while leaking B's;
+ * the Telegram double-send lesson. Model-level cases drive the tenant through
+ * TenantContext directly; the surface-level cases hit the real /api/v1/{shop} paths,
+ * the /admin/{tenant} routes, and the panel's Livewire tables/widgets.
+ */
+class TenantIsolationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Shop $shopA;
+
+    private Shop $shopB;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->shopA = Shop::factory()->create(['slug' => 'shop-a']);
+        $this->shopB = Shop::factory()->create(['slug' => 'shop-b']);
+    }
+
+    private function forShop(Shop $shop): void
+    {
+        app(TenantContext::class)->set($shop);
+    }
+
+    private function makeOrder(
+        OrderStatus $status = OrderStatus::AwaitingConfirmation,
+        int $totalMmk = 10000,
+        string $customer = 'Buyer',
+    ): Order {
+        return Order::create([
+            'customer_name' => $customer,
+            'phone' => '09-771234561',
+            'address' => 'Somewhere, Yangon',
+            'order_from' => 'website',
+            'status' => $status,
+            'total_mmk' => $totalMmk,
+        ])->refresh();
+    }
+
+    /** One priced 10ml fragrance in the CURRENT shop's catalog (55,000 Ks). */
+    private function makeFragrance(): Fragrance
+    {
+        $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        $fragrance = $brand->fragrances()->create([
+            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+        ]);
+        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+
+        return $fragrance;
+    }
+
+    public function test_catalog_queries_return_only_the_current_shops_rows(): void
+    {
+        $this->forShop($this->shopA);
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+        Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        $this->forShop($this->shopB);
+        Brand::create(['name' => 'Creed', 'type' => 'niche']);
+
+        $this->forShop($this->shopA);
+        $this->assertSame(2, Brand::count());
+        $this->assertEqualsCanonicalizing(['Chanel', 'Dior'], Brand::pluck('name')->all());
+
+        $this->forShop($this->shopB);
+        $this->assertSame(1, Brand::count());
+        $this->assertSame(['Creed'], Brand::pluck('name')->all());
+    }
+
+    public function test_two_shops_can_each_have_a_brand_named_chanel(): void
+    {
+        // The global brands.name / brands.slug uniques would kill this — the whole
+        // reason they became (shop_id, …) composites (findings Q5/A2).
+        $this->forShop($this->shopA);
+        $a = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        $this->forShop($this->shopB);
+        $b = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        $this->assertNotSame($a->id, $b->id);
+        $this->assertSame('chanel', $a->slug);
+        $this->assertSame('chanel', $b->slug); // same slug, different shop — allowed
+        $this->assertSame(1, Brand::count());  // B sees exactly one Chanel
+    }
+
+    public function test_the_brand_form_accepts_a_name_that_only_another_shop_carries(): void
+    {
+        // Same discriminating case as the promo form below: a raw ->unique()
+        // would let A's catalog block B from stocking "Chanel" at all.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        $this->forShop($this->shopB);
+        Livewire::test(CreateBrand::class)
+            ->fillForm(['name' => 'Chanel', 'type' => 'designer'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(1, Brand::count()); // B sees exactly its own Chanel
+    }
+
+    public function test_two_shops_can_run_the_same_promo_code(): void
+    {
+        // promo_codes.code joined the composite pass late — (shop_id, code), the
+        // same reasoning as both-shops-Chanel above.
+        $this->forShop($this->shopA);
+        $a = PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 5000]);
+
+        $this->forShop($this->shopB);
+        $b = PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 1000]);
+
+        $this->assertNotSame($a->id, $b->id);
+        $this->assertSame(1, PromoCode::count()); // B sees exactly its own SUMMER26
+    }
+
+    public function test_the_promo_form_accepts_a_code_that_only_another_shop_runs(): void
+    {
+        // The discriminating case for the form rule: a plain ->unique() queries
+        // the table raw and would block B from running a code A already has.
+        // scopedUnique goes through the tenant-scoped query, so it must not.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 5000]);
+
+        $this->forShop($this->shopB);
+        Livewire::test(CreatePromoCode::class)
+            ->fillForm([
+                'code' => 'SUMMER26',
+                'type' => PromoType::Fixed->value,
+                'value' => 1000,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(1, PromoCode::count()); // B sees exactly its own SUMMER26
+        $this->assertSame(1000, PromoCode::firstOrFail()->value);
+    }
+
+    public function test_a_shops_promo_code_is_not_redeemable_in_another_shops_checkout(): void
+    {
+        // §8 "Two shops, promo codes" — over the real /api/v1/{shop} surface.
+        $this->forShop($this->shopA);
+        PromoCode::create(['code' => 'ONLYA', 'type' => PromoType::Fixed, 'value' => 5000]);
+        $aItem = $this->makeFragrance();
+
+        $this->forShop($this->shopB);
+        $bItem = $this->makeFragrance();
+
+        // Positive control: A's code validates under A's own path.
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders/validate-promo", [
+            'code' => 'ONLYA',
+            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+        ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 5000);
+
+        // The same code under B's path does not exist — never A's discount in B's cart.
+        $this->postJson("/api/v1/{$this->shopB->slug}/orders/validate-promo", [
+            'code' => 'ONLYA',
+            'items' => [['fragrance_id' => $bItem->id, 'size_ml' => 10, 'quantity' => 1]],
+        ])->assertOk()->assertJsonPath('valid', false)->assertJsonPath('discount_mmk', 0);
+    }
+
+    public function test_tracking_lookup_is_scoped_to_the_shop(): void
+    {
+        $this->forShop($this->shopA);
+        $order = $this->makeOrder();
+
+        $this->forShop($this->shopB);
+        $this->assertNull(Order::findByTracking($order->tracking_code, $order->phone));
+
+        $this->forShop($this->shopA);
+        $this->assertNotNull(Order::findByTracking($order->tracking_code, $order->phone));
+    }
+
+    public function test_tracking_codes_stay_globally_unique_across_shops(): void
+    {
+        // generateTrackingCode wraps its dedup in withoutTenancy so the exists()
+        // check spans every shop — the codes below must all differ (findings Q2).
+        $codes = [];
+
+        foreach ([$this->shopA, $this->shopB, $this->shopA, $this->shopB] as $shop) {
+            $this->forShop($shop);
+            $codes[] = $this->makeOrder()->tracking_code;
+        }
+
+        $this->assertCount(4, array_unique($codes));
+    }
+
+    public function test_expenses_are_scoped_to_the_shop(): void
+    {
+        $this->forShop($this->shopA);
+        Expense::create(['spent_on' => '2026-08-01', 'category' => 'other', 'amount_mmk' => 1000]);
+        Expense::create(['spent_on' => '2026-08-02', 'category' => 'packaging', 'amount_mmk' => 2000]);
+
+        $this->forShop($this->shopB);
+        Expense::create(['spent_on' => '2026-08-01', 'category' => 'other', 'amount_mmk' => 5000]);
+
+        $this->forShop($this->shopA);
+        $this->assertSame(2, Expense::count());
+        $this->assertSame(3000, (int) Expense::sum('amount_mmk'));
+
+        $this->forShop($this->shopB);
+        $this->assertSame(1, Expense::count());
+        $this->assertSame(5000, (int) Expense::sum('amount_mmk'));
+    }
+
+    public function test_delivery_townships_are_scoped_and_cross_shop_ids_do_not_resolve(): void
+    {
+        $this->forShop($this->shopA);
+        $a = DeliveryTownship::create(['region' => 'yangon', 'name' => 'Bahan', 'is_active' => true]);
+
+        $this->forShop($this->shopB);
+        $this->assertSame(0, DeliveryTownship::count());
+        // The checkout equivalent: serviceable()->find(otherShopId) must return null,
+        // so a B checkout can't be routed to / priced by A's township (findings A5).
+        $this->assertNull(DeliveryTownship::find($a->id));
+
+        $this->forShop($this->shopA);
+        $this->assertSame(1, DeliveryTownship::count());
+    }
+
+    public function test_invoice_route_resolves_the_tenant_from_the_url_alone(): void
+    {
+        // Regression: these routes once registered via authenticatedRoutes(),
+        // OUTSIDE the /admin/{tenant} group — IdentifyTenant never ran,
+        // TenantContext stayed unset, and the {order} binding threw
+        // TenantNotSetException (a 500 on every invoice open in production,
+        // masked in tests by the context TestCase presets). The context is
+        // cleared here on purpose: the request must succeed on the route's own
+        // tenant resolution, nothing else.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $order = $this->makeOrder(OrderStatus::Pending); // fulfillable → invoice renders
+
+        app(TenantContext::class)->set(null);
+
+        $this->get(route('filament.admin.orders.invoice', [
+            'tenant' => $this->shopA->slug,
+            'order' => $order,
+        ]))->assertOk();
+
+        // The route's own lifecycle (IdentifyTenant → TenantSet → listener) is
+        // what set the context — proof the binding ran tenant-scoped.
+        $this->assertSame($this->shopA->id, app(TenantContext::class)->id());
+    }
+
+    public function test_cross_shop_invoice_and_proof_routes_are_generic_404s(): void
+    {
+        // §8 "Two shops, proof route": B's order id under A's panel URL must
+        // never stream bytes — the design's highest-severity line. Status is
+        // fulfillable and a proof exists, so a 404 here can only mean the
+        // tenant-scoped binding refused the cross-shop id.
+        Storage::fake(config('filesystems.proofs_disk'));
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopB);
+        $order = $this->makeOrder(OrderStatus::Pending);
+        $order->update([
+            'payment_proof_path' => UploadedFile::fake()->image('proof.jpg')
+                ->store('payment-proofs', config('filesystems.proofs_disk')),
+        ]);
+
+        app(TenantContext::class)->set(null);
+
+        $this->get(route('filament.admin.orders.invoice', [
+            'tenant' => $this->shopA->slug,
+            'order' => $order,
+        ]))->assertNotFound();
+
+        $this->get(route('filament.admin.orders.payment-proof', [
+            'tenant' => $this->shopA->slug,
+            'order' => $order,
+        ]))->assertNotFound();
+    }
+
+    public function test_public_catalog_api_returns_exact_per_shop_counts(): void
+    {
+        // §8 "Two shops, catalog" — over the real /api/v1/{shop} paths.
+        $this->forShop($this->shopA);
+        $this->makeFragrance();
+        Brand::firstOrFail()->fragrances()->create([
+            'name' => 'Bleu de Chanel', 'concentration' => 'edp', 'gender' => 'male',
+        ]);
+
+        $this->forShop($this->shopB);
+        $this->makeFragrance();
+
+        $this->getJson("/api/v1/{$this->shopA->slug}/fragrances")
+            ->assertOk()->assertJsonPath('meta.total', 2);
+
+        $this->getJson("/api/v1/{$this->shopB->slug}/fragrances")
+            ->assertOk()->assertJsonPath('meta.total', 1);
+    }
+
+    public function test_tracking_over_http_is_shop_scoped_and_the_404_stays_generic(): void
+    {
+        // §8 "Two shops, tracking": A's code+phone under B's path is the same
+        // generic 404 as a wrong code — no oracle distinguishing "wrong shop"
+        // from "no such order".
+        $this->forShop($this->shopA);
+        $order = $this->makeOrder();
+
+        $query = http_build_query(['tracking_code' => $order->tracking_code, 'phone' => $order->phone]);
+
+        $this->getJson("/api/v1/{$this->shopA->slug}/orders/track?{$query}")->assertOk();
+
+        $crossShop = $this->getJson("/api/v1/{$this->shopB->slug}/orders/track?{$query}")
+            ->assertNotFound();
+        $wrongCode = $this->getJson("/api/v1/{$this->shopA->slug}/orders/track?".http_build_query([
+            'tracking_code' => 'AAAAAAAAAA', 'phone' => $order->phone,
+        ]))->assertNotFound();
+
+        $this->assertSame($wrongCode->json(), $crossShop->json()); // byte-identical bodies
+    }
+
+    public function test_admin_order_table_lists_only_the_current_shops_orders(): void
+    {
+        // §8 "Two shops, admin table" — exact rendered counts, not presence.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder();
+        $this->makeOrder();
+
+        $this->forShop($this->shopB);
+        $bOrder = $this->makeOrder();
+
+        $this->forShop($this->shopA);
+        Livewire::test(ListOrders::class)
+            ->set('activeTab', 'all')
+            ->assertCountTableRecords(2)
+            ->assertCanNotSeeTableRecords([$bOrder]);
+
+        $this->forShop($this->shopB);
+        Livewire::test(ListOrders::class)
+            ->set('activeTab', 'all')
+            ->assertCountTableRecords(1);
+    }
+
+    public function test_dashboard_stats_count_only_the_current_shop(): void
+    {
+        // §8 "Two shops, dashboard" — the widgets are custom queries Filament's
+        // own tenancy never scopes; the app scope is what isolates them.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder(OrderStatus::Pending, totalMmk: 70000);
+
+        $this->forShop($this->shopB);
+        $this->makeOrder(OrderStatus::Pending, totalMmk: 999999);
+
+        $this->forShop($this->shopA);
+        Livewire::test(OrderStats::class)
+            ->assertSee('70,000 Ks')       // A's revenue, exactly
+            ->assertDontSee('999,999')     // never B's order…
+            ->assertDontSee('1,069,999');  // …and never A+B pooled
+    }
+
+    public function test_csv_export_contains_zero_other_shop_rows(): void
+    {
+        // §8 "Two shops, CSV export" — inspect the actual streamed bytes.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder(customer: 'Alice From Shop A');
+
+        $this->forShop($this->shopB);
+        $this->makeOrder(customer: 'Bobby From Shop B');
+
+        $this->forShop($this->shopA);
+        $livewire = Livewire::test(ListOrders::class)
+            ->set('activeTab', 'all')
+            ->callTableAction('exportCsv')
+            ->assertFileDownloaded('orders-'.now()->format('Y-m-d').'.csv');
+
+        $csv = base64_decode((string) data_get($livewire->effects, 'download.content'));
+
+        $this->assertSame(2, substr_count(trim($csv), "\n") + 1); // header + exactly A's one row
+        $this->assertStringContainsString('Alice From Shop A', $csv);
+        $this->assertStringNotContainsString('Bobby From Shop B', $csv);
+    }
+
+    public function test_profit_and_loss_counts_only_own_orders_and_expenses(): void
+    {
+        // §8 "Two shops, P&L + expenses": an expense entered in B never moves A's
+        // net; order counts stay per-shop (custom Page → app scope, findings A4).
+        $this->forShop($this->shopA);
+        $this->makeOrder();
+        Expense::create(['spent_on' => today(), 'category' => 'marketing', 'amount_mmk' => 3000]);
+
+        $this->forShop($this->shopB);
+        $this->makeOrder();
+        $this->makeOrder();
+        Expense::create(['spent_on' => today(), 'category' => 'marketing', 'amount_mmk' => 5000]);
+
+        $this->forShop($this->shopA);
+        $pnlA = MonthlyPnl::for(today()->year, today()->month);
+        $this->assertSame(1, $pnlA->totalOrders);
+        $this->assertSame(3000, $pnlA->operatingTotalMmk);
+
+        $this->forShop($this->shopB);
+        $pnlB = MonthlyPnl::for(today()->year, today()->month);
+        $this->assertSame(2, $pnlB->totalOrders);
+        $this->assertSame(5000, $pnlB->operatingTotalMmk);
+    }
+
+    public function test_delivery_zones_endpoint_is_per_shop_in_content_and_cache(): void
+    {
+        // §8 "Two shops, delivery zones": content per shop, and editing B's
+        // township busts only B's cache key.
+        $this->forShop($this->shopA);
+        $this->serviceableTownship(fee: 2000, name: 'Bahan');
+
+        $this->forShop($this->shopB);
+        $bTownship = $this->serviceableTownship(fee: 3000, name: 'Sanchaung');
+
+        $a = $this->getJson("/api/v1/{$this->shopA->slug}/delivery-zones")->assertOk();
+        $this->assertSame(['Bahan'], array_column($a->json('regions.0.townships'), 'name'));
+        $this->assertSame(2000, $a->json('regions.0.townships.0.fee_mmk'));
+
+        $b = $this->getJson("/api/v1/{$this->shopB->slug}/delivery-zones")->assertOk();
+        $this->assertSame(['Sanchaung'], array_column($b->json('regions.0.townships'), 'name'));
+        $this->assertSame(3000, $b->json('regions.0.townships.0.fee_mmk'));
+
+        // Both responses are cached now; a B reprice busts B's key alone.
+        $this->assertTrue(Cache::has('api.delivery-zones.'.$this->shopA->slug));
+        $this->assertTrue(Cache::has('api.delivery-zones.'.$this->shopB->slug));
+
+        $bTownship->update(['fee_mmk' => 3500]);
+
+        $this->assertTrue(Cache::has('api.delivery-zones.'.$this->shopA->slug));
+        $this->assertFalse(Cache::has('api.delivery-zones.'.$this->shopB->slug));
+    }
+
+    public function test_checkout_rejects_another_shops_township_id_over_http(): void
+    {
+        // §8 "Two shops, checkout township": B's township id in A's checkout is a
+        // 422 — the scoped serviceable()->find() returns null, so the order is
+        // never routed to, or priced by, another shop's zone.
+        $this->forShop($this->shopA);
+        $aItem = $this->makeFragrance();
+        $aTownship = $this->serviceableTownship(fee: 2000, name: 'Bahan');
+
+        $this->forShop($this->shopB);
+        $bTownship = $this->serviceableTownship(fee: 9999, name: 'Sanchaung');
+
+        $payload = fn (int $townshipId): array => [
+            'customer_name' => 'Su Su',
+            'phone' => '09-771234561',
+            'delivery_township_id' => $townshipId,
+            'address_line' => 'No. 12, Yangon',
+            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+        ];
+
+        // Positive control: A's own township checks out at A's fee.
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders", $payload($aTownship->id))
+            ->assertCreated()
+            ->assertJsonPath('delivery_fee_mmk', 2000);
+
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders", $payload($bTownship->id))
+            ->assertUnprocessable();
+    }
+
+    public function test_two_shops_can_route_the_same_township_through_the_same_courier(): void
+    {
+        // delivery_township_couriers keeps its (delivery_township_id, courier)
+        // unique DELIBERATELY un-widened: township ids are already per-shop, so
+        // the pair can never collide across shops and a (shop_id, …) composite
+        // would be redundant width. What must hold — and what this pins — is
+        // that B mirroring A's geography and courier is legal, while a same-shop
+        // duplicate route still dies on the unique.
+        $this->forShop($this->shopA);
+        $a = DeliveryTownship::create(['region' => 'yangon', 'name' => 'Bahan']);
+        $a->couriers()->create(['courier' => Courier::RoyalExpress->value, 'courier_name' => 'Yangon', 'is_available' => true]);
+
+        $this->forShop($this->shopB);
+        $b = DeliveryTownship::create(['region' => 'yangon', 'name' => 'Bahan']);
+        $b->couriers()->create(['courier' => Courier::RoyalExpress->value, 'courier_name' => 'Yangon', 'is_available' => true]);
+
+        $this->assertSame(1, DeliveryTownshipCourier::count()); // B sees exactly its own route
+
+        $this->expectException(QueryException::class);
+        $b->couriers()->create(['courier' => Courier::RoyalExpress->value, 'courier_name' => 'dup', 'is_available' => true]);
+    }
+
+    public function test_a_tenant_query_with_no_context_throws_rather_than_leaking(): void
+    {
+        $this->forShop($this->shopA);
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+
+        app(TenantContext::class)->set(null);
+
+        $this->expectException(TenantNotSetException::class);
+        Brand::count(); // must throw, NOT return every shop's rows
+    }
+
+    public function test_without_tenancy_sees_every_shops_rows(): void
+    {
+        $this->forShop($this->shopA);
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+        $this->forShop($this->shopB);
+        Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        $all = app(TenantContext::class)->withoutTenancy(fn () => Brand::count());
+        $this->assertSame(2, $all);
+    }
+
+    public function test_meta_cache_key_and_busting_are_per_shop(): void
+    {
+        Cache::put('api.meta.'.$this->shopA->slug, ['who' => 'A'], 600);
+        Cache::put('api.meta.'.$this->shopB->slug, ['who' => 'B'], 600);
+
+        // Saving A's payment settings busts only A's meta key (ShopSetting saved hook).
+        $this->forShop($this->shopA);
+        ShopSetting::current()->update(['kbzpay_name' => 'Daw Mya']);
+
+        $this->assertFalse(Cache::has('api.meta.'.$this->shopA->slug));
+        $this->assertTrue(Cache::has('api.meta.'.$this->shopB->slug));
+    }
+
+    public function test_without_tenancy_is_a_rare_audited_escape_hatch(): void
+    {
+        // The design budgets withoutTenancy() to a handful of call sites (§8 ledger);
+        // guard against proliferation. Counts CALLS (->withoutTenancy(), not the
+        // definition) across app/.
+        $count = 0;
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($files as $file) {
+            if ($file->isFile() && str_ends_with((string) $file->getFilename(), '.php')) {
+                $count += substr_count((string) file_get_contents($file->getPathname()), '->withoutTenancy(');
+            }
+        }
+
+        $this->assertLessThanOrEqual(5, $count);
+    }
+}

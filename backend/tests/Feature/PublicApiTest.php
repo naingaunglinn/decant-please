@@ -58,19 +58,19 @@ class PublicApiTest extends TestCase
 
     public function test_brands_lists_active_brands_with_active_fragrance_counts_and_caches(): void
     {
-        $response = $this->getJson('/api/v1/brands')->assertOk();
+        $response = $this->getJson('/api/v1/decant-please/brands')->assertOk();
 
         $response->assertJsonCount(2, 'data'); // Old House hidden
         $creed = collect($response->json('data'))->firstWhere('slug', 'creed');
         $this->assertSame(2, $creed['fragrances_count']); // GIT inactive, not counted
 
         Brand::create(['name' => 'Dior', 'type' => 'designer']);
-        $this->getJson('/api/v1/brands')->assertJsonCount(2, 'data'); // still cached
+        $this->getJson('/api/v1/decant-please/brands')->assertJsonCount(2, 'data'); // still cached
     }
 
     public function test_fragrance_list_hides_inactive_and_reports_in_stock_min_price(): void
     {
-        $response = $this->getJson('/api/v1/fragrances')->assertOk();
+        $response = $this->getJson('/api/v1/decant-please/fragrances')->assertOk();
 
         $names = collect($response->json('data'))->pluck('name');
         $this->assertEqualsCanonicalizing(['Allure Homme Sport', 'Aventus', 'Love In White'], $names->all());
@@ -85,7 +85,7 @@ class PublicApiTest extends TestCase
 
     public function test_fragrance_filters_narrow_the_catalog(): void
     {
-        $pluck = fn (string $query) => collect($this->getJson("/api/v1/fragrances?{$query}")->assertOk()->json('data'))->pluck('name')->all();
+        $pluck = fn (string $query) => collect($this->getJson("/api/v1/decant-please/fragrances?{$query}")->assertOk()->json('data'))->pluck('name')->all();
 
         $this->assertSame(['Love In White'], $pluck('gender=female'));
         $this->assertSame(['Allure Homme Sport'], $pluck('brand=chanel'));
@@ -102,19 +102,19 @@ class PublicApiTest extends TestCase
 
     public function test_fragrance_detail_by_slug_and_404_for_inactive(): void
     {
-        $this->getJson('/api/v1/fragrances/chanel-allure-homme-sport')
+        $this->getJson('/api/v1/decant-please/fragrances/chanel-allure-homme-sport')
             ->assertOk()
             ->assertJsonPath('data.name', 'Allure Homme Sport')
             ->assertJsonPath('data.concentration_label', 'Cologne')
             ->assertJsonPath('data.brand.type', 'designer')
             ->assertJsonCount(3, 'data.prices');
 
-        $this->getJson('/api/v1/fragrances/creed-green-irish-tweed')->assertNotFound();
+        $this->getJson('/api/v1/decant-please/fragrances/creed-green-irish-tweed')->assertNotFound();
     }
 
     public function test_meta_returns_filter_options_and_price_bounds(): void
     {
-        $this->getJson('/api/v1/meta')
+        $this->getJson('/api/v1/decant-please/meta')
             ->assertOk()
             ->assertJsonPath('price.min', 30000)
             ->assertJsonPath('price.max', 120000)   // GIT & Ghost Scent prices excluded
@@ -126,7 +126,7 @@ class PublicApiTest extends TestCase
 
     public function test_checkout_creates_awaiting_order_and_ignores_smuggled_prices(): void
     {
-        $response = $this->postJson('/api/v1/orders', $this->payload([
+        $response = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [[
                 'fragrance_id' => $this->allure->id,
                 'size_ml' => 10,
@@ -149,7 +149,7 @@ class PublicApiTest extends TestCase
     public function test_checkout_names_the_offending_item_in_422s(): void
     {
         // out-of-stock size, second item
-        $errors = $this->postJson('/api/v1/orders', $this->payload([
+        $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [
                 ['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1],
                 ['fragrance_id' => $this->allure->id, 'size_ml' => 30, 'quantity' => 1],
@@ -159,16 +159,16 @@ class PublicApiTest extends TestCase
 
         // inactive fragrance
         $git = Fragrance::where('name', 'Green Irish Tweed')->firstOrFail();
-        $errors = $this->postJson('/api/v1/orders', $this->payload([
+        $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => $git->id, 'size_ml' => 5, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
         $this->assertSame('That fragrance is no longer available.', $errors['items.0'][0]);
 
         // unknown fragrance id / unknown size
-        $this->postJson('/api/v1/orders', $this->payload([
+        $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => 999999, 'size_ml' => 5, 'quantity' => 1]],
         ]))->assertUnprocessable();
-        $errors = $this->postJson('/api/v1/orders', $this->payload([
+        $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 7, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
         $this->assertSame('7ml of Allure Homme Sport just sold out — pick another size.', $errors['items.0'][0]);
@@ -178,7 +178,7 @@ class PublicApiTest extends TestCase
 
     public function test_checkout_honeypot_pretends_success_but_creates_nothing(): void
     {
-        $this->postJson('/api/v1/orders', $this->payload(['website' => 'https://spam.example']))
+        $this->postJson('/api/v1/decant-please/orders', $this->payload(['website' => 'https://spam.example']))
             ->assertCreated()
             ->assertJsonStructure(['tracking_code', 'total_mmk', 'total_formatted']);
 
@@ -187,18 +187,18 @@ class PublicApiTest extends TestCase
 
     public function test_checkout_validates_required_fields(): void
     {
-        $this->postJson('/api/v1/orders', [])
+        $this->postJson('/api/v1/decant-please/orders', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['customer_name', 'phone', 'delivery_township_id', 'address_line', 'items']);
     }
 
     public function test_tracking_round_trip_and_generic_404s(): void
     {
-        $code = $this->postJson('/api/v1/orders', $this->payload())->assertCreated()->json('tracking_code');
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload())->assertCreated()->json('tracking_code');
 
         $order = Order::where('tracking_code', $code)->firstOrFail();
 
-        $this->getJson('/api/v1/orders/track?tracking_code='.strtolower($code).'&phone=09-771234561')
+        $this->getJson('/api/v1/decant-please/orders/track?tracking_code='.strtolower($code).'&phone=09-771234561')
             ->assertOk()
             ->assertJsonPath('tracking_code', $code)  // lowercase input normalized
             ->assertJsonPath('order_number', "#{$order->id}")
@@ -222,33 +222,33 @@ class PublicApiTest extends TestCase
             ->assertJsonPath('total_formatted', '55,000 Ks')
             ->assertJsonStructure(['placed_at']);
 
-        $wrongPhone = $this->getJson("/api/v1/orders/track?tracking_code={$code}&phone=09-000000000")->assertNotFound();
-        $wrongCode = $this->getJson('/api/v1/orders/track?tracking_code=WRONGCODE9&phone=09-771234561')->assertNotFound();
+        $wrongPhone = $this->getJson("/api/v1/decant-please/orders/track?tracking_code={$code}&phone=09-000000000")->assertNotFound();
+        $wrongCode = $this->getJson('/api/v1/decant-please/orders/track?tracking_code=WRONGCODE9&phone=09-771234561')->assertNotFound();
         $this->assertSame($wrongPhone->json(), $wrongCode->json()); // identical — no oracle
     }
 
     public function test_customer_can_cancel_only_while_awaiting_confirmation(): void
     {
-        $code = $this->postJson('/api/v1/orders', $this->payload())->assertCreated()->json('tracking_code');
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload())->assertCreated()->json('tracking_code');
         $pair = ['tracking_code' => $code, 'phone' => '09-771234561'];
 
         // wrong pair → the same generic 404 tracking uses
-        $wrong = $this->postJson('/api/v1/orders/cancel', ['tracking_code' => $code, 'phone' => '09-000000000'])
+        $wrong = $this->postJson('/api/v1/decant-please/orders/cancel', ['tracking_code' => $code, 'phone' => '09-000000000'])
             ->assertNotFound();
         $this->assertSame(
-            $this->getJson('/api/v1/orders/track?tracking_code=WRONGCODE9&phone=x')->json(),
+            $this->getJson('/api/v1/decant-please/orders/track?tracking_code=WRONGCODE9&phone=x')->json(),
             $wrong->json(),
         );
 
         // awaiting_confirmation → cancels, returns the updated receipt in place
-        $this->postJson('/api/v1/orders/cancel', $pair)
+        $this->postJson('/api/v1/decant-please/orders/cancel', $pair)
             ->assertOk()
             ->assertJsonPath('status', 'cancelled')
             ->assertJsonPath('subtotal_mmk', 55000);
         $this->assertSame(OrderStatus::Cancelled, Order::where('tracking_code', $code)->firstOrFail()->status);
 
         // already cancelled → 409, exact copy the receipt shows
-        $this->postJson('/api/v1/orders/cancel', $pair)
+        $this->postJson('/api/v1/decant-please/orders/cancel', $pair)
             ->assertStatus(409)
             ->assertJsonPath('message', "This order's already being prepared — call to cancel or change it.");
 
@@ -257,7 +257,7 @@ class PublicApiTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
         ] + $this->payload());
         $accepted->accept(today()->addDay());
-        $this->postJson('/api/v1/orders/cancel', ['tracking_code' => $accepted->tracking_code, 'phone' => '09-771234561'])
+        $this->postJson('/api/v1/decant-please/orders/cancel', ['tracking_code' => $accepted->tracking_code, 'phone' => '09-771234561'])
             ->assertStatus(409);
         $this->assertSame(OrderStatus::Pending, $accepted->fresh()->status);
     }
@@ -265,23 +265,23 @@ class PublicApiTest extends TestCase
     public function test_checkout_rate_limit_is_tight(): void
     {
         for ($i = 0; $i < 10; $i++) {
-            $this->postJson('/api/v1/orders', [])->assertUnprocessable();
+            $this->postJson('/api/v1/decant-please/orders', [])->assertUnprocessable();
         }
 
-        $this->postJson('/api/v1/orders', [])->assertStatus(429);
+        $this->postJson('/api/v1/decant-please/orders', [])->assertStatus(429);
     }
 
     public function test_tracking_rate_limit_is_tight(): void
     {
         for ($i = 0; $i < 20; $i++) {
-            $this->getJson('/api/v1/orders/track?tracking_code=X&phone=Y')->assertNotFound();
+            $this->getJson('/api/v1/decant-please/orders/track?tracking_code=X&phone=Y')->assertNotFound();
         }
 
-        $this->getJson('/api/v1/orders/track?tracking_code=X&phone=Y')->assertStatus(429);
+        $this->getJson('/api/v1/decant-please/orders/track?tracking_code=X&phone=Y')->assertStatus(429);
 
         // buckets are per-endpoint: exhausting tracking must not starve checkout or cancel
-        $this->postJson('/api/v1/orders/cancel', ['tracking_code' => 'X', 'phone' => 'Y'])->assertNotFound();
-        $this->postJson('/api/v1/orders', [])->assertUnprocessable();
+        $this->postJson('/api/v1/decant-please/orders/cancel', ['tracking_code' => 'X', 'phone' => 'Y'])->assertNotFound();
+        $this->postJson('/api/v1/decant-please/orders', [])->assertUnprocessable();
     }
 
     private function payload(array $overrides = []): array

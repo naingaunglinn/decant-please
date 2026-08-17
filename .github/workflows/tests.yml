@@ -121,8 +121,10 @@ jobs:
         run: |
           php artisan serve --port=8010 &
           for i in $(seq 1 30); do
-            curl -sf http://localhost:8010/api/v1/meta > /dev/null && break
+            curl -sf http://localhost:8010/api/v1/decant-please/meta > /dev/null && break
             [ "$i" = "30" ] && { echo "API never became ready"; exit 1; }
             sleep 1
           done
-          API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh
+          # Multi-tenancy Step 24: the public API is now under /api/v1/{shop}. The
+          # seeded default shop is `decant-please` (SHOP_SLUG), so the probes target it.
+          API=http://localhost:8010/api/v1/decant-please sh scripts/verify-postgres-portability.sh

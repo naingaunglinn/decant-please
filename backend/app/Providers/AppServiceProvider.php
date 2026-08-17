@@ -6,6 +6,8 @@ use App\Events\OrderPlaced;
 use App\Events\PaymentProofUploaded;
 use App\Listeners\NotifyAdminOfNewOrder;
 use App\Listeners\NotifyAdminOfPaymentProof;
+use App\Listeners\SyncTenantContextFromFilament;
+use Filament\Events\TenantSet;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -21,7 +23,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Read by BelongsToShop's global scope and creating hook. Registered as a
+        // plain singleton: FPM builds a fresh container per request, so this is
+        // already per-request (no cross-request leak), and unlike a scoped binding it
+        // survives the container's scoped-instance flush that Livewire/HTTP test
+        // helpers trigger mid-test — where nothing re-runs the resolver middleware.
+        // If this app ever moves to Octane (persistent container), switch to scoped()
+        // and reset it in an Octane RequestReceived listener.
+        $this->app->singleton(\App\Support\TenantContext::class);
     }
 
     /**
@@ -51,5 +60,9 @@ class AppServiceProvider extends ServiceProvider
         // isn't registered here silently never runs.
         Event::listen(OrderPlaced::class, NotifyAdminOfNewOrder::class);
         Event::listen(PaymentProofUploaded::class, NotifyAdminOfPaymentProof::class);
+
+        // Multi-tenancy Step 25a: mirror Filament's resolved panel tenant into our
+        // own TenantContext so the app scope stays the single source of truth.
+        Event::listen(TenantSet::class, SyncTenantContextFromFilament::class);
     }
 }

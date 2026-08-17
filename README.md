@@ -11,13 +11,18 @@ admin panel.
 No customer accounts. No payment gateway. Payment stays what it already is in Myanmar —
 bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
 
+Under the hood the system is **multi-tenant** (issue #57): one Laravel backend and one
+Postgres database serve many independent shops, each with its own storefront, catalog,
+orders and admin scope — invisible to customers, who only ever see one shop. The design
+lives in `prompts/multi-tenancy-design.md`.
+
 ---
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) admin panel at `/admin` — [README](backend/README.md) with routes & file structure |
+| `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) panels: per-shop admin at `/admin/{shop}`, studio at `/studio` — [README](backend/README.md) with routes & file structure |
 | `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
 | `CLAUDE.md` | Project spec and source of truth for every product/design decision |
 | `FINANCE.md` | Financial-surface roadmap — what's built, the real gaps in build order, and the money decisions locked or still open |
@@ -48,7 +53,15 @@ bank transfer, mobile banking, or cash on delivery, confirmed by the decanter.
   fee derived from the township server-side (shown as its own line, paid in cash to the
   courier; never part of an online prepayment)
 
-**Admin panel (`/admin`, login required)**
+**Admin panel (`/admin/{shop}`, login required — plus the studio panel at `/studio`)**
+
+Since multi-tenancy Step 25a the panel is tenant-aware: every URL carries the shop
+(`/admin/{shop}/…`), a switcher moves the studio operator between shops, and the
+**studio panel** at `/studio` is the super-admin home outside any shop — registering
+a shop there seeds its national delivery geography (inactive, unpriced) and, by
+default, creates the owner's login: an account with full control of that shop and
+access to nothing else. Zone activation and pricing are the go-live steps. Per shop,
+the panel offers:
 
 - Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a
   liquid-only bottle-cost reference (admin-eyes only — never the public API or invoices)
@@ -145,7 +158,8 @@ Then:
 | URL | What |
 |---|---|
 | http://localhost:3001 | Storefront |
-| http://localhost:8010/admin | Admin — `admin@decantplease.local` / the `ADMIN_PASSWORD` line in `backend/.env` |
+| http://localhost:8010/admin | Shop admin (redirects into `/admin/{shop}`) — `admin@decantplease.local` / the `ADMIN_PASSWORD` line in `backend/.env` |
+| http://localhost:8010/studio | Studio panel — same login; shop registry, studio accounts only |
 
 Ports are 8010/3001 because 8000/3000/3010 are taken by other local projects; Postgres
 publishes 5442 for the same reason. The database lives in the `decant_postgres_data`
@@ -207,8 +221,9 @@ php artisan storage:link    # serve uploaded images from /storage
 php artisan serve --port=8010
 ```
 
-Admin: **http://localhost:8010/admin** — `admin@decantplease.local` /
-whatever `ADMIN_PASSWORD` was when you seeded.
+Admin: **http://localhost:8010/admin** (per-shop) and **http://localhost:8010/studio**
+(shop registry) — `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
+seeded.
 
 **Frontend — http://localhost:3001**
 
@@ -238,12 +253,15 @@ npm run dev -- -p 3001
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` |
+| `NEXT_PUBLIC_SHOP_SLUG` | Which shop this storefront is — the `{shop}` path segment; matches a `shops.slug` row (defaults to `decant-please` locally) |
 | `NEXT_PUBLIC_SITE_URL` | Public site URL — canonical/OG metadata |
 | `NEXT_PUBLIC_IMAGE_URL` | Production only — the R2 public image host, allow-listed for the image optimizer; unset locally |
 
 ## Public API
 
-All endpoints are under `/api/v1`, JSON, paginated where applicable.
+All endpoints are under `/api/v1/{shop}` — the shop slug is the first path segment
+(multi-tenancy Step 24; unknown or inactive shops are a generic 404) — JSON, paginated
+where applicable.
 
 | Method | Endpoint | Purpose | Throttle |
 |---|---|---|---|

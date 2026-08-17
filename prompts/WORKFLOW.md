@@ -60,15 +60,29 @@ translate what 08 and 10 add, so it runs last.
    git checkout -b 12-order-confirmation-and-polish
    ```
 
+3a. **Map before you build.** Before writing any code, read `PRODUCT.md`, the step file,
+    and the relevant `AGENTS.md`, then return — without editing anything:
+
+    1. existing architecture in the affected area
+    2. files you will touch (and what you will deliberately not touch)
+    3. the API contract, if one changes
+    4. implementation sequence
+    5. risks
+    6. verification plan — which commands from `VERIFY.md`
+
+    Wait for that plan to be read before implementing. Amending five lines of plan is
+    cheaper than reverting twenty-five files.
+
 4. **Implement.** Read `CLAUDE.md` and the specific `prompts/0N-*.md` file, build it —
    same as every step before this one. Reference the issue number in commits if it's
    natural to (`git commit -m "feat: order receipt + cancellation (#12)"`), but don't
    force it into every single commit.
 
 5. **Update the docs in the same branch, not a follow-up PR:**
-   - `CLAUDE.md` — a short changelog note if this step changes something the project
-     memory should reflect (same pattern as the existing "What changed in vN"
-     sections). Bump the version marker in the title if it's a meaningful addition.
+   - `CHANGELOG.md` — a short version note at the top, same "What changed in vN" shape
+   - `AGENTS.md` / `PRODUCT.md` — only if a **durable rule or scope boundary** changed.
+     Most steps change neither. If you corrected the agent on the same thing twice
+     during this step, that correction belongs in `AGENTS.md` — that is the LEARN step.
    - The prompt file itself — if implementation revealed the spec was wrong,
      ambiguous, or worth amending, fix it in place rather than leaving a stale
      instruction for whoever reads it next (same discipline as the `01`/`03`

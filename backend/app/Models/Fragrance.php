@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Concentration;
 use App\Enums\Gender;
+use App\Models\Concerns\BelongsToShop;
 use App\Models\Concerns\HasSlug;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['brand_id', 'name', 'slug', 'concentration', 'gender', 'notes', 'vibes', 'performance', 'description', 'image_path', 'is_active', 'is_featured', 'stock_ml', 'low_stock_threshold_ml', 'bottle_cost_mmk', 'bottle_volume_ml'])]
 class Fragrance extends Model
 {
+    use BelongsToShop;
     use HasSlug;
 
     public function brand(): BelongsTo

@@ -8,7 +8,6 @@ use App\Filament\Pages\ProductionScheduleDay;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -22,11 +21,10 @@ class ProductionScheduleTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        // Studio account: under Filament tenancy (Step 25a) a real HTTP request
+        // to /admin/{tenant}/… passes IdentifyTenant, which 404s any user whose
+        // canAccessTenant() fails — a bare non-studio user can't open the pages.
+        $this->actingAs($this->studioUser());
     }
 
     // ---- The shared aggregation (Order::productionScheduleFor) --------------
@@ -309,7 +307,8 @@ class ProductionScheduleTest extends TestCase
     public function test_day_page_steps_between_days_and_links_back_to_the_calendar(): void
     {
         $this->assertStringEndsWith(
-            '/admin/production-schedule/2026-08-05',
+            // Panel URLs carry the tenant slug since Step 25a (/admin/{shop}/…).
+            '/admin/'.config('app.shop_slug').'/production-schedule/2026-08-05',
             ProductionScheduleDay::getUrl(['date' => '2026-08-05']),
         );
         // it needs a date, so it must never appear in the sidebar

@@ -4,14 +4,18 @@ namespace App\Providers\Filament;
 
 use App\Http\Controllers\OrderInvoiceController;
 use App\Http\Controllers\PaymentProofViewController;
+use App\Models\Shop;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -44,7 +48,16 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName('Decant Please!')
+            // Multi-tenancy Step 25a: the panel is now tenant-aware. Routes become
+            // /admin/{shop}/…; the shop is resolved from the slug, the switcher is
+            // rendered from the user's getTenants(), and IdentifyTenant enforces
+            // canAccessTenant. Our SyncTenantContextFromFilament listener mirrors the
+            // resolved tenant into TenantContext (AppServiceProvider).
+            ->tenant(Shop::class, slugAttribute: 'slug')
+            // The topbar wears the CURRENT shop's name — this panel belongs to
+            // whichever shop you're standing in, not to the platform. Tenant-less
+            // pages (login) fall back to the platform name.
+            ->brandName(fn (): string => Filament::getTenant()?->name ?? 'Decant Please!')
             ->colors([
                 'primary' => Color::Amber,
                 'blue' => Color::Blue,
@@ -65,13 +78,28 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
             ])
-            // authenticatedRoutes(), NOT routes(): Filament registers routes()
-            // closures alongside login/password-reset — outside the panel's auth
-            // middleware — while authenticatedRoutes() closures sit inside it
-            // (vendor routes/web.php). An invoice or a payment proof must never
-            // render for a logged-out visitor. Named filament.admin.orders.invoice
-            // and filament.admin.orders.payment-proof.
-            ->authenticatedRoutes(function (): void {
+            // The way back up: studio users get a user-menu link to their own
+            // panel (/studio — shop registry and, later, the cross-shop views).
+            // Owners never see it; canAccessPanel would 403 them there anyway.
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Studio')
+                    ->icon(Heroicon::OutlinedBuildingLibrary)
+                    ->url(fn (): string => Filament::getPanel('studio')->getUrl())
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_studio),
+            ])
+            // authenticatedTenantRoutes(), NOT authenticatedRoutes() or routes():
+            // routes() closures register alongside login/password-reset, outside the
+            // panel's auth middleware, and authenticatedRoutes() closures sit inside
+            // auth but OUTSIDE the {tenant} group (vendor routes/web.php) — there
+            // IdentifyTenant never runs, TenantContext stays unset, and the {order}
+            // binding throws TenantNotSetException. authenticatedTenantRoutes()
+            // closures get both: the auth guard (an invoice or proof must never
+            // render for a logged-out visitor) and the /admin/{tenant} prefix, so
+            // the binding resolves under the tenant scope (bootstrap/app.php orders
+            // IdentifyTenant before SubstituteBindings). Named
+            // filament.admin.orders.invoice and filament.admin.orders.payment-proof.
+            ->authenticatedTenantRoutes(function (): void {
                 Route::get('/orders/{order}/invoice', OrderInvoiceController::class)
                     ->name('orders.invoice');
                 Route::get('/orders/{order}/payment-proof', PaymentProofViewController::class)

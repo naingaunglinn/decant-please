@@ -12,11 +12,11 @@ use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
+use App\Support\Money;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions\Action;
-use App\Support\Money;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -310,7 +310,10 @@ class OrderResource extends Resource
             ->label('Print invoice')
             ->icon(Heroicon::OutlinedPrinter)
             ->visible(fn (Order $record): bool => $record->status->isFulfillable())
-            ->url(fn (Order $record): string => route('filament.admin.orders.invoice', $record))
+            // Named parameter: the route's first segment is {tenant} now (Step 25a),
+            // filled from the URL default the TenantSet listener registers — a
+            // positional $record would land in {tenant}, not {order}.
+            ->url(fn (Order $record): string => route('filament.admin.orders.invoice', ['order' => $record]))
             ->openUrlInNewTab();
     }
 

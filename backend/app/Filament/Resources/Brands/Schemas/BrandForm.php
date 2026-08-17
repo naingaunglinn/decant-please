@@ -20,6 +20,12 @@ class BrandForm
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
+                    // scopedUnique, not unique: it validates through the
+                    // tenant-scoped Brand query, so a duplicate in THIS shop is a
+                    // form error (instead of a raw QueryException off the
+                    // (shop_id, name) composite) while another shop's "Chanel"
+                    // doesn't block this one.
+                    ->scopedUnique(ignoreRecord: true)
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn (Set $set, ?string $state) => $set('slug', Str::slug($state ?? ''))),
                 TextInput::make('slug')

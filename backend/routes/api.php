@@ -9,9 +9,13 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentProofController;
 use App\Http\Controllers\Api\TrackOrderController;
 use App\Http\Controllers\Api\ValidatePromoController;
+use App\Http\Middleware\ResolveTenant;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
+// The {shop} segment is the tenant (Step 24, ADR-001). ResolveTenant binds it into
+// TenantContext (404 on unknown/inactive) before any controller runs; /up stays
+// unprefixed for Heroku's health check.
+Route::prefix('v1/{shop}')->middleware(ResolveTenant::class)->group(function () {
     Route::middleware('throttle:catalog')->group(function () {
         Route::get('/brands', BrandController::class);
         Route::get('/fragrances', [FragranceController::class, 'index']);
