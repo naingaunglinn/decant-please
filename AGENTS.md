@@ -21,9 +21,9 @@ Older docs describe this as a single-decanter tool. They are superseded.
 ```
 backend/              Laravel 13 + Filament 5 (PHP 8.3, Postgres 17)
   AGENTS.md           API/service/Filament/test conventions  ← read before backend work
-  app/Http/Controllers/Api/   public JSON API (routes/api.php, /api/v1)
+  app/Http/Controllers/Api/   public JSON API (routes/api.php, /api/v1/{shop})
   app/Filament/       admin panel resources, pages, widgets
-  tests/Feature/      the real suite (20 files)
+  tests/Feature/      the real suite (22 files)
   scripts/            verify-postgres-portability.sh
 frontend/             Next.js 16 App Router + Tailwind v4 (TypeScript)
   AGENTS.md           UI conventions, tokens, acceptance checks  ← read before frontend work
@@ -43,7 +43,7 @@ Run from the directory named. **Never claim work is done without running the rel
 | Tenant isolation | `backend/` | `php artisan test --filter=TenantIsolationTest` |
 | One backend test | `backend/` | `php artisan test --filter=PromoCodeTest` |
 | Backend format | `backend/` | `./vendor/bin/pint` |
-| Postgres portability | `backend/` | `API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh` |
+| Postgres portability | `backend/` | `sh scripts/verify-postgres-portability.sh` (base defaults to `…/api/v1/decant-please` — the API base must include the `{shop}` segment) |
 | Frontend typecheck | `frontend/` | `npm run typecheck` |
 | Frontend lint | `frontend/` | `npm run lint` |
 | Frontend build | `frontend/` | `npm run build` |

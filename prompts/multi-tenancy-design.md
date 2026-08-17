@@ -366,8 +366,10 @@ shops
   brand_primary, brand_accent, logo_path        -- Step C, see §10
   created_at, updated_at
 
-shop_user  (pivot — you belong to all shops, a client to one; lands with Filament tenancy, Step C)
-  shop_id, user_id, role
+shop_user  (pivot — access model decided in docs/adr/0003-admin-access-model.md:
+  Option C, is_studio flag as the studio grant; pivot shipped empty with Step 25a,
+  role column deferred until a client has staff)
+  shop_id, user_id
 ```
 
 Payment details do **not** move onto `shops` — amended after the audit. `shop_settings` shipped

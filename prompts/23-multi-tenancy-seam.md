@@ -43,12 +43,16 @@ against real paths.
   (one settings row per shop).
 - **Delivery-zone uniques become shop-scoped.** Geography is duplicated per shop (the
   decided model — design-doc §7, findings A2), so drop the global
-  `(region, name)` unique on `delivery_townships` for `(shop_id, region, name)`, and
-  the child's `(delivery_township_id, courier)` for
-  `(shop_id, delivery_township_id, courier)`. The national CSV seed is copied into each
-  shop (all inactive, fee 0) at onboarding, so a second shop's zone import can't collide
-  with the first's on township identity — the same reasoning as the slug composites
-  below.
+  `(region, name)` unique on `delivery_townships` for `(shop_id, region, name)`. The
+  national CSV seed is copied into each shop (all inactive, fee 0) at onboarding, so a
+  second shop's zone import can't collide with the first's on township identity — the
+  same reasoning as the slug composites below.
+  *As built:* the child's `(delivery_township_id, courier)` unique was deliberately
+  **not** widened to `(shop_id, …)` — township ids are already per-shop, so the pair
+  cannot collide across shops and the extra column would be redundant width;
+  `TenantIsolationTest` asserts the property instead of assuming it. And one composite
+  this spec missed entirely: `promo_codes.code` → `(shop_id, code)`, added in v25 —
+  two shops must both be able to run "SUMMER2026".
 - **Backfill in-migration** (Heroku's release phase runs `migrate --force` unattended —
   design-doc N5): create the one shop — slug from `SHOP_SLUG` env (add to
   `.env.example`, compose, and Heroku *before* promoting; it must match Step 24's

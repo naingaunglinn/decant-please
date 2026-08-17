@@ -9,7 +9,87 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v24
+## 0. What changed in v25
+
+**v25** turns on the panel's multi-tenancy (Step 25a — the Filament half pulled
+forward out of the deferred Step 25) and then hardens the whole seam: an audit of
+the branch found one production-breaking route bug, a red suite, and the gaps
+below; all are closed here. Step 25b/25c (per-tenant Telegram, theming, the
+all-shops dashboard, client logins) stay deferred until a real second client.
+
+- **The studio got its own panel.** Shop management moved out of the tenant URL
+  space into a second Filament panel at **`/studio`** (`StudioPanelProvider`, no
+  `->tenant()`, emerald where the shop panel is amber): the operator's correct
+  objection was that `/admin/decant-please/shops` made the super-admin look owned
+  by one shop. `User::canAccessPanel` gates it to `is_studio` accounts (a future
+  shop owner's login reaches only `/admin/{their-shop}`); same session guard, so
+  one login serves both, cross-linked via the user-menu "Studio" item and a
+  per-shop "Open panel" action. `ShopResource` now lives in
+  `app/Filament/Studio/Resources`; the 25b cross-shop features land in this panel.
+  **Registration now creates the owner's login too** (toggle, default on): a
+  NON-studio user attached to the shop via `shop_user` — full control of their
+  own shop through membership, 404 on any other shop's URLs, 403 on `/studio`
+  (the §8 case ADR-0003 owed "when the pivot lands", now tested). Shop + owner
+  commit in one transaction; the password is hand-set (no mail driver, §11) and
+  the `role` column stays deferred — an owner IS the shop's whole admin today.
+  And the shop panel's topbar brand is now the **current shop's name** (falling
+  back to "Decant Please!" on tenant-less pages like login) — the panel belongs
+  to the shop you're standing in, not to the platform.
+- **Step 25a — Filament tenancy + shop management.** The panel adopts
+  `->tenant(Shop::class, slugAttribute: 'slug')`: routes become `/admin/{shop}/…`,
+  the switcher renders from `getTenants()`, and `IdentifyTenant` enforces
+  `canAccessTenant`. Access model per ADR-0003 (Option C): `is_studio` is the
+  studio grant (existing users backfill as studio); the `shop_user` pivot lands
+  now but starts empty — client logins wait for the first client who asks, and the
+  pivot's `role` column stays deferred with them. A `TenantSet` listener mirrors
+  Filament's resolved tenant into `TenantContext` (and into `URL::defaults` for
+  `{tenant}` route generation), so the throwing `BelongsToShop` scope stays the one
+  isolation floor. `ShopResource` (Studio nav group, studio-only) is the "Register
+  a shop" screen; the interim panel middleware is deleted.
+- **Invoice/payment-proof routes moved inside the tenant space (critical fix).**
+  They were registered via `authenticatedRoutes()`, which mounts OUTSIDE the
+  `{tenant}` group — `IdentifyTenant` never ran, nothing set `TenantContext`
+  (the interim middleware being gone), and the `{order}` binding threw
+  `TenantNotSetException`: a 500 on every invoice/proof open in production, masked
+  in tests by the suite's preset context. Now `authenticatedTenantRoutes()`, with
+  `IdentifyTenant` ordered before `SubstituteBindings` (bootstrap/app.php), so the
+  binding resolves under the tenant scope — same shop streams, a cross-shop id
+  404s. Pinned by regression tests that clear the preset context first.
+- **Every tenant-owned natural key is per-shop now.** `promo_codes.code` was the
+  one the Step 23 composite pass missed — it becomes `(shop_id, code)`, and the
+  promo/brand forms validate via `scopedUnique()` (through the tenant-scoped
+  query) instead of raw-table `unique()`: a same-shop duplicate is a form error;
+  another shop's "Chanel"/"SUMMER26" is none of our business.
+  `delivery_township_couriers` keeps `(delivery_township_id, courier)`
+  **deliberately** — township ids are already per-shop, so the pair can't collide
+  across shops; a test asserts it rather than assuming it.
+- **Registering a shop seeds its delivery geography.** The national-chart copy
+  moved from `DeliveryZoneSeeder` into `App\Support\NationalGeography`, and
+  ManageShops' create action runs it for the new shop — all inactive at fee 0,
+  idempotent, never clobbering an activation or a price the decanter set. Without
+  it a new shop had zero townships and nothing offerable at checkout.
+- **`decant:probe-postgres` built** (Step 23 §8 owed it): a hidden command running
+  the TopFragrances join (shared via `TopFragrances::rankingQuery()` so probe and
+  widget can't drift), the production-schedule aggregation, and the seam's unique
+  indexes — tracking_code asserted deliberately global — against the connected
+  engine. `verify-postgres-portability.sh` invokes it (local php in CI, the
+  compose backend locally, SKIP otherwise).
+- **The §8 isolation table is now asserted at the real surface**, not just the
+  model layer: per-shop catalog counts over `/api/v1/{shop}`, cross-shop tracking
+  with byte-identical generic 404s, cross-shop invoice/proof, admin order-table
+  exact counts, dashboard stats, CSV export bytes, cross-shop promo redemption,
+  two-shop P&L, delivery-zones content + per-shop cache busting, B's township in
+  A's checkout → 422, and shop registration through the actual Filament action.
+  Panel tests authenticate as a studio user (`TestCase::studioUser()`) —
+  `IdentifyTenant` 404s anyone else, which is what had turned three
+  ProductionSchedule tests red.
+- Housekeeping that had drifted: `verify-image-fallback.mjs` gains the `{shop}`
+  segment; `AGENTS.md`'s portability command matches the script's shop-aware
+  base; `NEXT_PUBLIC_SHOP_SLUG` documented in the frontend env example and
+  DEPLOY.md; stale `SetDefaultTenant` comments corrected; README/API tables show
+  `/api/v1/{shop}` paths; ADR-0003 accepted with its as-built amendments.
+
+## 0.1 What changed in v24
 
 **v24** *builds* the multi-tenancy seam and routing that v23 specified (issue #57,
 `prompts/23-multi-tenancy-seam.md` + `24-multi-tenancy-routing.md`). The backend is now

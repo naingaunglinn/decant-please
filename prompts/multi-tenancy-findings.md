@@ -108,7 +108,7 @@ source.
 | `OrderItem` | tenant-owned | No Resource → Filament never scopes it; the doc's denormalised `shop_id` is what makes it directly scopable — keep it |
 | `PromoCode` | tenant-owned | `shop_id` list; Resource |
 | `ShopSetting` **(new, v14)** | tenant-owned in substance | Payment details — the very columns §7 originally folded into `shops`. Today a `firstOrCreate([])` singleton (`ShopSetting::current()`), **tenant-blind**: under multi-tenancy it either dissolves into `shops` columns or needs `shop_id` + a scoped `current()` — note a bare global scope can't parameterize `firstOrCreate([])`'s create side; the trait's auto-fill hook has to. *(Resolved since: keep the table, add `shop_id` + a unique index — see the design doc §7.)* |
-| `User` | global | Cross-shop via the proposed `shop_user` pivot; must gain `HasTenants` |
+| `User` | global | Gained `HasTenants` in Step 25a; access model is `docs/adr/0003-admin-access-model.md` (Option C: `is_studio` grant + an empty `shop_user` pivot for future client logins) |
 
 (`Concerns/HasSlug` is a trait, not a model — but see the slug finding under Q5.)
 

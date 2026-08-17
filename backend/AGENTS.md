@@ -39,7 +39,9 @@ the scope is missed, so **the scope is the isolation boundary**.
 | `app/Support/TenantContext.php` | request-scoped singleton — the one place "which shop is this?" lives |
 | `app/Models/Concerns/BelongsToShop.php` | the global scope + a `creating` hook that fills `shop_id` |
 | `app/Exceptions/TenantNotSetException.php` | thrown when a tenant query runs with no tenant set |
-| `app/Http/Middleware/SetDefaultTenant.php` | binds the shop for a request |
+| `app/Http/Middleware/ResolveTenant.php` | API side: resolves `/api/v1/{shop}` to a shop, generic 404 otherwise |
+| `app/Listeners/SyncTenantContextFromFilament.php` | panel side: mirrors Filament's resolved tenant (`IdentifyTenant` on `/admin/{shop}`) into `TenantContext` + URL defaults |
+| `bootstrap/app.php` middleware priority | orders `IdentifyTenant` before `SubstituteBindings`, so panel route-model bindings resolve under the tenant scope |
 
 **Rules**
 
@@ -139,13 +141,19 @@ API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh
   `{Thing}Resource.php`, `Pages/`, `Schemas/{Thing}Form.php`, `Tables/{Thing}sTable.php`.
   Follow the existing shape exactly — do not flatten it.
 - Custom pages go in `Filament/Pages/`, widgets in `Filament/Widgets/`.
+- **Two panels.** `Filament/Resources|Pages|Widgets` belong to the tenant panel
+  (`/admin/{shop}`, AdminPanelProvider); `Filament/Studio/Resources` belongs to the
+  studio panel (`/studio`, StudioPanelProvider — no tenancy, `is_studio` users only).
+  Anything cross-shop by nature (the shop registry, future all-shops views) lives in
+  Studio; anything a single shop operates lives in the tenant panel. Never register
+  a tenant-owned model's resource in Studio without the design saying so.
 - Widgets that show money must state their coverage honestly in the description
   (e.g. "fully-costed orders only, N of M") rather than quietly under-reporting.
 - The admin is used on a phone. Tables need sensible mobile column priorities.
 
 ## Tests
 
-`tests/Feature/` is the real suite — 20 files, and it is the primary feedback signal
+`tests/Feature/` is the real suite — 22 files, and it is the primary feedback signal
 for an agent working here. Write the test in the same PR as the behaviour.
 
 Something needs a Feature test when it:
@@ -157,12 +165,14 @@ Something needs a Feature test when it:
 Naming follows the existing files: `PromoCodeTest`, `DeliveryZoneTest`, `PublicApiTest`.
 Run one with `php artisan test --filter=DeliveryZoneTest`.
 
-## Public API surface — `/api/v1`
+## Public API surface — `/api/v1/{shop}`
 
+Every path below sits under `/api/v1/{shop}` (multi-tenancy Step 24): `ResolveTenant`
+turns the slug into the tenant, and an unknown or inactive shop is a generic 404.
 Reads are throttled as one bucket; each public write has its own bucket so one cannot
 starve another. Keep that separation when adding an endpoint.
 
-| Method | Path | Throttle |
+| Method | Path (under `/api/v1/{shop}`) | Throttle |
 |---|---|---|
 | GET | `/brands`, `/fragrances`, `/fragrances/{slug}`, `/meta`, `/delivery-zones` | `catalog` |
 | POST | `/orders` | `checkout` |
