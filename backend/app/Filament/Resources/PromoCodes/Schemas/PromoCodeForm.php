@@ -25,7 +25,12 @@ class PromoCodeForm
                             ->required()
                             ->maxLength(64)
                             ->alphaDash()
-                            ->unique(ignoreRecord: true)
+                            // scopedUnique, not unique: the plain rule queries the
+                            // table raw and would block a code that only exists in
+                            // ANOTHER shop. This one goes through PromoCode::query(),
+                            // so BelongsToShop narrows it to the current tenant —
+                            // matching the (shop_id, code) composite index.
+                            ->scopedUnique(ignoreRecord: true)
                             ->extraInputAttributes(['style' => 'text-transform: uppercase'])
                             ->helperText('Stored uppercase; customers can type it in any case.'),
                         Select::make('type')

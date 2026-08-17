@@ -7,7 +7,6 @@ use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Widgets\OrderStats;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -235,7 +234,7 @@ class PaymentTest extends TestCase
         $order = $this->order();
         $order->attachPaymentProof(UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk));
 
-        $response = $this->get(route('filament.admin.orders.payment-proof', $order));
+        $response = $this->get(route('filament.admin.orders.payment-proof', ['order' => $order]));
 
         $response->assertRedirect();
         $this->assertStringContainsString('/admin/login', $response->headers->get('Location'));
@@ -249,7 +248,7 @@ class PaymentTest extends TestCase
         $path = UploadedFile::fake()->image('proof.jpg')->store('payment-proofs', $disk);
         $order->attachPaymentProof($path);
 
-        $response = $this->get(route('filament.admin.orders.payment-proof', $order));
+        $response = $this->get(route('filament.admin.orders.payment-proof', ['order' => $order]));
 
         $response->assertOk();
         $this->assertStringStartsWith('image/', $response->headers->get('Content-Type'));
@@ -261,7 +260,7 @@ class PaymentTest extends TestCase
         $this->actingAsAdmin();
         $this->fakeProofsDisk();
 
-        $this->get(route('filament.admin.orders.payment-proof', $this->order()))
+        $this->get(route('filament.admin.orders.payment-proof', ['order' => $this->order()]))
             ->assertNotFound();
     }
 
@@ -354,10 +353,6 @@ class PaymentTest extends TestCase
 
     private function actingAsAdmin(): void
     {
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 }

@@ -281,7 +281,7 @@ class OrderForm
                             'name' => basename($file),
                             'size' => 0,
                             'type' => null,
-                            'url' => route('filament.admin.orders.payment-proof', $record),
+                            'url' => route('filament.admin.orders.payment-proof', ['order' => $record]),
                         ];
                     })
                     ->hintAction(
@@ -289,7 +289,7 @@ class OrderForm
                             ->label('Open full size')
                             ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                             ->url(fn (?Order $record): ?string => $record?->payment_proof_path
-                                ? route('filament.admin.orders.payment-proof', $record)
+                                ? route('filament.admin.orders.payment-proof', ['order' => $record])
                                 : null)
                             ->openUrlInNewTab()
                             ->visible(fn (?Order $record): bool => $record?->payment_proof_path !== null),

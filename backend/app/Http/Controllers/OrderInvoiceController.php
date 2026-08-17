@@ -17,7 +17,10 @@ use Illuminate\Http\Response;
  */
 class OrderInvoiceController extends Controller
 {
-    public function __invoke(Order $order): Response
+    // The route lives under /admin/{tenant} (Step 25a), so the slug arrives as
+    // the first argument; IdentifyTenant has already resolved and authorized it,
+    // and the {order} binding ran under the tenant scope — a cross-shop id 404s.
+    public function __invoke(string $tenant, Order $order): Response
     {
         // Same gate as the actions that link here: an order that isn't
         // fulfillable has no committed schedule or guaranteed pricing to

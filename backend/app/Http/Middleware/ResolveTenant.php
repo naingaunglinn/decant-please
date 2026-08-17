@@ -15,8 +15,9 @@ use Symfony\Component\HttpFoundation\Response;
  * or inactive shop — the same generic-404 discipline as tracking, so the endpoint
  * is no shop-enumeration oracle beyond what the storefront URL already reveals.
  *
- * Replaces the interim SetDefaultTenant on the API side; the panel keeps its own
- * interim middleware until Filament tenancy lands (Step 25).
+ * The API-side half of per-route tenant resolution; the panel's half is Filament's
+ * IdentifyTenant, mirrored into TenantContext by SyncTenantContextFromFilament
+ * (Step 25a). The interim SetDefaultTenant middleware both replaced is deleted.
  */
 class ResolveTenant
 {

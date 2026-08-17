@@ -56,6 +56,28 @@ for sort in price_asc price_desc name newest; do
     fi
 done
 
+# 3. The tenant-seam probe (multi-tenancy Step 23 §8): decant:probe-postgres runs
+#    the TopFragrances join (an unqualified shop_id is ambiguous on Postgres only,
+#    green on SQLite), the production-schedule aggregation, and the seam's unique
+#    indexes — behind panel auth, so curl can't reach them; it needs an artisan.
+#    CI has php on the path; local dev has the docker compose stack; otherwise SKIP.
+if command -v php > /dev/null 2>&1 && [ -f artisan ]; then
+    probe_runner="php artisan"
+elif docker compose -f "$(dirname "$0")/../../docker-compose.yml" ps -q backend 2> /dev/null | grep -q .; then
+    probe_runner="docker compose -f $(dirname "$0")/../../docker-compose.yml exec -T backend php artisan"
+else
+    probe_runner=""
+    echo "SKIP  tenant-seam probe — no php on the path and no running compose backend"
+fi
+
+if [ -n "$probe_runner" ]; then
+    if $probe_runner decant:probe-postgres; then
+        pass "tenant-seam probe (joins, alias sorts, unique indexes)"
+    else
+        fail "tenant-seam probe" "decant:probe-postgres exited non-zero"
+    fi
+fi
+
 if [ "$failures" -eq 0 ]; then
     echo "\nall checks passed"
     exit 0

@@ -5,6 +5,7 @@ namespace Tests;
 use App\Enums\Courier;
 use App\Models\DeliveryTownship;
 use App\Models\Shop;
+use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Schema;
@@ -13,10 +14,11 @@ use Illuminate\Support\Facades\URL;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Every test runs single-shop, mirroring production's interim resolver
-     * (SetDefaultTenant): once BelongsToShop's scope throws without a tenant, an
-     * unscoped test create would error, so pin the default shop here. Tests that
-     * exercise isolation set a different shop on TenantContext directly.
+     * Every test runs single-shop by default: once BelongsToShop's scope throws
+     * without a tenant, an unscoped test create would error, so pin the default
+     * shop here. Tests that exercise isolation set a different shop on
+     * TenantContext directly — and the route-resolution regression tests clear
+     * this preset on purpose, so a request must resolve its own tenant.
      */
     protected function setUp(): void
     {
@@ -38,6 +40,22 @@ abstract class TestCase extends BaseTestCase
             // when no one is authenticated).
             URL::defaults(['tenant' => $shop->slug]);
         }
+    }
+
+    /**
+     * The operator account panel tests authenticate as. Under Filament tenancy
+     * (Step 25a) every /admin/{tenant} request passes IdentifyTenant, which 404s
+     * any user whose canAccessTenant() fails — so a test admin must be a studio
+     * account, exactly like the backfilled production founder.
+     */
+    protected function studioUser(): User
+    {
+        return User::create([
+            'name' => 'Admin',
+            'email' => 'admin@decantplease.local',
+            'password' => 'secret-password',
+            'is_studio' => true,
+        ]);
     }
 
     /**

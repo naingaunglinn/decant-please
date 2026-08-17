@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Fragrances\Schemas;
 use App\Enums\BrandType;
 use App\Enums\Concentration;
 use App\Enums\Gender;
+use App\Models\Brand;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -38,7 +39,10 @@ class FragranceForm
                                 TextInput::make('name')
                                     ->required()
                                     ->maxLength(255)
-                                    ->unique('brands', 'name'),
+                                    // Tenant-scoped: the raw ->unique('brands','name')
+                                    // checked the whole table, so it blocked any name
+                                    // another shop's catalog already carries.
+                                    ->scopedUnique(Brand::class),
                                 Select::make('type')
                                     ->options(BrandType::class)
                                     ->default(BrandType::Designer->value)

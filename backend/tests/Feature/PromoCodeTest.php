@@ -169,6 +169,27 @@ class PromoCodeTest extends TestCase
         $this->assertSame('NEWYEAR25', PromoCode::latest('id')->firstOrFail()->code); // stored uppercase
     }
 
+    public function test_promo_code_must_be_unique_within_the_shop(): void
+    {
+        // (shop_id, code) composite: the form's scopedUnique goes through the
+        // tenant-scoped PromoCode query, so a duplicate in THIS shop is a form
+        // error — while another shop running the same code is none of our
+        // business (asserted from the other side in TenantIsolationTest).
+        $this->actingAs(User::factory()->create());
+        PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 2500]);
+
+        Livewire::test(CreatePromoCode::class)
+            ->fillForm([
+                'code' => 'SUMMER26',
+                'type' => PromoType::Fixed->value,
+                'value' => 1000,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['code']);
+
+        $this->assertSame(1, PromoCode::count());
+    }
+
     private function payload(array $overrides = []): array
     {
         return $overrides + [
