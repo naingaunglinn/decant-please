@@ -51,7 +51,12 @@ One prompt file per session. `/clear` between them — a session that has been r
 > (audit/decision), 3 and 4 as one branch (PR #87, v26; session 4 rode along and was
 > retargeted exactly as the §1 placement note prescribes — much of its README/feature
 > list was already closed by the v25 doc pass). `CLAUDE-md-v21-section.md` is merged
-> and deleted. Next: session 5 (ADR-0004 stays Proposed until then).
+> and deleted. Session 5 ran 2026-08-18: the pressure-test surfaced the incumbent
+> missing from the draft's options and a fourth option, and the owner accepted
+> ADR-0004 **as amended** (#88) — one storefront deployment, validated Host → tenant,
+> internal tenant-keyed rewrite, custom domains first-class. Implementation proceeds
+> as its own issue with a reviewed migration plan, outside this kit's session list.
+> Next: session 6 (step 33).
 
 ### Session 1 — audit (read-only, no branch, no issue)
 

@@ -1,152 +1,167 @@
 # ADR-0004: How a shop's storefront is addressed
 
-**Status:** Proposed
-**Date:** 2026-08-17
+**Status:** Accepted — as amended, 2026-08-18 (issue #88)
+**Date:** proposed 2026-08-17 (subdomain-first draft); amended and accepted 2026-08-18
+after the tenancy-kit session-5 pressure-test and the owner's decision
 **Deciders:** repo owner
-**Supersedes:** nothing (drafted externally as "0001"; renumbered on placement — 0001–0003 exist)
-**Must be reconciled with:** `prompts/multi-tenancy-design.md` ADR-004 (storefront
-topology), which is *accepted* and chose N Vercel projects — one per shop, addressed by
-its own domain via `NEXT_PUBLIC_SHOP_SLUG` — precisely to keep theming build-time and
-CORS static. This proposal's premise ("one Next.js app, subdomain via Host header") is
-that decision's rejected Option B revisited; the session-5 pressure-test should argue
-them against each other, not treat this page as green-field.
+**Supersedes:** `prompts/multi-tenancy-design.md` §6 ADR-004 (N Vercel projects, one per
+shop, build-time `NEXT_PUBLIC_SHOP_SLUG`). This is the "contained frontend change"
+ADR-0002 anticipated as its reading #2 — taken deliberately. ADR-0002's **backend**
+decision (pooled: one instance, one database, `BelongsToShop`) is untouched, and its
+exit ramps stand.
+**History:** drafted externally as "0001"; renumbered on placement (0001–0003 exist).
+The original draft proposed subdomains resolved from a domains table; the pressure-test
+showed its real blast radius (below) and the owner chose a fourth option the draft had
+not considered, recorded here as the decision.
 
 ## Context
 
 Steps 23–25a made the API and admin panel tenant-aware: `/api/v1/{shop}/*` resolves
 through `ResolveTenant`, and the Studio registry can register a shop. Registering a shop
-implies giving its decanter a URL to put in their TikTok bio — and that part isn't
-decided.
+implies giving its decanter a URL to put in their TikTok bio — and that part wasn't
+decided. The constraints:
 
-The constraints that shape it:
+- The decanters already have their own brand identities on social. **"Your shop, on our
+  platform" is a different pitch from "a page on someone else's site"** — a custom
+  domain is part of the core business model (paid tier), not a future nicety.
+- Customers arrive from TikTok/Facebook links on Myanmar mobile connections.
+  Shareability, legitimacy, and page speed matter; memorability doesn't.
+- Ops budget is one person; infrastructure stays near $12/mo. Onboarding must stay
+  "minutes, not a deployment" (F6).
+- No customer accounts, no identity cookies — cart is `localStorage`, so the usual
+  cookie-scoping argument against shared infrastructure doesn't apply.
 
-- **One Next.js app on Vercel**, with a single `NEXT_PUBLIC_API_URL` and a single
-  `NEXT_PUBLIC_SITE_URL` used for canonical and OG metadata.
-- **`config/cors.php` allows exactly one origin**, `FRONTEND_URL`, which is also what the
-  admin's "View on site" links point at.
-- The customers are Myanmar buyers arriving from a TikTok or Facebook link. They will
-  not type the URL. Shareability and looking legitimate matter; memorability matters less.
-- **No customer accounts and no cookies carrying identity** on the storefront — cart is
-  `localStorage`. This removes the usual cookie-scoping argument against a shared origin.
-- The decanters already have their own brand identities on social. "Your shop, on our
-  platform" is a different pitch from "a page on someone else's site", and the pitch is
-  the product here.
-- Ops budget is one person. Anything requiring per-shop manual DNS work caps how many
-  shops can be onboarded in an afternoon.
+What the session-5 pressure-test added to the original draft:
+
+- The **incumbent** (N Vercel projects, one per shop) was missing from the draft's own
+  options table. At 20 shops it costs: 20 builds per push and per promotion, 20
+  hand-set `NEXT_PUBLIC_SHOP_SLUG`s where one typo serves another shop's catalog under
+  the wrong domain (an isolation failure no test can see), 20 Production-Branch
+  settings, and onboarding that is literally a deployment.
+- Any *single-deployment* design that resolves the tenant from the request host and
+  keys nothing else re-creates the step-32 cache leak one layer up: the Next.js Full
+  Route Cache keys by pathname, so `/fragrance/sauvage` rendered for shop A would be
+  served under shop B's domain — no attacker required, and invisible to both
+  `TenantIsolationTest` and the browser-evidence scripts.
+- Making every route host-aware via request headers turns the whole storefront
+  dynamically rendered — a function invocation per page view instead of cached HTML.
+- Vercel preview deployments arrive on `*.vercel.app` hosts that map to no shop — the
+  same failure that killed origin-based tenancy for the API (design-doc ADR-001,
+  option C).
 
 ## Decision
 
-**Subdomain per shop (`{shop}.decantplease.com`), resolved through a `shop_domains`
-table rather than the `shops.slug` column**, so a custom domain per shop is later a row
-in that table and not a re-architecture.
+**One centralized admin, one shared storefront deployment, N tenants, N domains.**
 
-`ResolveTenant` becomes the single site that turns *either* a path segment *or* a `Host`
-header into a shop. The API keeps its `/api/v1/{shop}/*` shape untouched — this decision
-is about the storefront's public face, and the API's explicit slug segment is a feature,
-not a thing to hide behind a header.
+```
+Admin (Filament, unchanged)          Storefront (one Next.js deployment)
+admin host, /admin/{shop}, /studio     client-a.com   client-b.com   {c}.decantplease.com
+            │                                 │              │              │
+            └────────── API / DB ◄────────────┴──────────────┴──────────────┘
+                                          Host → shop_domains → tenant
+                                          internal rewrite → /{tenant-key}/…
+```
+
+- **Every shop is addressed by its own public domain.** Custom domains
+  (`client-a.com`) are first-class; platform subdomains (`{shop}.decantplease.com`)
+  are supported by the **same mechanism** — the two are commercial tiers
+  (trial/free vs paid), not different architectures.
+- **The incoming `Host`, validated against the `shop_domains` table, is the only
+  authoritative tenant signal on the storefront.** Not a client-supplied slug, query
+  parameter, cookie, or `localStorage` value. One domain maps to one shop; a shop may
+  hold several domains with one marked primary.
+- **The request is rewritten internally to a tenant-keyed route** (`/{tenant-key}/…`,
+  the `[shop]` segment). The browser URL never shows it — `client-a.com/fragrance/x`
+  stays `client-a.com/fragrance/x`. The internal segment exists to make every cache
+  key carry the tenant *by construction*: `/{a}/fragrance/sauvage` and
+  `/{b}/fragrance/sauvage` can never share a rendered-HTML cache entry. (Whether the
+  segment value is the shop slug or the validated host is an implementation choice —
+  both satisfy the invariant; the host variant keeps the rewrite I/O-free. The
+  implementation plan decides and records it.)
+- **Performance is a first-class constraint: only the rewrite layer runs
+  per-request.** Pages keep today's static/ISR + 60s data-cache profile; tenant
+  resolution must not convert the storefront to global dynamic rendering. Anything
+  genuinely request-bound is isolated to the smallest possible layer.
+- **Fail closed.** An unknown host — including `*.vercel.app` previews and local dev
+  hosts — resolves only through an explicit mapping (a seeded/dev row or a deliberate
+  preview mapping) or returns a 404. There is no fallback tenant, ever; a preview must
+  never silently serve a production shop.
+- **The backend scope remains the security boundary.** The API stays
+  `/api/v1/{shop}/*` through `ResolveTenant`, and `BelongsToShop` keeps enforcing
+  isolation regardless of what the frontend resolves. Frontend routing is a caching
+  and addressing mechanism, never the isolation mechanism.
+- **Per-tenant SEO derives from the tenant's primary domain** — canonical, Open
+  Graph, sitemap, robots — never from a global `NEXT_PUBLIC_SITE_URL`. Secondary
+  domains redirect (308) to the primary.
+- **No per-tenant Vercel projects.** The N-projects model is decommissioned once this
+  ships; a per-tenant project returns only if a future requirement (per-tenant build
+  isolation, a contractual fork) justifies it explicitly.
 
 ## Options considered
 
-### Option A — path-based, `decantplease.com/{shop}`
+| | Option | Fate |
+|---|---|---|
+| A | Path-based `decantplease.com/{shop}` | Rejected — one origin/robots/sitemap makes the SERP a de-facto cross-shop directory (the NON-GOALS' most load-bearing exclusion), shops enumerable by path, shared browser state, and the exit breaks every shared link, ×N shops |
+| B | Subdomain-first, host resolved at runtime (the original draft) | Amended — right direction, but as drafted it fused public addressing with internal keying: route-cache leak or full dynamic rendering, broken previews, and it deferred custom domains that the business model requires now |
+| C | Custom domain per shop, one Vercel project each (the incumbent, design-doc §6) | Superseded — 20 builds per push, hand-drawn isolation boundaries in a dashboard, onboarding = a deployment (breaks F6) |
+| **D** | **One deployment; validated Host → tenant; internal tenant-keyed rewrite; custom domains and subdomains through one mechanism** | **Accepted** |
 
-| Dimension | Assessment |
-|---|---|
-| Ops | None. No DNS, no certificates, one Vercel project as-is. |
-| CORS | Unchanged — one origin forever. |
-| Time to ship | Hours. |
-| Decanter's brand | Weak. Reads as a directory listing. |
-| SEO | Shops share a domain's authority — helps a new shop, means one shop's spam hurts the others. |
-| Slug changes | Cheap; one redirect rule. |
+D is B's public face on A's internal mechanics: the customer sees their own domain (C's
+brand story), the app keys every route and cache entry by an explicit tenant segment
+(A's cache-safety and the repo's explicit-tenant idiom, ADR-001), and there is one
+build, one project, one thing to watch (B's ops story).
 
-**Pros:** cheapest by a wide margin; the storefront's routing already speaks in path
-segments; zero new failure modes.
-**Cons:** the platform is visible in every URL a decanter shares, which is exactly the
-opposite of the pitch; no path to a custom domain without redoing this later.
+## What D costs, honestly
 
-### Option B — subdomain, `{shop}.decantplease.com`
-
-| Dimension | Assessment |
-|---|---|
-| Ops | Wildcard DNS record + wildcard certificate, configured once. |
-| CORS | Becomes a per-request check of `Origin` against the domains table. |
-| Time to ship | Days. |
-| Decanter's brand | Good — reads as *their* shop. |
-| SEO | Each shop is its own site; authority isn't shared in either direction. |
-| Slug changes | Need a redirect; the slug is now public identity, not an internal key. |
-
-**Pros:** the brand story works; wildcard setup is one-time, so onboarding stays
-self-service; a clean seam toward custom domains.
-**Cons:** the slug becomes load-bearing and public — renaming it breaks shared links;
-CORS and canonical URLs both become dynamic; local dev needs a wildcard host entry.
-
-### Option C — custom domain per shop
-
-| Dimension | Assessment |
-|---|---|
-| Ops | Per-shop domain verification and certificate issuance; Vercel Domains API. |
-| CORS | Dynamic, same as B. |
-| Time to ship | Weeks, and permanently more support load. |
-| Decanter's brand | Strongest — the platform is invisible. |
-| SEO | Fully independent. |
-| Slug changes | Irrelevant; the domain is identity. |
-
-**Pros:** what a decanter with an established brand actually wants.
-**Cons:** each onboarding gains a DNS conversation with someone who may not own their
-domain yet; certificate failures become a support queue; it is the wrong first move for
-a platform with two shops.
-
-## Trade-off analysis
-
-A and C are the honest endpoints of the same axis: A optimizes for the operator's time,
-C for the decanter's brand. B is not a compromise between them so much as a way of
-**deferring the choice cheaply** — a wildcard certificate is configured once and never
-touched again, and if a decanter later wants their own domain, the domains table already
-exists to hold it.
-
-The thing that makes B safe is putting resolution in a table from day one. Resolving from
-`shops.slug` would work identically today and would make option C a migration; a
-`shop_domains` row with a `primary` flag makes it an insert.
-
-The argument for A is real and shouldn't be dismissed: with two shops, the platform has
-no idea yet whether decanters care about the URL. If the next two onboardings say they
-don't, A was correct and B was premature. The tiebreaker is that B's cost is a one-time
-DNS setup rather than ongoing work, and that migrating A → B later means breaking every
-link already shared into TikTok comments — a link that dies is worse than one that looks
-generic.
+- Every storefront route moves under the internal tenant segment — a mechanical but
+  wide frontend migration, plus a `proxy.ts` that must exclude static assets and must
+  not do per-request I/O.
+- CORS stops being a static allowlist: the API must accept N shop origins, resolved
+  from `shop_domains` with a short cache. A cache bug here is a "checkout broken for
+  one shop" incident — it ships with its own test.
+- On the subdomain tier the slug becomes public identity — renaming breaks shared
+  links. Slug immutability (or a redirect path) must be decided during implementation.
+- Each custom domain still has to be attached to the one Vercel project for TLS — a
+  small per-paying-shop ops step (dashboard or Domains API), bounded and chargeable;
+  the wildcard for subdomains is attached once.
+- What the platform apex `decantplease.com` itself serves is now a real question
+  (marketing page? redirect?) — deliberately left open, tracked below.
 
 ## Consequences
 
-**Easier**
+**Easier:** onboarding stays self-service (register in Studio, map a domain — F6
+holds); per-shop sitemap/robots/canonical key off data, not env; one build per push at
+any shop count; previews and local dev work through explicit host rows; custom domains
+are an insert plus a Vercel domain-attach, not a re-architecture; the cache-leak class
+is closed structurally, and testable.
 
-- Onboarding a shop stays self-service: register in Studio, the subdomain resolves.
-- Per-shop sitemap, robots, canonical, and OG metadata all key off the request host.
-- Custom domains become additive.
+**Harder:** dynamic CORS (cached, tested); the frontend route migration touches every
+page; `NEXT_PUBLIC_SHOP_SLUG`/`NEXT_PUBLIC_SITE_URL` are retired from the storefront
+(build-time per-shop config dies with the N-projects model); `DEPLOY.md`'s frontend
+half is rewritten.
 
-**Harder**
+## Action items (the implementation backlog — sequenced plan lives with issue #88)
 
-- `config/cors.php` stops being a static allowlist. The origin check queries the domains
-  table on every preflight, so it needs caching, and a cache bug becomes a "checkout is
-  broken for one shop" incident.
-- `NEXT_PUBLIC_SITE_URL` can no longer be a build-time constant; canonical/OG metadata
-  must be derived per request.
-- Local dev needs `*.decant.localhost` or equivalent, and the fixed-port convention in §7
-  needs a line about it.
-- Slug edits need a redirect path. Consider making the slug immutable after first order,
-  with a Studio-only override that writes the redirect.
-
-**To revisit**
-
-- If three or more decanters ask for their own domain, promote C from "later" to next.
-- If shops share a domain's SEO in a way that turns out to matter (either direction),
-  this decision is the lever.
-
-## Action items
-
-1. [ ] `shop_domains` table — shop, host, `is_primary`, verified-at.
-2. [ ] `ResolveTenant` accepts host *or* path segment; one resolution site, cached.
-3. [ ] Dynamic CORS origin check against the table, with a cache and a test that a
-       non-shop origin is rejected.
-4. [ ] Per-request canonical / OG / sitemap host on the frontend.
-5. [ ] Wildcard DNS + certificate; document in `DEPLOY.md`.
-6. [ ] Local dev wildcard host, documented alongside the fixed ports in §7.
-7. [ ] Decide slug mutability; implement the redirect if mutable.
+1. [ ] `shop_domains` migration + model: `shop_id`, `host` (unique), `is_primary`,
+       `verified_at`. Platform-owned — **no** `BelongsToShop` (resolution runs before
+       any tenant context exists), same footing as `shops`/`users` per AGENTS §8.
+2. [ ] Public storefront-host resolution endpoint outside the `{shop}` route group
+       (slug, shop name, primary host), throttled, generic 404 — no enumeration oracle.
+3. [ ] Dynamic CORS from `shop_domains` with a short cache; a test that a non-shop
+       origin is rejected and each mapped origin is accepted.
+4. [ ] `proxy.ts`: host → internal tenant-keyed rewrite. I/O-free, static matcher
+       excluding `_next`/assets while still covering `robots.txt`/`sitemap.xml`.
+5. [ ] Route migration under the tenant segment; a cached (≤60s) resolver in `lib/`
+       feeding pages, `generateMetadata`, and the API path — pages stay static/ISR.
+6. [ ] Per-tenant metadata/sitemap/robots from the resolve payload's primary domain;
+       nested metadata conventions (or route handlers) under the tenant segment;
+       secondary → primary 308 at the tenant layout seam.
+7. [ ] Preview/dev host policy: seed `localhost:3001` → the dev shop; preview hosts
+       map only by deliberate row/env; everything else 404s. Never a fallback tenant.
+8. [ ] Tests: backend resolution + CORS suites; a browser-evidence script asserting
+       the step-32 cache case end-to-end — same pathname, two hosts, two different
+       tenants' HTML; unknown host fails closed.
+9. [ ] Studio: manage a shop's domains (registry integration belongs to step 34).
+10. [ ] `DEPLOY.md`: single-project domain runbook (wildcard once, custom per paying
+        shop), decommission the N-projects instructions; resolve slug mutability; decide
+        what the platform apex serves.
