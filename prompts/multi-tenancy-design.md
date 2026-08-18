@@ -335,6 +335,14 @@ build breaks everyone with no isolation whatsoever.
 **Option A**, and note that the cost is N Vercel builds per push — acceptable at ten shops, worth
 revisiting at fifty.
 
+> **Superseded (2026-08-18, issue #88):** `docs/adr/0004-storefront-addressing.md` is
+> accepted as amended and replaces this decision. The storefront becomes **one**
+> deployment resolving the tenant from the validated `Host` (via a `shop_domains`
+> table) and rewriting internally to a tenant-keyed route — Option B's runtime
+> resolution married to Option A's explicit tenant keys, with custom domains
+> first-class. The revisit trigger in §11 ("ten shops: N builds per push") is thereby
+> retired. The backend topology (ADR-0002: pooled) is unchanged.
+
 ### Consequences
 
 - Vercel Pro at $20/mo becomes mandatory rather than deferred once any client pays. Real cost model

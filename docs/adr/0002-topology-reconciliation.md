@@ -128,6 +128,13 @@ this decision.
 record twice. Fixing the shorthand is cheaper than re-litigating the architecture a third
 time.
 
+> **Amended (2026-08-18, issue #88):** reading #2 has since become true for the
+> storefront — `docs/adr/0004-storefront-addressing.md` (accepted as amended) replaces
+> the frontend row above with **one** storefront deployment resolving the tenant from
+> the validated `Host` and rewriting internally to a tenant-keyed route. "Many
+> storefronts" now means many *domains*, not many deployments. Everything else here —
+> the pooled backend, the isolation invariants, the exit ramps — stands unchanged.
+
 ## Consequences
 
 - The routing and shop-onboarding steps proceed as specced.
