@@ -36,6 +36,14 @@ class DatabaseSeeder extends Seeder
         );
         app(TenantContext::class)->set($shop);
 
+        // ADR-0004: the shared storefront resolves hosts through shop_domains. Map
+        // the fixed local port to the default shop so the storefront, curl, and
+        // every verify-*.mjs script resolve with no env var and no DNS. Idempotent.
+        $shop->domains()->updateOrCreate(
+            ['host' => 'localhost:3001'],
+            ['is_primary' => true, 'verified_at' => now()],
+        );
+
         $this->call([
             CatalogSeeder::class,
             DeliveryZoneSeeder::class, // before orders — demo checkouts pick a township

@@ -276,6 +276,11 @@ where applicable.
 | POST | `/orders/payment-proof` | Upload a transfer screenshot (code + phone gated) | 10/min |
 | POST | `/orders/validate-promo` | Preview a promo code against the cart | 10/min |
 
+One platform endpoint sits outside the shop prefix: `GET /api/v1/_storefront/host/{host}`
+resolves a storefront domain to its shop for the shared storefront deployment
+(ADR-0004; PR-B's proxy layer will consume it). Unknown, unverified, and inactive
+hosts get one generic 404; 60/min per IP.
+
 Guarantees worth knowing:
 
 - **Prices are never trusted from the client — and neither is the delivery fee.**
@@ -291,14 +296,14 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 236 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, full API
+docker compose exec backend php artisan test   # 258 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, storefront hosts, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 
 Or with local toolchains:
 
 ```bash
-cd backend && php artisan test   # same 236 tests, using your local toolchain
+cd backend && php artisan test   # same 258 tests, using your local toolchain
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 

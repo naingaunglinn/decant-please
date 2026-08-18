@@ -7,10 +7,18 @@ use App\Http\Controllers\Api\FragranceController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentProofController;
+use App\Http\Controllers\Api\StorefrontHostController;
 use App\Http\Controllers\Api\TrackOrderController;
 use App\Http\Controllers\Api\ValidatePromoController;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Support\Facades\Route;
+
+// Platform endpoint (ADR-0004): the shared storefront deployment resolves an
+// incoming Host to a shop here. Deliberately OUTSIDE the {shop} group — this call
+// is what produces the slug — and registered before it, so the literal
+// `_storefront` prefix always beats the {shop} pattern in route matching.
+Route::get('v1/_storefront/host/{host}', StorefrontHostController::class)
+    ->middleware('throttle:host-resolve');
 
 // The {shop} segment is the tenant (Step 24, ADR-001). ResolveTenant binds it into
 // TenantContext (404 on unknown/inactive) before any controller runs; /up stays

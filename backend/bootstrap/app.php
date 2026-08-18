@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\MergeShopDomainCorsOrigins;
 use Filament\Http\Middleware\IdentifyTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // (AppServiceProvider) into one global bucket, and $request->isSecure() is false,
         // which can loop Filament login under SESSION_SECURE_COOKIE=true.
         $middleware->trustProxies(at: '*');
+
+        // ADR-0004: merge verified shop domains into the CORS allowlist before
+        // HandleCors runs — it re-reads config('cors') per request in handle(),
+        // so the config repository is the override point, not the service binding.
+        $middleware->prepend(MergeShopDomainCorsOrigins::class);
 
         // Tenant resolution is per-route (Step 24/25a): ResolveTenant on the
         // /api/v1/{shop} group binds the tenant from the path; the panel resolves

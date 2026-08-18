@@ -9,7 +9,55 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v26
+## 0. What changed in v27
+
+**v27** starts ADR-0004 — storefront addressing, accepted as amended (#88/#89): one
+shared storefront deployment, every tenant on its own public domain, the validated
+`Host` resolved through a platform table and rewritten internally to a tenant-keyed
+route. This version ships **PR-A, the backend seam** (#90); the frontend cutover
+(proxy, tenant routes, per-tenant SEO) is PR-B and has not landed — nothing consumes
+the new endpoint yet.
+
+- **`shop_domains`** — the durable host → shop mapping. Platform-owned like `shops`
+  itself (no `BelongsToShop`: this table is what *produces* the tenant), normalized
+  lowercase hosts (scheme/path/trailing-dot stripped, port kept — dev is
+  `localhost:3001`), globally unique, a `verified_at` gate, and at most one primary
+  per shop enforced by a partial unique index (valid on Postgres 17 **and** the
+  SQLite the suite runs on). `www.x.com` is its own explicit row — normalization
+  never guesses aliases.
+- **`GET /api/v1/_storefront/host/{host}`** — the storefront's tenant handshake
+  (slug, shop name, requested + primary host). Registered before and outside the
+  `{shop}` group; its `host-resolve` bucket is IP-keyed, deliberately — the per-shop
+  limiter key would throw here, no tenant exists yet. Unknown, unverified, and
+  inactive-shop hosts are one byte-identical generic 404 (the test pins the
+  production body — debug bodies differ by caller trace and can never be identical).
+- **CORS is dynamic now, at one seam.** `HandleCors` re-reads `config('cors')`
+  inside `handle()` on every request, so `MergeShopDomainCorsOrigins` (prepended in
+  `bootstrap/app.php`) merges every verified-and-active shop domain — 60s cache,
+  busted by the model's write hooks — over the env `FRONTEND_URL` platform defaults,
+  and only on `cors.paths` requests (a DB-less health check never touches the
+  table). Verified working under `php artisan config:cache` against the running
+  Postgres stack. A dead end recorded so nobody repeats it: rebinding `CorsService`
+  does nothing — the framework never binds it, and the middleware overwrites its
+  options from config each request.
+- **The Studio manages domains.** A "Domains" action on the shop registry
+  (replace-set modal), with the rules in `Shop::syncDomains()`: exactly one primary
+  (promoted when none is flagged), verification stamps preserved on re-saves,
+  per-model deletes so the CORS cache busts fire, and a cross-shop host grab mapped
+  to a validation error. The registry shows each shop's primary domain, and "View on
+  site" now prefers the shop's verified primary domain over the `FRONTEND_URL`
+  fallback.
+- The seeder maps `localhost:3001 → decant-please` (verified, primary), so local dev
+  and every existing verify script resolve with no env var. Suite: **258 tests /
+  1,158 assertions** — `StorefrontHostResolutionTest` adds 22; `TenantIsolationTest`
+  stays at 40 with its `withoutTenancy()` budget untouched (the new table is
+  unscoped by design). Frontend `types.ts` mirrors the new Resource
+  (`StorefrontHost`); typecheck green — the 4 `react-hooks` lint errors pre-exist on
+  `develop`, untouched here. `backend/AGENTS.md`'s portability-script example gains
+  the `{shop}` segment its own base requires (running it without one produces seven
+  phantom FAILs).
+
+## 0.1 What changed in v26
 
 **v26** runs Step 32 — tenant isolation hardening. The Phase 1 audit walked every scope
 seam outside Filament's resource tenancy (all 19 spec surfaces: widgets, custom pages,
