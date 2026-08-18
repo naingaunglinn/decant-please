@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { getMeta } from "@/lib/api";
 
-export async function Footer() {
+export async function Footer({ shop, name }: { shop: string; name: string }) {
   let social: { tiktok_url: string | null; facebook_url: string | null } = {
     tiktok_url: null,
     facebook_url: null,
   };
   try {
-    social = (await getMeta()).social ?? social; // ?? guards a stale cached /meta from before this field existed
+    social = (await getMeta(shop)).social ?? social; // ?? guards a stale cached /meta from before this field existed
   } catch {
     // API unreachable (e.g. at build time) — footer stands without the links
   }
@@ -22,11 +22,11 @@ export async function Footer() {
       <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xs">
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-ink-strong">
-            Decant Please!
+            {name}
           </p>
           <p className="mt-3 text-sm text-muted">
-            Authentic fragrance, decanted by hand in Yangon. 5ml, 10ml and 30ml vials,
-            delivered across Myanmar.
+            Authentic fragrance, decanted by hand. 5ml, 10ml and 30ml vials, delivered
+            across Myanmar.
           </p>
         </div>
 
@@ -52,8 +52,8 @@ export async function Footer() {
           )}
         </nav>
 
-        <p>© {new Date().getFullYear()} Decant Please!
-          fully developed by{" "}
+        <p>© {new Date().getFullYear()} {name}
+          {" "}fully developed by{" "}
           <Link
             href="https://nightace-studio.dev"
             target="_blank"

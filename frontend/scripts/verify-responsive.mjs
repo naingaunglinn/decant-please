@@ -183,7 +183,7 @@ for (const width of WIDTHS) {
       for (const [label, loc] of [
         ["name", nameInput],
         ["phone", page.getByLabel(/^phone/i)], // its wrapping label includes the hint text
-        ["address", page.getByLabel(/delivery address/i)],
+        ["address", page.getByLabel(/^address/i)], // step 30 renamed "Delivery address" to "Address" (region/township carry the delivery part)
         ["note", page.getByLabel(/note \(optional\)/i)],
         ["promo", promoInput],
       ]) {

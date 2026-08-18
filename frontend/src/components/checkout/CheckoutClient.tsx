@@ -6,6 +6,7 @@ import { CheckoutForm, type ContactFields } from "./CheckoutForm";
 import { OrderSummaryCard } from "./OrderSummaryCard";
 import { Button } from "@/components/ui/Button";
 import { useCart } from "@/hooks/useCart";
+import { useTenant } from "@/lib/tenant-context";
 import { createOrder, getDeliveryZones, ApiValidationError } from "@/lib/api";
 import type { DeliveryTownshipOption, DeliveryZones } from "@/lib/types";
 
@@ -18,6 +19,7 @@ export interface CheckoutErrors {
 const NO_ERRORS: CheckoutErrors = { fields: {}, lines: {}, general: null };
 
 export function CheckoutClient() {
+  const { slug: shop } = useTenant();
   const { lines, subtotal, hydrated, clear } = useCart();
   const router = useRouter();
   const [errors, setErrors] = useState<CheckoutErrors>(NO_ERRORS);
@@ -31,7 +33,7 @@ export function CheckoutClient() {
   // fetched once per checkout visit — the township select filters client-side
   useEffect(() => {
     let active = true;
-    getDeliveryZones()
+    getDeliveryZones(shop)
       .then((tree) => {
         if (active) setZones(tree);
       })
@@ -41,7 +43,7 @@ export function CheckoutClient() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [shop]);
 
   if (!hydrated) return null;
 
@@ -65,6 +67,7 @@ export function CheckoutClient() {
 
     try {
       const order = await createOrder(
+        shop,
         {
           ...contact,
           delivery_township_id: contact.delivery_township_id,

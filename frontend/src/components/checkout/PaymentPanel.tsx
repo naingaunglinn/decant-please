@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
 import { getMeta, uploadPaymentProof, ApiValidationError } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { OrderStatusResponse, PaymentInfo } from "@/lib/types";
 
@@ -31,6 +32,7 @@ function TransferTarget({ label, name, number }: { label: string; name?: string;
  *  confirmation. Live view only — never printed. Uploading proof never marks the
  *  order paid; that stays the decanter's manual call. */
 export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
+  const { slug: shop } = useTenant();
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -43,7 +45,7 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
 
   useEffect(() => {
     let active = true;
-    getMeta()
+    getMeta(shop)
       .then((meta) => {
         if (active) setPayment(meta.payment);
       })
@@ -53,14 +55,14 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [shop]);
 
   const upload = async () => {
     if (!file) return;
     setUploading(true);
     setError(null);
     try {
-      const updated = await uploadPaymentProof(order.tracking_code, order.phone, file);
+      const updated = await uploadPaymentProof(shop, order.tracking_code, order.phone, file);
       if (updated) {
         onOrderUpdate(updated);
         setFile(null);

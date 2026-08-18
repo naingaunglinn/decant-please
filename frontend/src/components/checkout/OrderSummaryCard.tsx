@@ -5,6 +5,7 @@ import { CartItemRow } from "@/components/cart/CartItemRow";
 import { Pill } from "@/components/ui/Pill";
 import { useCart, cartLineKey } from "@/hooks/useCart";
 import { validatePromo, ApiValidationError } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { CheckoutItem, DeliveryTownshipOption } from "@/lib/types";
 
@@ -26,6 +27,7 @@ interface OrderSummaryCardProps {
 }
 
 export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderSummaryCardProps) {
+  const { slug: shop } = useTenant();
   const { lines, subtotal } = useCart();
   const [input, setInput] = useState("");
   const [applied, setApplied] = useState<AppliedPromo | null>(null);
@@ -47,7 +49,7 @@ export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderS
     setChecking(true);
     setPromoError(null);
     try {
-      const preview = await validatePromo(code, cartItems());
+      const preview = await validatePromo(shop, code, cartItems());
       if (preview.valid) {
         setApplied({
           code: code.toUpperCase(),
@@ -87,7 +89,7 @@ export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderS
       return;
     }
     let stale = false;
-    validatePromo(applied.code, cartItems())
+    validatePromo(shop, applied.code, cartItems())
       .then((preview) => {
         if (stale) return;
         if (preview.valid) {

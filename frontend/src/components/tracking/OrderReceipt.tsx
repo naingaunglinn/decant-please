@@ -6,6 +6,7 @@ import { Pill } from "@/components/ui/Pill";
 import { StatusTimeline } from "./StatusTimeline";
 import { PaymentPanel } from "@/components/checkout/PaymentPanel";
 import { cancelOrder, ApiConflictError } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { OrderStatusResponse } from "@/lib/types";
 
@@ -125,6 +126,7 @@ function ReceiptBody({ order, note }: { order: OrderStatusResponse; note: string
  *  the live view (timeline, cancel, CTAs); in print it's a static document — the
  *  live view never prints, and the printed receipt never promises live updates. */
 export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderReceiptProps) {
+  const { slug: shop, name: shopName } = useTenant();
   // local copy so a cancel can update the view in place without a reload
   const [order, setOrder] = useState(initial);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -149,7 +151,7 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
     setCancelling(true);
     setCancelError(null);
     try {
-      const updated = await cancelOrder(order.tracking_code, order.phone);
+      const updated = await cancelOrder(shop, order.tracking_code, order.phone);
       if (updated) setOrder(updated);
       else setCancelError("We couldn't find this order anymore — refresh and try again.");
     } catch (error) {
@@ -169,7 +171,7 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
       {/* ------ the printed document — a static snapshot of the transaction ------ */}
       <div className="print-only">
         <p className="text-lg font-bold uppercase tracking-[0.2em] text-ink-strong">
-          Decant Please!
+          {shopName}
         </p>
         <h2 className="mt-2 text-2xl font-bold uppercase tracking-[0.15em] text-ink-strong">
           Receipt

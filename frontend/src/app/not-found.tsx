@@ -1,23 +1,13 @@
-import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/Pill";
-
-export default function NotFound() {
+// The fail-closed page for hosts that resolve to no shop (ADR-0004): unknown,
+// unverified, or the shop is inactive. Deliberately unbranded — there is no
+// tenant to brand it with, and it must reveal nothing about which domains or
+// shops exist. In-tenant 404s (a dead fragrance link) render the branded
+// app/[host]/not-found.tsx instead.
+export default function RootNotFound() {
   return (
-    <div className="mx-auto flex max-w-[480px] flex-col items-start gap-6 px-4 py-24 sm:px-6">
-      <Pill tone="muted">404</Pill>
-      <h1 className="text-[28px] font-bold uppercase tracking-[0.12em] text-ink-strong">
-        Evaporated
-      </h1>
-      <p className="text-sm leading-relaxed text-muted">
-        Whatever was here isn&apos;t anymore — maybe the fragrance was retired, or the link
-        lost a character on its way to you.
-      </p>
-      <div className="flex gap-3">
-        <Button href="/shop">Browse the shop</Button>
-        <Button href="/" variant="ghost">
-          Back home
-        </Button>
-      </div>
-    </div>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="text-sm font-medium uppercase tracking-[0.2em] text-ink-strong">404</p>
+      <p className="text-sm text-muted">There is no storefront at this address.</p>
+    </main>
   );
 }

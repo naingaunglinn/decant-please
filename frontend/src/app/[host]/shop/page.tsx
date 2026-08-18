@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ViewTransition } from "react";
 import { getBrands, getFragrances, getMeta } from "@/lib/api";
+import { tenantPage } from "@/lib/tenant";
 import { FragranceGrid } from "@/components/catalog/FragranceGrid";
 import { FilterBar } from "@/components/catalog/FilterBar";
 import { FilterSheet } from "@/components/catalog/FilterSheet";
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
   title: "Shop decants",
   description:
     "Browse every fragrance we decant — filter by brand, scent notes, gender, size and budget.",
+  alternates: { canonical: "/shop" }, // filters deliberately excluded from the canonical
 };
 
 type SearchParams = { [key: string]: string | string[] | undefined };
@@ -18,10 +20,13 @@ const first = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
 
 export default async function ShopPage({
+  params: routeParams,
   searchParams,
 }: {
+  params: Promise<{ host: string }>;
   searchParams: Promise<SearchParams>;
 }) {
+  const { host } = await routeParams;
   const params = await searchParams;
 
   const filters = {
@@ -38,12 +43,6 @@ export default async function ShopPage({
     per_page: "12",
   };
 
-  const [fragrances, brands, meta] = await Promise.all([
-    getFragrances(filters),
-    getBrands(),
-    getMeta(),
-  ]);
-
   const flat: Record<string, string | undefined> = {
     q: filters.q,
     notes: filters.notes,
@@ -56,6 +55,18 @@ export default async function ShopPage({
     sort: filters.sort,
     page: filters.page,
   };
+
+  // a secondary-domain 308 keeps the whole filtered view, not just /shop
+  const query = new URLSearchParams(
+    Object.entries(flat).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  ).toString();
+  const tenant = await tenantPage(host, `/shop${query ? `?${query}` : ""}`);
+
+  const [fragrances, brands, meta] = await Promise.all([
+    getFragrances(tenant.slug, filters),
+    getBrands(tenant.slug),
+    getMeta(tenant.slug),
+  ]);
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 md:py-16">

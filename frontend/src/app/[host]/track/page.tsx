@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { TrackClient } from "@/components/tracking/TrackClient";
+import { tenantPage } from "@/lib/tenant";
 
 export const metadata: Metadata = {
   title: "Track your order",
@@ -7,11 +8,16 @@ export const metadata: Metadata = {
 };
 
 export default async function TrackPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ host: string }>;
   searchParams: Promise<{ code?: string }>;
 }) {
+  const { host } = await params;
   const { code } = await searchParams;
+  // a secondary-domain 308 must keep the prefilled code from shared links
+  await tenantPage(host, `/track${code ? `?code=${encodeURIComponent(code)}` : ""}`);
 
   return (
     <div className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">

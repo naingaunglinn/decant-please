@@ -12,18 +12,15 @@ import type {
   PromoPreview,
 } from "./types";
 
-// Multi-tenancy Step 24: a storefront serves exactly one shop, pinned by its slug
-// in the API path (/api/v1/{shop}/…). Every helper routes through BASE, so this one
-// line is the whole client change.
-//
-// NOTE: the spec calls for failing the build when NEXT_PUBLIC_SHOP_SLUG is unset (a
-// storefront pointed at no shop is a misconfiguration). That flip is deferred until
-// each Vercel storefront has the var provisioned — for now it defaults to the sole
-// shop so an un-provisioned preview still builds. Set NEXT_PUBLIC_SHOP_SLUG per
-// deployment (matching the backend's SHOP_SLUG) once a second storefront exists.
-const SHOP_SLUG = process.env.NEXT_PUBLIC_SHOP_SLUG ?? "decant-please";
+// ADR-0004 (PR-B): one storefront deployment serves every shop, so the shop is a
+// per-request fact, not a build-time constant — every helper takes the resolved
+// slug explicitly. Server components get it from lib/tenant.ts (the validated
+// Host); client components from useTenant() (lib/tenant-context.tsx). There is
+// deliberately no module-scope tenant state and no default shop: an unthreaded
+// call site is a compile error, never a silent wrong-shop request.
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api";
 
-const BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api"}/v1/${SHOP_SLUG}`;
+const base = (shop: string): string => `${API_URL}/v1/${encodeURIComponent(shop)}`;
 
 /** Thrown on 422s so callers can surface per-field / per-item messages. */
 export class ApiValidationError extends Error {
@@ -36,8 +33,8 @@ export class ApiValidationError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+async function apiFetch<T>(shop: string, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${base(shop)}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
@@ -59,6 +56,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getFragrances(
+  shop: string,
   filters: FragranceFilters = {},
 ): Promise<Paginated<Fragrance>> {
   const params = new URLSearchParams(
@@ -66,11 +64,11 @@ export async function getFragrances(
   );
   const qs = params.size > 0 ? `?${params}` : "";
 
-  return apiFetch(`/fragrances${qs}`, { next: { revalidate: 60 } });
+  return apiFetch(shop, `/fragrances${qs}`, { next: { revalidate: 60 } });
 }
 
-export async function getFragrance(slug: string): Promise<Fragrance | null> {
-  const response = await fetch(`${BASE}/fragrances/${encodeURIComponent(slug)}`, {
+export async function getFragrance(shop: string, slug: string): Promise<Fragrance | null> {
+  const response = await fetch(`${base(shop)}/fragrances/${encodeURIComponent(slug)}`, {
     headers: { Accept: "application/json" },
     next: { revalidate: 60 },
   });
@@ -82,29 +80,30 @@ export async function getFragrance(slug: string): Promise<Fragrance | null> {
   return body.data;
 }
 
-export async function getBrands(): Promise<Brand[]> {
-  const body = await apiFetch<{ data: Brand[] }>("/brands", { next: { revalidate: 60 } });
+export async function getBrands(shop: string): Promise<Brand[]> {
+  const body = await apiFetch<{ data: Brand[] }>(shop, "/brands", { next: { revalidate: 60 } });
   return body.data;
 }
 
-export async function getMeta(): Promise<CatalogMeta> {
-  return apiFetch("/meta", { next: { revalidate: 60 } });
+export async function getMeta(shop: string): Promise<CatalogMeta> {
+  return apiFetch(shop, "/meta", { next: { revalidate: 60 } });
 }
 
 /** The serviceable delivery tree — fetched once on the checkout page. If this
  *  fails, checkout fails visibly: there is deliberately no free-text fallback,
  *  or an order would land with no zone and no fee. */
-export async function getDeliveryZones(): Promise<DeliveryZones> {
-  return apiFetch("/delivery-zones", { cache: "no-store" });
+export async function getDeliveryZones(shop: string): Promise<DeliveryZones> {
+  return apiFetch(shop, "/delivery-zones", { cache: "no-store" });
 }
 
 export async function createOrder(
+  shop: string,
   payload: CheckoutPayload,
   proof?: File | null,
 ): Promise<CheckoutResponse> {
   // Online orders attach their transfer slip at checkout → multipart. COD stays JSON.
   if (!proof) {
-    return apiFetch("/orders", {
+    return apiFetch(shop, "/orders", {
       method: "POST",
       body: JSON.stringify(payload),
       cache: "no-store",
@@ -129,7 +128,7 @@ export async function createOrder(
   form.append("proof", proof);
 
   // No Content-Type — the browser sets the multipart boundary.
-  const response = await fetch(`${BASE}/orders`, {
+  const response = await fetch(`${base(shop)}/orders`, {
     method: "POST",
     headers: { Accept: "application/json" },
     body: form,
@@ -148,10 +147,11 @@ export async function createOrder(
 /** Preview a promo against the current cart — server re-derives the subtotal.
  *  Business rejections come back as { valid: false, message } with a 200. */
 export async function validatePromo(
+  shop: string,
   code: string,
   items: CheckoutItem[],
 ): Promise<PromoPreview> {
-  return apiFetch("/orders/validate-promo", {
+  return apiFetch(shop, "/orders/validate-promo", {
     method: "POST",
     body: JSON.stringify({ code, items }),
     cache: "no-store",
@@ -161,11 +161,12 @@ export async function validatePromo(
 /** Returns null when the code+phone pair doesn't match — the API deliberately
  *  never says which half was wrong. */
 export async function trackOrder(
+  shop: string,
   trackingCode: string,
   phone: string,
 ): Promise<OrderStatusResponse | null> {
   const params = new URLSearchParams({ tracking_code: trackingCode, phone });
-  const response = await fetch(`${BASE}/orders/track?${params}`, {
+  const response = await fetch(`${base(shop)}/orders/track?${params}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
@@ -181,6 +182,7 @@ export async function trackOrder(
  *  a 422 (wrong file type/size) throws ApiValidationError. Does NOT mark the order
  *  paid — the decanter confirms that separately. */
 export async function uploadPaymentProof(
+  shop: string,
   trackingCode: string,
   phone: string,
   file: File,
@@ -190,7 +192,7 @@ export async function uploadPaymentProof(
   form.append("phone", phone);
   form.append("proof", file);
 
-  const response = await fetch(`${BASE}/orders/payment-proof`, {
+  const response = await fetch(`${base(shop)}/orders/payment-proof`, {
     method: "POST",
     headers: { Accept: "application/json" },
     body: form,
@@ -218,10 +220,11 @@ export class ApiConflictError extends Error {
 /** Same generic-404 contract as trackOrder; 409 (already accepted) throws
  *  ApiConflictError with the server's customer-facing message. */
 export async function cancelOrder(
+  shop: string,
   trackingCode: string,
   phone: string,
 ): Promise<OrderStatusResponse | null> {
-  const response = await fetch(`${BASE}/orders/cancel`, {
+  const response = await fetch(`${base(shop)}/orders/cancel`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ tracking_code: trackingCode, phone }),

@@ -7,7 +7,7 @@ const LINKS = [
   { href: "/track", label: "Track order" },
 ];
 
-export function Navbar() {
+export function Navbar({ name }: { name: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-mist/85 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
@@ -17,7 +17,7 @@ export function Navbar() {
             href="/"
             className="text-sm font-bold uppercase tracking-[0.2em] text-ink-strong"
           >
-            Decant Please!
+            {name}
           </Link>
         </div>
 
