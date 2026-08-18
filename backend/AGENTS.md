@@ -123,7 +123,7 @@ If your change adds or edits a query with `LIKE`, `ORDER BY`, or an alias, a gre
 
 ```bash
 php artisan serve --port=8010 &
-API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh
+API=http://localhost:8010/api/v1/decant-please sh scripts/verify-postgres-portability.sh
 ```
 
 ## Migrations
@@ -201,5 +201,5 @@ php artisan test --filter=SomeTest               # one file
 php artisan test --filter=TenantIsolationTest    # the isolation boundary
 ./vendor/bin/pint                                # format
 php artisan migrate:fresh --seed                 # rebuild local data
-API=http://localhost:8010/api/v1 sh scripts/verify-postgres-portability.sh
+API=http://localhost:8010/api/v1/decant-please sh scripts/verify-postgres-portability.sh
 ```

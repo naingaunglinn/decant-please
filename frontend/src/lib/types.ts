@@ -193,6 +193,18 @@ export interface OrderStatusResponse {
   paid_at: string | null;
 }
 
+/** GET /api/v1/_storefront/host/{host} — the shared storefront deployment's
+ *  host → shop handshake (ADR-0004; wrapped as `{ data: StorefrontHost }`).
+ *  Mirrors the backend's StorefrontHostResource. Unused until PR-B's proxy layer
+ *  lands; typed now because the Resource ships now (same-PR rule). */
+export interface StorefrontHost {
+  slug: string;
+  name: string;
+  host: string;
+  is_primary: boolean;
+  primary_host: string;
+}
+
 /** A cart line as stored client-side. Prices here are previews only —
  *  the server re-derives the authoritative total at checkout. */
 export interface CartLine {

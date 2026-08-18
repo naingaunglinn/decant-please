@@ -9,6 +9,7 @@ use App\Filament\Resources\Fragrances\FragranceResource;
 use App\Models\Fragrance;
 use App\Support\CatalogImport;
 use App\Support\Money;
+use App\Support\TenantContext;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -19,7 +20,6 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
-use InvalidArgumentException;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -30,11 +30,18 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
+use InvalidArgumentException;
 
 class FragrancesTable
 {
     public static function configure(Table $table): Table
     {
+        // ADR-0004: "View on site" points at this shop's verified primary domain
+        // once one is mapped; FRONTEND_URL stays the platform fallback. Resolved
+        // once per request here, not per row in the action's url closure.
+        $storefront = app(TenantContext::class)->get()?->storefrontUrl()
+            ?? rtrim(config('app.frontend_url'), '/');
+
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
                 ->with('decantPrices')
@@ -124,7 +131,7 @@ class FragrancesTable
                 Action::make('viewOnSite')
                     ->label('View on site')
                     ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-                    ->url(fn (Fragrance $record): string => rtrim(config('app.frontend_url'), '/')."/fragrance/{$record->slug}")
+                    ->url(fn (Fragrance $record): string => "{$storefront}/fragrance/{$record->slug}")
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 ReplicateAction::make()

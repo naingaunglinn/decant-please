@@ -63,6 +63,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('payment-proof', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('payment-proof', $request)));
         RateLimiter::for('promo', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('promo', $request)));
 
+        // Platform endpoint (ADR-0004): host→shop resolution runs BEFORE any tenant
+        // exists, so the per-shop key above would throw here — IP-only is correct.
+        // The storefront asks about once per host per minute (its data-cache TTL);
+        // 60/min absorbs that with room for a curious curl.
+        RateLimiter::for('host-resolve', fn (Request $request) => Limit::perMinute(60)->by('host-resolve|'.$request->ip()));
+
         // Admin Telegram alerts. Wired explicitly, and necessarily so: event
         // auto-discovery is off (bootstrap/app.php, #52), so a listener that
         // isn't registered here silently never runs.

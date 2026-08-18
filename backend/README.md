@@ -33,7 +33,7 @@ Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
 | Variable | Purpose |
 |---|---|
 | `APP_URL` | This app's own URL — image URLs in API responses are built from it |
-| `FRONTEND_URL` | Storefront origin — the CORS allowlist **and** admin "View on site" links |
+| `FRONTEND_URL` | Storefront origin **platform default** — the CORS base (verified `shop_domains` rows merge in per request since ADR-0004) and the "View on site" fallback for shops with no verified primary domain |
 | `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/{shop}/meta` for the storefront footer; blank = hidden |
 | `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details exposed via `/api/v1/{shop}/meta`; blank fields hidden, whole block null when none set |
@@ -65,6 +65,12 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 Each limit is its own per-shop-per-IP bucket (named limiters in `AppServiceProvider`,
 keyed shop + IP since step 32), so heavy catalog browsing can never starve checkout,
 tracking, or cancellation — and one shop's traffic can never spend another shop's budget.
+
+**Platform — outside the `{shop}` prefix (ADR-0004)**
+
+| Method | Route | Purpose | Throttle |
+|---|---|---|---|
+| GET | `/api/v1/_storefront/host/{host}` | Resolves a storefront host to its shop (slug, name, primary host) for the shared storefront deployment; unknown, unverified, and inactive hosts are one generic 404 | 60/min (IP-keyed — no tenant exists yet) |
 
 **Admin panel — tenant-aware since Step 25a: everything below `/admin` requires login,
 and every operational URL carries the shop (`/admin/{shop}/…`); the tenant switcher
@@ -113,9 +119,9 @@ backend/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
 │   │   ├── Controllers/                    # OrderInvoiceController (A5 PDFs), PaymentProofViewController (streams proofs) — panel-auth'd
-│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder, ValidatePromo, PaymentProof
-│   │   └── Resources/                      # JSON shaping for brands, fragrances, prices
-│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem, PromoCode (+ Concerns/HasSlug)
+│   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder, ValidatePromo, PaymentProof, StorefrontHost
+│   │   └── Resources/                      # JSON shaping for brands, fragrances, prices, storefront hosts
+│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem, PromoCode, Shop, ShopDomain (+ Concerns/HasSlug)
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
@@ -123,7 +129,7 @@ backend/
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
 │   └── Support/                            # Money (the one Kyat formatter), CatalogImport (CSV import engine), TelegramNotifier
 ├── bootstrap/app.php                       # routing + middleware wiring; event auto-discovery disabled (#52)
-├── config/cors.php                         # allowlist = FRONTEND_URL           ← must match storefront origin
+├── config/cors.php                         # platform CORS defaults (FRONTEND_URL) — verified shop_domains merge in per request (ADR-0004)
 ├── database/
 │   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
@@ -132,7 +138,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 236 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation
+├── tests/Feature/                          # 258 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -163,6 +169,13 @@ backend/
   its call sites at 5. New storage objects are prefixed `shops/{id}/…`; objects written
   before step 32 keep their old paths (every reader uses the stored path, so both eras
   serve fine — an accepted limit, not a migration).
+- **Storefront hosts resolve through `shop_domains`** (ADR-0004, accepted as amended).
+  Normalized lowercase hosts (scheme/path/trailing-dot stripped, port kept), globally
+  unique, `verified_at` gate, at most one primary per shop (partial unique index). The
+  table is platform-owned and deliberately carries **no** tenant scope — it is what
+  *produces* the tenant. Resolution and the CORS allowlist both require a verified row
+  on an active shop and fail closed; `Shop::syncDomains()` is the one write path (the
+  Studio "Domains" action delegates to it).
 
 ## Testing
 
@@ -170,9 +183,11 @@ backend/
 php artisan test
 ```
 
-236 tests / 1,099 assertions on an in-memory SQLite database — 40 of them in
-`TenantIsolationTest`, the two-shop isolation suite — and your dev Postgres data is
-never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
+258 tests / 1,158 assertions on an in-memory SQLite database — 40 of them in
+`TenantIsolationTest`, the two-shop isolation suite, and 22 in
+`StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
+your dev Postgres data is never touched. N+1 queries throw outside production
+(`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`
 mistake and a select alias inside `ORDER BY`, both of which Postgres rejects, so the
