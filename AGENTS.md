@@ -139,6 +139,47 @@ A change is done when **all** of these hold, and you have said so with evidence:
 - Keep it simple and readable. Solo maintainer, non-technical customers, ~$12/mo of
   infrastructure. Reject anything justified by throughput — **isolation and cost are the
   design drivers, scale is not.** Simple is a constraint here, not a stylistic preference.
+- **Tenant scoping is the `BelongsToShop` global scope — decided, not a default**
+  (step 32, Phase 2). Explicit per-site `whereBelongsTo($shop)` was considered and
+  rejected for this tree: it fails open, and this codebase makes forgetting both easy
+  and invisible — money figures are summed in PHP over fetched rows (OrderStats,
+  DiscountCost, CourierFloat, MonthlyPnl), so a missed clause doesn't crash, it
+  inflates a dashboard number with other shops' orders; and the suite runs SQLite,
+  where an unqualified `shop_id` join is green yet ambiguous on Postgres. The scope
+  closes all of that by construction: every query on every surface Filament's tenancy
+  does not reach (widgets, custom pages, panel controllers, the API, commands) is
+  scoped whether or not its author thought about tenancy — including inside
+  `whereHas` and correlated subselects, where a hand-written clause has to be
+  remembered per subquery.
+  - The scope **throws** (`TenantNotSetException`) when no tenant is set — never an
+    empty result, never all shops. The 500 names the wiring bug; an empty page hides
+    it. This is how the `authenticatedRoutes()` invoice misregistration was caught —
+    the explicit-clause idiom would have streamed a cross-shop bank slip instead.
+  - Cross-shop **writes** never bypass. Set the context to the target shop and let
+    the creating hook stamp `shop_id` (`NationalGeography::seed` is the model); a
+    bypassed create leaves `shop_id` null and dies on the NOT NULL.
+  - Cross-shop **reads** go through `TenantContext::withoutTenancy()` — never
+    `withoutGlobalScope`. One spelling, finally-restored, and metered:
+    `TenantIsolationTest` caps `->withoutTenancy(` call sites in `app/` at 5. The
+    ledger (design-doc §8): tracking-code dedup (built), the backfill migration
+    (done), the studio's cross-shop views (step 34). Exceeding the cap means raising
+    it and the ledger in the same PR — a reviewed act, never a side effect.
+  - Platform-owned tables (`shops`, `users`, step 34's `studio_audit_events`) do not
+    carry the trait. That is why `/studio` needs zero bypasses today — keep it true:
+    a new Studio surface either reads platform tables, runs per-shop under a set
+    context, or spends a budgeted `withoutTenancy()`.
+  - Filament's `->tenant()` scopes Resources only. It is navigation, not isolation —
+    never rely on panel tenancy for a query Filament doesn't own.
+- **Tenancy reaches past queries** (step 32): cache keys carry the shop; rate-limiter
+  buckets key shop + IP; storage objects are written under `shops/{id}/…`. A tenant is
+  set only by the two established entry points — `ResolveTenant` on the API, Filament's
+  tenancy mirrored into `TenantContext` by `SyncTenantContextFromFilament` on the
+  panels — never ad hoc in a controller or page. A new Filament page or widget states
+  its scoping in a top-of-class comment; "deliberately cross-shop, Studio only" is a
+  legitimate answer, written once. Per-shop config resolution (shop row → env → off) is
+  step 33's resolver; until it lands, a *new* bare `config('services.telegram.*')` /
+  `config('app.payment.*')` read is a bug — the env blocks are platform defaults, never
+  a shop's live value.
 - **One backend serves every shop.** One bad deploy affects all of them, so the
   `develop` → `main` promotion gate matters more under pooling, not less. Never merge a PR
   yourself, and never skip verification because a change "looks small".

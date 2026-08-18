@@ -6,6 +6,7 @@ use App\Enums\BrandType;
 use App\Enums\Concentration;
 use App\Enums\Gender;
 use App\Models\Brand;
+use App\Support\TenantContext;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -64,7 +65,8 @@ class FragranceForm
                             ->imageEditor()
                             ->imageEditorAspectRatios(['1:1'])
                             ->disk(config('filesystems.media_disk'))
-                            ->directory('fragrances')
+                            // shops/{id}/ prefix (step 32) — see BrandForm
+                            ->directory(fn (): string => 'shops/'.app(TenantContext::class)->id().'/fragrances')
                             ->maxSize(2048)
                             ->helperText('Square (1:1) images look best on the cards.'),
                     ]),

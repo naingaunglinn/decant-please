@@ -62,8 +62,9 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 | POST | `/api/v1/{shop}/orders/payment-proof` | Customer's transfer screenshot, code + phone gated — stored on the private proofs disk, never marks paid | 10/min |
 | POST | `/api/v1/{shop}/orders/validate-promo` | Preview a promo code — nothing persisted; checkout re-validates | 10/min |
 
-Each limit is its own per-IP bucket (named limiters in `AppServiceProvider`), so heavy
-catalog browsing can never starve checkout, tracking, or cancellation.
+Each limit is its own per-shop-per-IP bucket (named limiters in `AppServiceProvider`,
+keyed shop + IP since step 32), so heavy catalog browsing can never starve checkout,
+tracking, or cancellation — and one shop's traffic can never spend another shop's budget.
 
 **Admin panel — tenant-aware since Step 25a: everything below `/admin` requires login,
 and every operational URL carries the shop (`/admin/{shop}/…`); the tenant switcher
@@ -131,7 +132,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 143 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule
+├── tests/Feature/                          # 236 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -153,6 +154,15 @@ backend/
   of a limited code), and a code that lapsed between preview and submit drops the discount
   instead of blocking the order. `orders.promo_code` is a snapshot; editing `discount_mmk`
   in Filament never touches it.
+- **Every tenant-owned model is scoped by the `BelongsToShop` global scope** — decided in
+  step 32, not left as a default. The scope **throws** `TenantNotSetException` when no
+  tenant is set (never an empty result, never all shops), filters on the qualified
+  `shop_id`, and a creating hook stamps ownership from `TenantContext`. Cross-shop writes
+  set the context to the target shop (`NationalGeography::seed` is the model); cross-shop
+  reads spend a budgeted `TenantContext::withoutTenancy()` — `TenantIsolationTest` caps
+  its call sites at 5. New storage objects are prefixed `shops/{id}/…`; objects written
+  before step 32 keep their old paths (every reader uses the stored path, so both eras
+  serve fine — an accepted limit, not a migration).
 
 ## Testing
 
@@ -160,7 +170,8 @@ backend/
 php artisan test
 ```
 
-143 tests / 659 assertions on an in-memory SQLite database — your dev Postgres data is
+236 tests / 1,099 assertions on an in-memory SQLite database — 40 of them in
+`TenantIsolationTest`, the two-shop isolation suite — and your dev Postgres data is
 never touched. N+1 queries throw outside production (`Model::preventLazyLoading`).
 
 SQLite isn't Postgres, and the difference bites: it accepts a case-sensitive-`LIKE`
@@ -171,7 +182,7 @@ those against the running stack — reach for it whenever a change is engine-spe
 ## Useful artisan commands
 
 ```bash
-php artisan decant:fresh-start   # wipe demo fragrances + orders (and their payment proofs); keep brands and admin user
+php artisan decant:fresh-start --shop=<slug>   # wipe ONE shop's demo fragrances + orders (and its proof files); keeps brands and admin user; refuses without a shop
 php artisan db:seed              # reseed demo data (idempotent admin user)
 php artisan telegram:test        # confirm the configured bot token + chat id actually reach Telegram
 php artisan cache:clear          # /api/v1 responses are cached for 10 minutes

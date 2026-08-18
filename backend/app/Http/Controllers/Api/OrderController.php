@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -81,10 +82,14 @@ class OrderController extends Controller
         ]);
 
         // Online prepay: the transfer slip rides in with the checkout, so the order
-        // is born with its proof on the private disk (never the public media disk).
+        // is born with its proof on the private disk (never the public media disk),
+        // under the shop's own shops/{id}/ prefix (step 32).
         if ($request->hasFile('proof')) {
             $order->attachPaymentProof(
-                $request->file('proof')->store('payment-proofs', config('filesystems.proofs_disk')),
+                $request->file('proof')->store(
+                    'shops/'.app(TenantContext::class)->id().'/payment-proofs',
+                    config('filesystems.proofs_disk'),
+                ),
             );
         }
 

@@ -6,10 +6,18 @@ use App\Enums\Courier;
 use App\Enums\OrderStatus;
 use App\Enums\PromoType;
 use App\Exceptions\TenantNotSetException;
+use App\Filament\Pages\ProductionSchedule;
+use App\Filament\Pages\ProductionScheduleDay;
 use App\Filament\Resources\Brands\Pages\CreateBrand;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\PromoCodes\Pages\CreatePromoCode;
+use App\Filament\Widgets\CourierFloat;
+use App\Filament\Widgets\DiscountCost;
+use App\Filament\Widgets\LowStock;
 use App\Filament\Widgets\OrderStats;
+use App\Filament\Widgets\RevenueChart;
+use App\Filament\Widgets\TopFragrances;
+use App\Filament\Widgets\UpcomingDecants;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
 use App\Models\DeliveryTownshipCourier;
@@ -19,12 +27,15 @@ use App\Models\Order;
 use App\Models\PromoCode;
 use App\Models\Shop;
 use App\Models\ShopSetting;
+use App\Models\User;
 use App\Support\MonthlyPnl;
 use App\Support\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -79,6 +90,19 @@ class TenantIsolationTest extends TestCase
 
         $fragrance = $brand->fragrances()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+        ]);
+        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+
+        return $fragrance;
+    }
+
+    /** A priced 10ml fragrance under a NAMED brand, in the CURRENT shop's catalog. */
+    private function makeNamedFragrance(string $brandName, string $fragranceName): Fragrance
+    {
+        $brand = Brand::firstOrCreate(['name' => $brandName], ['type' => 'designer']);
+
+        $fragrance = $brand->fragrances()->create([
+            'name' => $fragranceName, 'concentration' => 'edp', 'gender' => 'unisex',
         ]);
         $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
@@ -575,5 +599,391 @@ class TenantIsolationTest extends TestCase
         }
 
         $this->assertLessThanOrEqual(5, $count);
+    }
+
+    public function test_brands_and_meta_endpoints_are_per_shop_in_content(): void
+    {
+        // Phase 4 case 1, the endpoints the fragrances-count case doesn't reach:
+        // /brands rows and /meta's catalog-derived figures are the current shop's.
+        $this->forShop($this->shopA);
+        $this->makeFragrance(); // Chanel, one 10ml price
+        Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        $this->forShop($this->shopB);
+        $this->makeFragrance()->decantPrices()->create(['size_ml' => 30, 'price_mmk' => 99000]);
+
+        $a = $this->getJson("/api/v1/{$this->shopA->slug}/brands")->assertOk();
+        $this->assertEqualsCanonicalizing(['Chanel', 'Dior'], array_column($a->json('data'), 'name'));
+
+        $b = $this->getJson("/api/v1/{$this->shopB->slug}/brands")->assertOk();
+        $this->assertSame(['Chanel'], array_column($b->json('data'), 'name'));
+
+        $this->getJson("/api/v1/{$this->shopA->slug}/meta")->assertOk()
+            ->assertJsonPath('sizes', [10])
+            ->assertJsonPath('price.max', 55000);
+        $this->getJson("/api/v1/{$this->shopB->slug}/meta")->assertOk()
+            ->assertJsonPath('sizes', [10, 30])
+            ->assertJsonPath('price.max', 99000);
+    }
+
+    public function test_a_shared_fragrance_slug_resolves_to_each_shops_own_row(): void
+    {
+        // Phase 4 case 2: both shops stock the same fragrance, so both carry the
+        // same slug — and /{shop}/fragrances/{slug} must resolve WITHIN the shop.
+        $this->forShop($this->shopA);
+        $a = $this->makeFragrance();
+
+        $this->forShop($this->shopB);
+        $b = $this->makeFragrance();
+
+        $this->assertSame($a->slug, $b->slug); // the (shop_id, slug) composite at work
+
+        $this->getJson("/api/v1/{$this->shopA->slug}/fragrances/{$a->slug}")
+            ->assertOk()->assertJsonPath('data.id', $a->id);
+        $this->getJson("/api/v1/{$this->shopB->slug}/fragrances/{$b->slug}")
+            ->assertOk()->assertJsonPath('data.id', $b->id);
+    }
+
+    public function test_cancel_and_proof_upload_under_the_wrong_shop_are_the_same_generic_404(): void
+    {
+        // Phase 4 case 4: the two mutating public endpoints answer a cross-slug
+        // pair exactly like an unknown code — byte-identical, nothing persisted.
+        Storage::fake(config('filesystems.proofs_disk'));
+
+        $this->forShop($this->shopA);
+        $order = $this->makeOrder(); // awaiting_confirmation — cancellable in its own shop
+        $pair = ['tracking_code' => $order->tracking_code, 'phone' => $order->phone];
+
+        $wrongCode = $this->postJson("/api/v1/{$this->shopA->slug}/orders/cancel", [
+            'tracking_code' => 'AAAAAAAAAA', 'phone' => $order->phone,
+        ])->assertNotFound();
+
+        $crossCancel = $this->postJson("/api/v1/{$this->shopB->slug}/orders/cancel", $pair)
+            ->assertNotFound();
+        $this->assertSame($wrongCode->json(), $crossCancel->json());
+
+        $crossProof = $this->post(
+            "/api/v1/{$this->shopB->slug}/orders/payment-proof",
+            $pair + ['proof' => UploadedFile::fake()->image('slip.jpg')],
+            ['Accept' => 'application/json'],
+        )->assertNotFound();
+        $this->assertSame($wrongCode->json(), $crossProof->json());
+
+        // the cross-shop attempts changed nothing: no object stored, order untouched
+        Storage::disk(config('filesystems.proofs_disk'))->assertDirectoryEmpty('/');
+        $this->forShop($this->shopA);
+        $this->assertSame(OrderStatus::AwaitingConfirmation, $order->fresh()->status);
+    }
+
+    public function test_the_same_promo_code_string_evaluates_against_the_requesting_shops_row(): void
+    {
+        // Phase 4 case 5, over HTTP: one code string, two shops, two values —
+        // each storefront gets its own shop's discount, never the other's.
+        $this->forShop($this->shopA);
+        PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 5000]);
+        $aItem = $this->makeFragrance();
+
+        $this->forShop($this->shopB);
+        PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 1000]);
+        $bItem = $this->makeFragrance();
+
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders/validate-promo", [
+            'code' => 'SUMMER26',
+            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+        ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 5000);
+
+        $this->postJson("/api/v1/{$this->shopB->slug}/orders/validate-promo", [
+            'code' => 'SUMMER26',
+            'items' => [['fragrance_id' => $bItem->id, 'size_ml' => 10, 'quantity' => 1]],
+        ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 1000);
+    }
+
+    public function test_a_shop_confined_user_cannot_reach_another_shops_panel_or_files(): void
+    {
+        // Phase 4 case 6, over HTTP: membership is enforced by IdentifyTenant on
+        // the request itself, and the answer is a generic 404 — including for the
+        // file-streaming routes, before a byte moves.
+        $this->forShop($this->shopB);
+        $bOrder = $this->makeOrder(OrderStatus::Pending);
+
+        $owner = User::create([
+            'name' => 'Owner A',
+            'email' => 'owner@shop-a.test',
+            'password' => 'secret-password',
+            'is_studio' => false,
+        ]);
+        $owner->shops()->attach($this->shopA);
+        $this->actingAs($owner);
+
+        $this->get("/admin/{$this->shopB->slug}")->assertNotFound();
+        $this->get(route('filament.admin.orders.invoice', [
+            'tenant' => $this->shopB->slug, 'order' => $bOrder,
+        ]))->assertNotFound();
+        $this->get(route('filament.admin.orders.payment-proof', [
+            'tenant' => $this->shopB->slug, 'order' => $bOrder,
+        ]))->assertNotFound();
+
+        // positive control: their own shop opens normally
+        $this->get("/admin/{$this->shopA->slug}")->assertOk();
+    }
+
+    public function test_revenue_chart_sums_only_the_current_shops_orders(): void
+    {
+        // Phase 4 case 7 (RevenueChart): the dataset is read directly so the
+        // assertion is an exact figure, not "some chart rendered".
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder(OrderStatus::Pending, totalMmk: 70000);
+
+        $this->forShop($this->shopB);
+        $this->makeOrder(OrderStatus::Pending, totalMmk: 999999);
+
+        $this->forShop($this->shopA);
+        $chart = Livewire::test(RevenueChart::class)->instance();
+        $data = (new \ReflectionMethod($chart, 'getData'))->invoke($chart);
+        $this->assertSame(70000, array_sum($data['datasets'][0]['data']));
+
+        $this->forShop($this->shopB);
+        $chart = Livewire::test(RevenueChart::class)->instance();
+        $data = (new \ReflectionMethod($chart, 'getData'))->invoke($chart);
+        $this->assertSame(999999, array_sum($data['datasets'][0]['data']));
+    }
+
+    public function test_top_fragrances_and_low_stock_rank_only_the_current_shops_catalog(): void
+    {
+        // Phase 4 case 7 (the catalog-side table widgets) — exact row counts.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $aFragrance = $this->makeNamedFragrance('Chanel', 'Allure Homme Sport');
+        $aFragrance->update(['stock_ml' => 2, 'low_stock_threshold_ml' => 5]);
+        $this->makeOrder(OrderStatus::Pending)->items()->create([
+            'fragrance_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 3,
+        ]);
+
+        $this->forShop($this->shopB);
+        $bFragrance = $this->makeNamedFragrance('Dior', 'Sauvage');
+        $bFragrance->update(['stock_ml' => 1, 'low_stock_threshold_ml' => 5]);
+        $this->makeOrder(OrderStatus::Pending)->items()->create([
+            'fragrance_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 9,
+        ]);
+
+        $this->forShop($this->shopA);
+        Livewire::test(TopFragrances::class)
+            ->assertCountTableRecords(1)
+            ->assertSee('Allure Homme Sport')
+            ->assertDontSee('Sauvage');
+        Livewire::test(LowStock::class)
+            ->assertCountTableRecords(1)
+            ->assertSee('Allure Homme Sport')
+            ->assertDontSee('Sauvage');
+    }
+
+    public function test_upcoming_decants_lists_only_the_current_shops_orders(): void
+    {
+        // Phase 4 case 7 (UpcomingDecants) — an exact rendered count.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder(OrderStatus::Pending, customer: 'Alice From Shop A')
+            ->update(['decant_date' => today()->addDay()]);
+
+        $this->forShop($this->shopB);
+        $this->makeOrder(OrderStatus::Pending, customer: 'Bobby From Shop B')
+            ->update(['decant_date' => today()->addDay()]);
+
+        $this->forShop($this->shopA);
+        Livewire::test(UpcomingDecants::class)
+            ->assertCountTableRecords(1)
+            ->assertSee('Alice From Shop A')
+            ->assertDontSee('Bobby From Shop B');
+    }
+
+    public function test_courier_float_and_discount_cost_report_only_the_current_shops_money(): void
+    {
+        // Phase 4 case 7 (the v19/#75/#77 money widgets): PHP sums over a scoped
+        // fetch — never B's figure, never the pooled figure.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->makeOrder(OrderStatus::Pending)
+            ->update(['handed_to_courier_at' => today(), 'courier_carrying_mmk' => 70000]);
+        $this->makeOrder(OrderStatus::Pending)
+            ->update(['discount_mmk' => 4000, 'promo_code' => 'ONLYA']);
+
+        $this->forShop($this->shopB);
+        $this->makeOrder(OrderStatus::Pending)
+            ->update(['handed_to_courier_at' => today(), 'courier_carrying_mmk' => 999999]);
+        $this->makeOrder(OrderStatus::Pending)
+            ->update(['discount_mmk' => 8888, 'promo_code' => 'ONLYB']);
+
+        $this->forShop($this->shopA);
+        Livewire::test(CourierFloat::class)
+            ->assertSee('70,000 Ks')
+            ->assertDontSee('999,999')     // never B's float…
+            ->assertDontSee('1,069,999');  // …and never A+B pooled
+        Livewire::test(DiscountCost::class)
+            ->assertSee('ONLYA')
+            ->assertSee('4,000 Ks')
+            ->assertDontSee('ONLYB')
+            ->assertDontSee('8,888');
+    }
+
+    public function test_production_schedule_feed_and_day_page_contain_none_of_the_other_shops_vials(): void
+    {
+        // Phase 4 case 8: both schedule surfaces read Order::productionScheduleFor,
+        // and both must aggregate only the current shop — exact vial counts.
+        $this->actingAs($this->studioUser());
+        $date = '2026-09-01';
+
+        $this->forShop($this->shopA);
+        $aFragrance = $this->makeNamedFragrance('Chanel', 'Allure Homme Sport');
+        $aOrder = $this->makeOrder(OrderStatus::Pending);
+        $aOrder->update(['decant_date' => $date]);
+        $aOrder->items()->create([
+            'fragrance_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 2,
+        ]);
+
+        $this->forShop($this->shopB);
+        $bFragrance = $this->makeNamedFragrance('Dior', 'Sauvage');
+        $bOrder = $this->makeOrder(OrderStatus::Pending);
+        $bOrder->update(['decant_date' => $date]);
+        $bOrder->items()->create([
+            'fragrance_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 5,
+        ]);
+
+        $this->forShop($this->shopA);
+        $events = (new ProductionSchedule)->calendarEvents($date, '2026-09-02');
+        $this->assertCount(1, $events);
+        $this->assertSame('2 vials', $events[0]['title']); // exactly A's — never 7 pooled
+
+        Livewire::test(ProductionScheduleDay::class, ['date' => $date])
+            ->assertSee('Chanel — Allure Homme Sport')
+            ->assertSee('× 2')
+            ->assertDontSee('Dior — Sauvage')
+            ->assertDontSee('× 5');
+
+        $this->forShop($this->shopB);
+        $this->assertSame('5 vials', (new ProductionSchedule)->calendarEvents($date, '2026-09-02')[0]['title']);
+    }
+
+    public function test_the_brands_cache_between_two_shops_requests_stays_per_shop(): void
+    {
+        // Phase 4 case 10 — the discriminating case for an unkeyed cache key.
+        // A's request warms the cache first; B's request follows in the SAME
+        // process with the cache deliberately NOT cleared between the two.
+        // Clearing it here would let an unkeyed 'api.brands' key pass this test
+        // by never being read twice — the whole leak is the second read.
+        $this->forShop($this->shopA);
+        Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+        Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        $this->forShop($this->shopB);
+        Brand::create(['name' => 'Creed', 'type' => 'niche']);
+
+        $a = $this->getJson("/api/v1/{$this->shopA->slug}/brands")->assertOk();
+        $this->assertEqualsCanonicalizing(['Chanel', 'Dior'], array_column($a->json('data'), 'name'));
+
+        // no Cache::flush() here — that is the point
+        $b = $this->getJson("/api/v1/{$this->shopB->slug}/brands")->assertOk();
+        $this->assertSame(['Creed'], array_column($b->json('data'), 'name'));
+
+        // and A's payload is still A's when its cached copy is read back
+        $again = $this->getJson("/api/v1/{$this->shopA->slug}/brands")->assertOk();
+        $this->assertEqualsCanonicalizing(['Chanel', 'Dior'], array_column($again->json('data'), 'name'));
+    }
+
+    public function test_fresh_start_scoped_to_one_shop_leaves_the_other_shops_data_and_proof_files(): void
+    {
+        // Phase 4 case 11: resetting A must not touch B's rows OR B's proof
+        // objects. B's proof sits at a pre-step-32 UNPREFIXED path on purpose —
+        // the regression this pins is the shared-directory wipe, which deleted
+        // every shop's files however they were prefixed.
+        Storage::fake(config('filesystems.proofs_disk'));
+        $disk = Storage::disk(config('filesystems.proofs_disk'));
+
+        $this->forShop($this->shopA);
+        $this->makeFragrance();
+        $aPath = UploadedFile::fake()->image('a.jpg')
+            ->store('shops/'.$this->shopA->id.'/payment-proofs', config('filesystems.proofs_disk'));
+        $this->makeOrder()->update(['payment_proof_path' => $aPath]);
+
+        $this->forShop($this->shopB);
+        $this->makeFragrance();
+        $bPath = UploadedFile::fake()->image('b.jpg')
+            ->store('payment-proofs', config('filesystems.proofs_disk')); // old-era path
+        $this->makeOrder()->update(['payment_proof_path' => $bPath]);
+
+        $this->artisan('decant:fresh-start', ['--shop' => $this->shopA->slug, '--force' => true])
+            ->assertSuccessful();
+
+        $this->forShop($this->shopA);
+        $this->assertSame(0, Order::count());
+        $this->assertSame(0, Fragrance::count());
+        $disk->assertMissing($aPath);
+
+        $this->forShop($this->shopB);
+        $this->assertSame(1, Order::count());
+        $this->assertSame(1, Fragrance::count());
+        $disk->assertExists($bPath);
+    }
+
+    public function test_fresh_start_refuses_without_a_resolved_shop(): void
+    {
+        // Phase 4 case 11, second half: no ambient tenant and no --shop is a
+        // refusal, never a whichever-shop-happens-to-be-first wipe.
+        $this->forShop($this->shopA);
+        $this->makeOrder();
+
+        app(TenantContext::class)->set(null);
+
+        $this->artisan('decant:fresh-start', ['--force' => true])->assertFailed();
+
+        $this->forShop($this->shopA);
+        $this->assertSame(1, Order::count());
+    }
+
+    public function test_rate_limiter_buckets_carry_the_shop(): void
+    {
+        // Step 32: same IP, different shop, different budget — carrier NAT puts
+        // many customers of many shops behind one IP.
+        $limiter = RateLimiter::limiter('checkout');
+        $request = Request::create('/api/v1/shop-a/orders', 'POST');
+
+        $this->forShop($this->shopA);
+        $aKey = $limiter($request)->key;
+
+        $this->forShop($this->shopB);
+        $bKey = $limiter($request)->key;
+
+        $this->assertStringContainsString('shop-a', $aKey);
+        $this->assertStringContainsString('shop-b', $bKey);
+        $this->assertNotSame($aKey, $bKey);
+    }
+
+    public function test_customer_proof_uploads_land_under_the_shops_own_prefix(): void
+    {
+        // Step 32: new storage objects carry shops/{id}/ so per-shop archive and
+        // delete stay surgical. (Pre-existing objects are not migrated — the
+        // stored path is what every reader uses, so both eras keep working.)
+        Storage::fake(config('filesystems.proofs_disk'));
+
+        $this->forShop($this->shopA);
+        $order = $this->makeOrder();
+
+        $this->post("/api/v1/{$this->shopA->slug}/orders/payment-proof", [
+            'tracking_code' => $order->tracking_code,
+            'phone' => $order->phone,
+            'proof' => UploadedFile::fake()->image('slip.jpg'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $path = $order->fresh()->payment_proof_path;
+        $this->assertStringStartsWith('shops/'.$this->shopA->id.'/payment-proofs/', $path);
+        Storage::disk(config('filesystems.proofs_disk'))->assertExists($path);
     }
 }

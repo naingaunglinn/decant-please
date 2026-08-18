@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\ShopSetting;
+use App\Support\TenantContext;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
@@ -61,7 +62,8 @@ class ManagePayment extends Page
                             ->label('Payment QR (MMQR)')
                             ->image()
                             ->disk(config('filesystems.media_disk'))
-                            ->directory('payment-qr')
+                            // shops/{id}/ prefix (step 32) — see BrandForm
+                            ->directory(fn (): string => 'shops/'.app(TenantContext::class)->id().'/payment-qr')
                             ->maxSize(2048)
                             ->columnSpanFull()
                             ->helperText('Your MMQR — customers scan it to pay from any wallet (KBZPay, Wave, AYA, CB…).'),

@@ -9,7 +9,63 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v25
+## 0. What changed in v26
+
+**v26** runs Step 32 — tenant isolation hardening. The Phase 1 audit walked every scope
+seam outside Filament's resource tenancy (all 19 spec surfaces: widgets, custom pages,
+panel controllers, public endpoints, promo evaluation, slugs, response cache, limiters,
+CSV both ways, storage, commands, seeder, Telegram) and found the query layer already
+sound — the `BelongsToShop` global scope built in v23–v25 held on every row. Three
+non-query leaks surfaced; all three are closed here:
+
+- **Rate limiters now key shop + IP** (`AppServiceProvider`). Per-IP-only buckets let
+  one shop's traffic spend every shop's budget — and Myanmar's carrier NAT puts many
+  customers of many shops behind one IP, so that was the normal case, not the edge.
+- **New storage objects carry a `shops/{id}/…` prefix** on all six write sites (brand
+  logos, fragrance images, the payment QR, and all three payment-proof writers), so
+  per-shop archive and delete stay surgical. Objects written earlier keep their
+  unprefixed paths — every reader uses the stored path, so both eras serve fine.
+  Recorded as an accepted limit, not migrated.
+- **`decant:fresh-start` no longer wipes the shared proofs directory.** It ran
+  `deleteDirectory('payment-proofs')` — one shop's reset destroyed every shop's proof
+  files. It now deletes this shop's proofs by their stored paths (the same pattern its
+  fragrance-image cleanup already used), which also covers pre-prefix paths.
+- **The scoping idiom is now a written decision** (Phase 2): the global scope stays;
+  per-site `whereBelongsTo()` was rejected for this tree (fails open, and the
+  PHP-summed money widgets make a missed clause silent). Recorded in `AGENTS.md` §8,
+  `backend/README.md`, and the `decant-tenancy` skill; the `withoutTenancy()` budget
+  (≤ 5 call sites, 1 used) stays test-enforced.
+- **`TenantIsolationTest` grew from 24 to 40 cases** — the Phase 4 gaps: per-shop
+  `/brands` + `/meta` content, shared-slug resolution, cancel/proof cross-slug generic
+  404s asserted byte-identical, one promo string in two shops over HTTP, a
+  shop-confined user 404ing on another shop's panel and file routes, exact per-widget
+  figures for all seven dashboard widgets, both production-schedule surfaces, the
+  deliberately-uncleared two-shop cache read, fresh-start cross-shop survival (rows
+  *and* proof files) plus the no-`--shop` refusal, and pins for the new limiter keys
+  and the storage prefix. Suite: 236 tests / 1,099 assertions.
+- **Deliberately untouched, per the spec's own row assignments:** `/meta`'s
+  `config('app.payment.*')` / `social` env fallbacks and the single global Telegram
+  bot/chat (with its `{tenant}`-less admin links) — step 33's shop→env→off resolver
+  owns both.
+- **The kit's doc payload is merged and the carrier deleted** (kit session 4, riding
+  this branch). `CLAUDE-md-v21-section.md` — placed at repo root by #84, drafted
+  pre-v24 against the monolithic `CLAUDE.md` — is folded into today's split per the
+  kit's own retargeting note: the conventions block → `AGENTS.md` §8 (the scoping
+  decision plus a new "tenancy reaches past queries" bullet), the domain fact it added
+  → `PRODUCT.md` RULES (per-shop natural keys named explicitly), the version note →
+  this entry; `PRODUCT.md`'s NON-GOALS already carried the v23 marketplace split, so
+  the §8 amendment had nothing left to do there. Root `README.md` reconciled in the
+  same pass: `{shop}` named in the API table itself, the stray `/api/v1/meta`,
+  236-test lines, `--shop` on fresh-start, the panels-as-second-register design note,
+  a layout row pointing at `PRODUCT.md`/`AGENTS.md`, and an out-of-scope list that now
+  excludes the *marketplace* rather than multi-tenancy. Draft claims describing
+  unshipped work were dropped, not merged: the `shops` status enum, impersonation
+  audit, and registry columns stay step 34's; the config resolver stays step 33's; the
+  panels' palette is stock Filament amber/emerald, not a pine-derived ramp.
+  `docs/adr/0004-storefront-addressing.md` stays **Proposed** — the session-5
+  pressure-test hasn't run.
+
+## 0.1 What changed in v25
 
 **v25** turns on the panel's multi-tenancy (Step 25a — the Filament half pulled
 forward out of the deferred Step 25) and then hardens the whole seam: an audit of

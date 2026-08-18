@@ -63,6 +63,16 @@ Pick **one** and apply it everywhere:
 Recommendation: **A**, precisely because of the failure direction. Record the choice and
 the reasoning in the PR body and in the §7 addition (see `CLAUDE-md-v21-section.md`).
 
+> **Decided as run (v26): A, as already built.** Steps 23–25a had implemented the global
+> scope before this step ran, with two deviations from the sketch above that were kept
+> deliberately: the scope **throws** `TenantNotSetException` instead of returning empty
+> (the 500 names the wiring bug), and the bypass is the context-level
+> `TenantContext::withoutTenancy()` (finally-restored, budget-counted) rather than
+> per-query `withoutGlobalScope`. The decision block lives in `AGENTS.md` §8
+> (`CLAUDE.md` being a pointer since ADR-0001); the kit's carrier file
+> `CLAUDE-md-v21-section.md` sat at repo root from #84 until kit session 4 merged its
+> remaining sections into `AGENTS.md` / `PRODUCT.md` / `CHANGELOG.md` and deleted it.
+
 Filament's own tenancy still handles Resources; the global scope is the belt for the
 widgets, pages, controllers, and commands that Filament's tenancy does not reach.
 
@@ -72,6 +82,11 @@ Only the rows the audit marked unscoped or accidental. Smallest diff that closes
 No refactors riding along, no renames, no new features.
 
 ## Phase 4 — `tests/Feature/TenantIsolationTest.php`
+
+> **As run (v26):** the file had existed since step 23 with 24 cases; this step extended
+> it to 40, adding the cases below it lacked (2, 4, 6, 8, most of 7, the case-10 cache
+> read, case 11) plus pins for the two Phase 3 fixes (per-shop limiter keys, the
+> `shops/{id}/` storage prefix).
 
 The point of this file is that it fails loudly when a *future* step un-scopes something.
 Seed two shops, each with its own brand, fragrance (deliberately the **same slug** in

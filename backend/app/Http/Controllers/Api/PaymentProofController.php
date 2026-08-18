@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Events\PaymentProofUploaded;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -35,9 +36,13 @@ class PaymentProofController extends Controller
 
         $hadProof = $order->payment_proof_path !== null;
 
-        // The private proofs disk, never the public media disk. Replacing an
-        // earlier upload cleans up the old object via the model's updated hook.
-        $path = $request->file('proof')->store('payment-proofs', config('filesystems.proofs_disk'));
+        // The private proofs disk, never the public media disk, under the shop's
+        // own shops/{id}/ prefix (step 32). Replacing an earlier upload cleans up
+        // the old object via the model's updated hook.
+        $path = $request->file('proof')->store(
+            'shops/'.app(TenantContext::class)->id().'/payment-proofs',
+            config('filesystems.proofs_disk'),
+        );
 
         $order->attachPaymentProof($path);
 

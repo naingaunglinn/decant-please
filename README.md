@@ -24,7 +24,7 @@ lives in `prompts/multi-tenancy-design.md`.
 |---|---|
 | `backend/` | Laravel 13 — JSON API + [Filament v5](https://filamentphp.com) panels: per-shop admin at `/admin/{shop}`, studio at `/studio` — [README](backend/README.md) with routes & file structure |
 | `frontend/` | Next.js 16 (App Router, TypeScript, Tailwind v4) — public storefront — [README](frontend/README.md) with routes & file structure |
-| `CLAUDE.md` | Project spec and source of truth for every product/design decision |
+| `PRODUCT.md` | The product source of truth — what should exist and why; `CLAUDE.md` is a pointer at `AGENTS.md`, the always-on agent working rules (the ADR-0001 split) |
 | `FINANCE.md` | Financial-surface roadmap — what's built, the real gaps in build order, and the money decisions locked or still open |
 | `DEPLOY.md` | Production deployment guide (Heroku backend + Vercel frontend + Cloudflare R2 storage, backups) |
 | `prompts/` | The step-by-step build prompts this project was built from |
@@ -243,7 +243,7 @@ npm run dev -- -p 3001
 | `FRONTEND_URL` | Storefront origin — CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by the seeder for the admin login |
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Shown as storefront footer links; blank = hidden |
-| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details shown at checkout / on the receipt via `/api/v1/meta`; blank fields are hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details shown at checkout / on the receipt via `/api/v1/{shop}/meta`; blank fields are hidden |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram; both blank = alerts off |
 | `MEDIA_DISK` | Disk for uploaded images — `public` locally (via `storage:link`), `s3` (Cloudflare R2) in production |
 | `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a second no-public-domain R2 bucket in production |
@@ -263,7 +263,7 @@ All endpoints are under `/api/v1/{shop}` — the shop slug is the first path seg
 (multi-tenancy Step 24; unknown or inactive shops are a generic 404) — JSON, paginated
 where applicable.
 
-| Method | Endpoint | Purpose | Throttle |
+| Method | Endpoint (under `/api/v1/{shop}`) | Purpose | Throttle |
 |---|---|---|---|
 | GET | `/fragrances` | Filterable catalog | 120/min |
 | GET | `/fragrances/{slug}` | Fragrance detail | 120/min |
@@ -291,14 +291,14 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 104 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, full API
+docker compose exec backend php artisan test   # 236 tests — domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 
 Or with local toolchains:
 
 ```bash
-cd backend && php artisan test   # same 104 tests, using your local toolchain
+cd backend && php artisan test   # same 236 tests, using your local toolchain
 cd frontend && npm run build     # type-checks and builds the storefront
 ```
 
@@ -325,7 +325,7 @@ history is the decanter's financial record).
 When the demo data has served its purpose:
 
 ```bash
-php artisan decant:fresh-start   # wipes demo fragrances + orders; keeps brands and the admin login
+php artisan decant:fresh-start --shop=<slug>   # wipes ONE shop's demo fragrances + orders (and its proof files); keeps brands and the admin login; refuses without --shop
 ```
 
 ## Design
@@ -334,14 +334,27 @@ Premium-minimalist, apothecary-adjacent — pale `mist` background, near-black t
 `pine` green used sparingly, one Helvetica-stack family throughout. Every piece of metadata
 lives in a thin hairline-bordered pill (a vial label, not a badge), and the one deliberate
 motion moment is the tracking timeline filling like a vial. Tokens live in
-`frontend/src/app/globals.css`; the full design language is specified in `CLAUDE.md`.
+`frontend/src/app/globals.css` (portable copy: `design-tokens.json`); the full design
+language is specified in `frontend/AGENTS.md`.
+
+That language is customer-side. The admin and Studio panels are deliberately a second
+register — Filament's own chrome, with stock palettes as the "which panel am I in?" cue
+(shop panel amber, studio emerald) and Filament's badges rather than hairline pills, and
+**no Vite-compiled Filament theme**: the Heroku build path has no Node, the same
+constraint that vendored FullCalendar.
 
 ## Deliberately out of scope
 
-Online payment gateways, customer accounts, chat, multi-decanter marketplace,
-per-bottle inventory (total-ml decant stock *is* in since v8, and a liquid-only
-cost/margin view since step 28), and **customer-facing**
-notifications — admin-side Telegram alerts shipped in step 21, but a bot can't message
-a customer who never pressed Start, so reaching them would need per-customer opt-in or
-a paid channel; the tracking page stays the customer's channel. See `CLAUDE.md` §8
-before adding any of these.
+Online payment gateways, customer accounts, chat, per-bottle inventory (total-ml decant
+stock *is* in since v8, and a liquid-only cost/margin view since step 28), and
+**customer-facing** notifications — admin-side Telegram alerts shipped in step 21, but a
+bot can't message a customer who never pressed Start, so reaching them would need
+per-customer opt-in or a paid channel; the tracking page stays the customer's channel.
+
+**Multi-shop is no longer out of scope — a marketplace still is.** Several shops on one
+deployment shipped in steps 23–25a: each is a self-contained business with its own
+catalog, orders, books, and admin, with the studio panel above them. What stays out is
+the **marketplace**: cross-shop browsing or search, a shared cart, and any surface that
+presents the shops to a customer as a directory — a customer arrives at one decanter's
+storefront from that decanter's own link and never learns the others exist. See
+`PRODUCT.md` § NON-GOALS before adding anything in this list.

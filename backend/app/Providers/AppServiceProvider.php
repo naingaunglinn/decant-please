@@ -7,6 +7,7 @@ use App\Events\PaymentProofUploaded;
 use App\Listeners\NotifyAdminOfNewOrder;
 use App\Listeners\NotifyAdminOfPaymentProof;
 use App\Listeners\SyncTenantContextFromFilament;
+use App\Support\TenantContext;
 use Filament\Events\TenantSet;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -30,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         // helpers trigger mid-test — where nothing re-runs the resolver middleware.
         // If this app ever moves to Octane (persistent container), switch to scoped()
         // and reset it in an Octane RequestReceived listener.
-        $this->app->singleton(\App\Support\TenantContext::class);
+        $this->app->singleton(TenantContext::class);
     }
 
     /**
@@ -45,15 +46,22 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Named limiters so each endpoint gets its own per-IP bucket. Inline
+        // Named limiters so each endpoint gets its own bucket, keyed shop + IP.
+        // Both components are load-bearing: the endpoint prefix because inline
         // `throttle:n,1` keys guests by ip alone (no path), so catalog browsing
-        // was silently eating the checkout allowance.
-        RateLimiter::for('catalog', fn (Request $request) => Limit::perMinute(120)->by('catalog|'.$request->ip()));
-        RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(10)->by('checkout|'.$request->ip()));
-        RateLimiter::for('tracking', fn (Request $request) => Limit::perMinute(20)->by('tracking|'.$request->ip()));
-        RateLimiter::for('cancel', fn (Request $request) => Limit::perMinute(10)->by('cancel|'.$request->ip()));
-        RateLimiter::for('payment-proof', fn (Request $request) => Limit::perMinute(10)->by('payment-proof|'.$request->ip()));
-        RateLimiter::for('promo', fn (Request $request) => Limit::perMinute(10)->by('promo|'.$request->ip()));
+        // was silently eating the checkout allowance — and the shop (step 32)
+        // because Myanmar's mobile carriers NAT many customers behind one IP,
+        // so a per-IP-only bucket lets one shop's traffic spend every shop's
+        // budget. ResolveTenant has always run by the time a limiter resolves
+        // (it sits on the /api/v1/{shop} group, outside the route throttles).
+        $perShopIp = fn (string $bucket, Request $request): string => $bucket.'|'.app(TenantContext::class)->slug().'|'.$request->ip();
+
+        RateLimiter::for('catalog', fn (Request $request) => Limit::perMinute(120)->by($perShopIp('catalog', $request)));
+        RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('checkout', $request)));
+        RateLimiter::for('tracking', fn (Request $request) => Limit::perMinute(20)->by($perShopIp('tracking', $request)));
+        RateLimiter::for('cancel', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('cancel', $request)));
+        RateLimiter::for('payment-proof', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('payment-proof', $request)));
+        RateLimiter::for('promo', fn (Request $request) => Limit::perMinute(10)->by($perShopIp('promo', $request)));
 
         // Admin Telegram alerts. Wired explicitly, and necessarily so: event
         // auto-discovery is off (bootstrap/app.php, #52), so a listener that

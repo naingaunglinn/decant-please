@@ -14,7 +14,13 @@ resolves per shop. Everything below is a consequence.
 
 ## Before writing a query
 
-Every model belongs to exactly one shop. Scoping is [record the step-32 idiom here].
+Every model belongs to exactly one shop. Scoping is the `BelongsToShop` **global scope**
+(step 32's decision): it **throws** `TenantNotSetException` when no tenant is set — never
+an empty result, never all shops — filters on the *qualified* `shop_id`, and a creating
+hook stamps ownership from `TenantContext`. Cross-shop **writes** set the context to the
+target shop (`NationalGeography::seed` is the model); cross-shop **reads** spend
+`TenantContext::withoutTenancy()`, budgeted at ≤ 5 call sites by `TenantIsolationTest`.
+Never `withoutGlobalScope`. Platform-owned tables (`shops`, `users`) don't carry the trait.
 
 - A Filament **Resource** inherits panel tenancy. A **widget**, **custom page**,
   **controller registered via `authenticatedRoutes()`**, **artisan command**, **seeder**,
