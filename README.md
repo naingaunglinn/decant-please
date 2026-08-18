@@ -253,9 +253,13 @@ npm run dev -- -p 3001
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Laravel API base, e.g. `http://localhost:8010/api` |
-| `NEXT_PUBLIC_SHOP_SLUG` | Which shop this storefront is — the `{shop}` path segment; matches a `shops.slug` row (defaults to `decant-please` locally) |
-| `NEXT_PUBLIC_SITE_URL` | Public site URL — canonical/OG metadata |
 | `NEXT_PUBLIC_IMAGE_URL` | Production only — the R2 public image host, allow-listed for the image optimizer; unset locally |
+
+No per-shop variable and no site-URL variable (ADR-0004): **the request Host is the
+tenant** — one storefront deployment serves every shop, resolving each domain against
+the backend's `shop_domains` table, with canonical/OG/sitemap URLs derived from the
+shop's verified primary domain. Locally the seeder maps `localhost:3001 →
+decant-please`, so the dev storefront just works.
 
 ## Public API
 

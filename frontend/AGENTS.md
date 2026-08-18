@@ -24,15 +24,27 @@ GSAP (scroll) · Motion (component state, import from `motion/react`, **not**
 ## Structure
 
 ```
-src/app/          routes — page.tsx / loading.tsx / error.tsx / not-found.tsx
+src/proxy.ts      ADR-0004: Host → internal /{host}/… rewrite. I/O-free, always.
+src/app/          bare shell + unbranded fail-closed not-found
+src/app/[host]/   the tenant tree — every public route lives here; the segment
+                  IS the validated public host (page.tsx / loading.tsx /
+                  error.tsx / not-found.tsx, robots.txt/ + sitemap.xml/ handlers)
 src/components/   grouped by surface: catalog, checkout, cart, home, product,
                   tracking, layout, ui
-src/lib/          api.ts (fetching), types.ts (API contract), format.ts,
-                  cart-context.tsx
+src/lib/          api.ts (fetching, tenant-parameterized), tenant.ts (resolver +
+                  tenantPage gate), tenant-context.tsx (useTenant), types.ts
+                  (API contract), format.ts, cart-context.tsx
 src/hooks/        useCart.ts
 scripts/          verify-*.mjs — real-browser regression checks
 ```
 
+- **The Host is the tenant.** Server pages call `tenantPage(params.host, ownPath)` —
+  resolve-or-404 plus the secondary→primary 308 — and pass the slug into `lib/api.ts`
+  explicitly; client components read `useTenant()`. Never a build-time shop, never
+  module-scope tenant state, never a tenant from a query param or storage. The proxy
+  performs no I/O and no authorization — the backend scope is the security boundary.
+  The empty `generateStaticParams` exports are load-bearing (they opt routes into
+  on-demand ISR); a new static-eligible page under `[host]` should carry one too.
 - Catalog fetching happens in **server components**. Cart and checkout interactivity is
   client-side.
 - A new surface gets its own directory under `components/`. Do not add to `ui/` unless
@@ -108,6 +120,7 @@ change and paste its real output — not a summary of what you expect it to say.
 | `verify-home-rails.mjs` | featured vs recently-viewed `<ViewTransition>` name collisions | **dev server only** (needs React dev warnings) |
 | `verify-image-fallback.mjs` | missing image falls back to the vial glyph, not a broken icon | dev or prod |
 | `verify-print.mjs` | printed receipt is a static document, not the live view | needs `CODE=` + `PHONE=` |
+| `verify-tenant-hosts.mjs` | ADR-0004 host routing: per-tenant pages, the step-32 same-path/two-hosts cache case (both orders), fail-closed unknown hosts, secondary→primary 308, per-tenant robots/sitemap | dev proves correctness; **`next start` proves the cache** (fixture snippet in the script header) |
 
 ```bash
 BASE_URL=http://localhost:3001 node scripts/verify-responsive.mjs

@@ -37,6 +37,20 @@ The key carries the shop. An unkeyed catalog or `/meta` cache serves one shop's 
 under another's slug, with no attacker and no unusual request — the cheapest possible
 leak. Busting on save busts that shop's key only.
 
+## Before touching the storefront's routing
+
+One Next.js deployment serves every shop (ADR-0004): the request **Host** is the
+tenant. `src/proxy.ts` rewrites publicly-invisible `/{host}/…` internally — I/O-free,
+never authorization — and `lib/tenant.ts` resolves the host against `shop_domains`
+(cached 60s), failing **closed**: unknown, unverified, and inactive hosts 404, and
+there is no default-shop fallback, ever. Pages gate through `tenantPage(host, path)`
+(which also 308s secondary domains to the verified primary); client components read
+`useTenant()`. Never accept a tenant from a query param, storage, or client state.
+The empty `generateStaticParams` exports are what keep home/PDP/checkout on-demand-ISR
+— removing one silently turns the route fully dynamic. Cache isolation is structural
+(the host is in the route-cache key) and pinned end-to-end by
+`verify-tenant-hosts.mjs` against a production build.
+
 ## Before writing a public lookup
 
 Tracking codes are globally unique; that is not the same as safe. `tracking_code` +
