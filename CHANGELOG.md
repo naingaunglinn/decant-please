@@ -47,6 +47,23 @@ non-query leaks surfaced; all three are closed here:
   `config('app.payment.*')` / `social` env fallbacks and the single global Telegram
   bot/chat (with its `{tenant}`-less admin links) — step 33's shop→env→off resolver
   owns both.
+- **The kit's doc payload is merged and the carrier deleted** (kit session 4, riding
+  this branch). `CLAUDE-md-v21-section.md` — placed at repo root by #84, drafted
+  pre-v24 against the monolithic `CLAUDE.md` — is folded into today's split per the
+  kit's own retargeting note: the conventions block → `AGENTS.md` §8 (the scoping
+  decision plus a new "tenancy reaches past queries" bullet), the domain fact it added
+  → `PRODUCT.md` RULES (per-shop natural keys named explicitly), the version note →
+  this entry; `PRODUCT.md`'s NON-GOALS already carried the v23 marketplace split, so
+  the §8 amendment had nothing left to do there. Root `README.md` reconciled in the
+  same pass: `{shop}` named in the API table itself, the stray `/api/v1/meta`,
+  236-test lines, `--shop` on fresh-start, the panels-as-second-register design note,
+  a layout row pointing at `PRODUCT.md`/`AGENTS.md`, and an out-of-scope list that now
+  excludes the *marketplace* rather than multi-tenancy. Draft claims describing
+  unshipped work were dropped, not merged: the `shops` status enum, impersonation
+  audit, and registry columns stay step 34's; the config resolver stays step 33's; the
+  panels' palette is stock Filament amber/emerald, not a pine-derived ramp.
+  `docs/adr/0004-storefront-addressing.md` stays **Proposed** — the session-5
+  pressure-test hasn't run.
 
 ## 0.1 What changed in v25
 

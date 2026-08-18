@@ -68,8 +68,10 @@ the reasoning in the PR body and in the §7 addition (see `CLAUDE-md-v21-section
 > deliberately: the scope **throws** `TenantNotSetException` instead of returning empty
 > (the 500 names the wiring bug), and the bypass is the context-level
 > `TenantContext::withoutTenancy()` (finally-restored, budget-counted) rather than
-> per-query `withoutGlobalScope`. `CLAUDE-md-v21-section.md` was never placed in the
-> tree; the decision block lives in `AGENTS.md` §8 instead.
+> per-query `withoutGlobalScope`. The decision block lives in `AGENTS.md` §8
+> (`CLAUDE.md` being a pointer since ADR-0001); the kit's carrier file
+> `CLAUDE-md-v21-section.md` sat at repo root from #84 until kit session 4 merged its
+> remaining sections into `AGENTS.md` / `PRODUCT.md` / `CHANGELOG.md` and deleted it.
 
 Filament's own tenancy still handles Resources; the global scope is the belt for the
 widgets, pages, controllers, and commands that Filament's tenancy does not reach.

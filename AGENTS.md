@@ -170,6 +170,16 @@ A change is done when **all** of these hold, and you have said so with evidence:
     context, or spends a budgeted `withoutTenancy()`.
   - Filament's `->tenant()` scopes Resources only. It is navigation, not isolation —
     never rely on panel tenancy for a query Filament doesn't own.
+- **Tenancy reaches past queries** (step 32): cache keys carry the shop; rate-limiter
+  buckets key shop + IP; storage objects are written under `shops/{id}/…`. A tenant is
+  set only by the two established entry points — `ResolveTenant` on the API, Filament's
+  tenancy mirrored into `TenantContext` by `SyncTenantContextFromFilament` on the
+  panels — never ad hoc in a controller or page. A new Filament page or widget states
+  its scoping in a top-of-class comment; "deliberately cross-shop, Studio only" is a
+  legitimate answer, written once. Per-shop config resolution (shop row → env → off) is
+  step 33's resolver; until it lands, a *new* bare `config('services.telegram.*')` /
+  `config('app.payment.*')` read is a bug — the env blocks are platform defaults, never
+  a shop's live value.
 - **One backend serves every shop.** One bad deploy affects all of them, so the
   `develop` → `main` promotion gate matters more under pooling, not less. Never merge a PR
   yourself, and never skip verification because a change "looks small".

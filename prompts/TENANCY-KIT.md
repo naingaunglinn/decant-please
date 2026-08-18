@@ -47,6 +47,12 @@ the READMEs, before the v24/v25 work merged, so calibrate:
 One prompt file per session. `/clear` between them — a session that has been reading
 `app/Filament` for an hour gives worse audits than a fresh one.
 
+> **Run state (2026-08-18):** sessions 1–4 are done — 1 and 2 chat-only
+> (audit/decision), 3 and 4 as one branch (PR #87, v26; session 4 rode along and was
+> retargeted exactly as the §1 placement note prescribes — much of its README/feature
+> list was already closed by the v25 doc pass). `CLAUDE-md-v21-section.md` is merged
+> and deleted. Next: session 5 (ADR-0004 stays Proposed until then).
+
 ### Session 1 — audit (read-only, no branch, no issue)
 
 ```
