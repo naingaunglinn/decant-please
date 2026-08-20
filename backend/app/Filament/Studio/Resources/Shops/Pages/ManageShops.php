@@ -31,7 +31,7 @@ class ManageShops extends ManageRecords
                 ->label('Register a shop')
                 ->using(function (array $data): Shop {
                     return DB::transaction(function () use ($data): Shop {
-                        $shop = Shop::create(Arr::only($data, ['name', 'slug', 'is_active']));
+                        $shop = Shop::create(Arr::only($data, ['name', 'slug', 'status']));
 
                         if ($data['create_owner'] ?? false) {
                             $owner = User::create([
@@ -41,6 +41,10 @@ class ManageShops extends ManageRecords
                                 'is_studio' => false,
                             ]);
                             $owner->shops()->attach($shop);
+                            // Step 34: the owner login carries the shop_owner
+                            // capability role (Shield). WHICH shop stays the
+                            // membership above + canAccessTenant/BelongsToShop.
+                            $owner->assignRole('shop_owner');
                         }
 
                         return $shop;

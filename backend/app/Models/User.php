@@ -15,22 +15,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'is_studio'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasRoles, Notifiable;
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // The studio panel (/studio) is the super-admin home — is_studio only.
-        // The tenant panel (/admin/{shop}) admits any operator account; WHICH
-        // shops they can enter is canAccessTenant's job, not this one's.
-        // Customers never get accounts either way (PRODUCT.md non-goals).
+        // The studio panel (/studio) is the super-admin home — studio_admin only.
+        // Authorization is now the studio_admin role (Shield super_admin), with
+        // is_studio kept transitionally as data (ADR-0003 Step-34 amendment): the
+        // access decision reads the role, not the column. The tenant panel
+        // (/admin/{shop}) admits any operator account; WHICH shops they can enter
+        // is canAccessTenant's job. Customers never get accounts (PRODUCT.md).
         if ($panel->getId() === 'studio') {
-            return $this->is_studio;
+            return $this->hasRole('studio_admin');
         }
 
         return true;
@@ -50,7 +53,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      */
     public function getTenants(Panel $panel): Collection
     {
-        return $this->is_studio
+        return $this->hasRole('studio_admin')
             ? Shop::query()->orderBy('name')->get()
             : $this->shops()->orderBy('name')->get();
     }
@@ -58,7 +61,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /** Filament tenancy: may this user operate $tenant? Studio sees all. */
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->is_studio || $this->shops()->whereKey($tenant->getKey())->exists();
+        return $this->hasRole('studio_admin') || $this->shops()->whereKey($tenant->getKey())->exists();
     }
 
     /**

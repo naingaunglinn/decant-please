@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Filament\Widgets\CourierFloat;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use LogicException;
@@ -19,11 +18,7 @@ class CourierFloatTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_handoff_snapshots_the_carrying_amount_and_settle_releases_it(): void

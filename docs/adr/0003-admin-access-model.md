@@ -1,6 +1,7 @@
 # ADR-0003: Admin access model for Filament tenancy
 
-**Status:** Accepted — Option C, amended as built (v25; see "As built" below)
+**Status:** Accepted — Option C, amended as built (v25), and extended to
+Shield-based authorization for Step 34 (see "As built" and "Third amendment" below)
 **Date:** 2026-08-11 · **Built:** 2026-08-17
 **Deciders:** Naing Aung Linn
 **Informs:** `prompts/*-multi-tenancy-shop-onboarding.md` (whose panel half became
@@ -151,9 +152,73 @@ no invite/reset flow), `role` remains deferred, and the §8 panel-URL-404 case
 for a confined owner is now in the suite (`ShopManagementTest`) along with the
 studio-panel 403.
 
+## Third amendment (Step 34 — authorization via Filament Shield)
+
+Step 34 introduces roles beyond `is_studio` (`studio_admin` / `shop_owner` /
+`shop_staff`) and per-resource authorization the panels have never had. Rather than
+a hand-built RBAC, the accepted direction is **Filament Shield 4.x** (Filament
+v5-compatible, on `spatie/laravel-permission`) as the authorization layer, adopted
+in **non-team mode**. A compatibility spike (docs + inspection, no install)
+confirmed the fit; this amendment records the decision.
+
+**The boundary — this ADR's founding split (finding §2), now named.** Shield answers
+*"may this user perform this action?"*: it owns roles, permissions, and the generated
+Filament/Laravel policies. The existing seam remains the sole authority for *"may
+this user enter this shop, and does this record belong to this shop?"* —
+`TenantContext`, the throwing `BelongsToShop` scope, `shop_user` membership,
+`canAccessTenant()`/`getTenants()`, and `ResolveTenant` are **untouched** (only the
+backing of the three `HasTenants`/panel readers moves from `is_studio` to
+`hasRole('studio_admin')`). Authorization and isolation stay orthogonal, and Shield
+changes nothing about what can leak — a policy authorizes an action; `BelongsToShop`
+still scopes the rows.
+
+**Non-team, deliberately.** Shield's tenant scoping is opt-in
+(`FilamentShieldPlugin::make()->scopeToTenant(true)`); we do **not** call it and do
+**not** enable Spatie teams. Teams would put a per-request `team_id` on the
+permission tables — a second shop-scoping mechanism parallel to
+`BelongsToShop`/`TenantContext`, i.e. two sources of truth for "which shop," the
+exact drift this seam exists to avoid. Roles are global.
+
+**Roles are global capabilities; shops stay where they are.** `studio_admin` maps to
+Shield's super_admin (Gate::before grants every ability — platform-wide by
+construction). `shop_owner` / `shop_staff` are capability roles only; *which* shop a
+user may act in is still `shop_user` membership + `canAccessTenant()`, and per-shop
+record visibility is still `BelongsToShop`. Non-team mode cannot express *different
+roles per shop for one user* — not a requirement here (this ADR's own note: "no
+second real role until a client has staff").
+
+**No `users.role`, no `shop_user.role` — the deferred column is superseded.** Roles
+live in Spatie's `roles`/`model_has_roles` tables managed through Shield's UI, so
+neither column is ever added. Design-doc §7's `role`-on-pivot annotation is cancelled.
+
+**`is_studio` is transitional; the source of truth becomes `studio_admin`.** The
+column is **not removed here**: existing `is_studio = true` users are assigned
+`studio_admin` in the same change, the three readers move to `hasRole('studio_admin')`,
+and the column may drop a later release once nothing reads it. The composed contract's
+shape is unchanged — only its backing moves from a boolean to a role, exactly what
+finding §1 anticipated ("Filament binds to two methods, not to a table").
+
+**`/studio`-only management UI.** Shield's Role/Permission resource is registered on
+the `/studio` panel only; the `/admin` panel gets no Shield UI, but its resources are
+still enforced by the generated model-level policies.
+
+**Two safety pre-conditions.** *Deny-by-default:* once policies exist Filament denies
+unless authorized, so `studio_admin` is created and assigned to existing operators in
+the **same data migration** (atomic with the release-phase `migrate`) — no lockout
+window. *Guard alignment:* Spatie roles/permissions and the panels all use the `web`
+guard.
+
 ## Action items
 
 1. [x] Decide A/B/C — Option C accepted
 2. [x] Amended: the shop-onboarding step's scope (now `25a` as built, pointing
        here), design doc §7's `shop_user` annotation, and findings §4's `User` row
 3. [x] Shipped: `is_studio` + composed `HasTenants` (deviations recorded above)
+4. [x] Step 34 PR-1: adopted Filament Shield 4.x (non-team) + `spatie/laravel-permission`;
+       `HasRoles` on `User`; `scopeToTenant()` never called; teams off
+5. [x] Seeded roles (`studio_admin` = super_admin via `define_via_gate`, `shop_owner`,
+       `shop_staff`) + backfill assignment in a deploy-safe data migration; guard `web`
+6. [x] Shield UI on `/studio` only; generated resource policies (enforced on `/admin` too)
+7. [x] `canAccessPanel`/`getTenants`/`canAccessTenant` read `hasRole('studio_admin')`;
+       `is_studio` kept transitionally (removal is a later follow-up)
+8. [ ] Later: drop the `is_studio` column once nothing reads it

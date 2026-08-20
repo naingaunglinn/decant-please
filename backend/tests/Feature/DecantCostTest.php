@@ -9,7 +9,6 @@ use App\Http\Resources\FragranceResource;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -22,11 +21,7 @@ class DecantCostTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     // ---- the derivation ----

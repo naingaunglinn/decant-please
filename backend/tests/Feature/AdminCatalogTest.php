@@ -9,7 +9,6 @@ use App\Filament\Resources\Fragrances\Pages\CreateFragrance;
 use App\Filament\Resources\Fragrances\Pages\ListFragrances;
 use App\Models\Brand;
 use App\Models\Fragrance;
-use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -25,11 +24,7 @@ class AdminCatalogTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_brand_list_renders_records(): void

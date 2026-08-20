@@ -5,7 +5,9 @@ namespace Database\Factories;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -41,5 +43,20 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Step 34: keep the transitional `is_studio` flag and the studio_admin role in
+     * step for factory-made users, so existing tests that create `is_studio` users
+     * still reach /studio under Shield's role-backed access. Guarded so the factory
+     * works before the roles migration has run.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if ($user->is_studio && Schema::hasTable('roles') && Role::where('name', 'studio_admin')->exists()) {
+                $user->assignRole('studio_admin');
+            }
+        });
     }
 }

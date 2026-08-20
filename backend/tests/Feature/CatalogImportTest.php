@@ -7,7 +7,6 @@ use App\Enums\Concentration;
 use App\Filament\Resources\Fragrances\Pages\ListFragrances;
 use App\Models\Brand;
 use App\Models\Fragrance;
-use App\Models\User;
 use App\Support\CatalogImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -156,11 +155,7 @@ class CatalogImportTest extends TestCase
 
     public function test_admin_can_import_and_download_the_template_from_the_fragrances_page(): void
     {
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
 
         $file = UploadedFile::fake()->createWithContent('catalog.csv',
             self::HEADER."\n".self::ALLURE_ROW);

@@ -25,9 +25,13 @@ class ResolveTenant
 
     public function handle(Request $request, Closure $next): Response
     {
+        // ->active() is the one lifecycle seam (scopeActive === status live, Step 34):
+        // only a live shop resolves; onboarding/suspended/archived 404 as before.
+        // The resolution architecture is unchanged — only the servable predicate moved
+        // from the retired is_active boolean to the status enum.
         $shop = Shop::query()
             ->where('slug', $request->route('shop'))
-            ->where('is_active', true)
+            ->active()
             ->first();
 
         abort_if($shop === null, 404);

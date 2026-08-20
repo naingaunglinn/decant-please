@@ -13,7 +13,6 @@ use App\Filament\Widgets\UpcomingDecants;
 use App\Models\Brand;
 use App\Models\DecantPrice;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -26,11 +25,7 @@ class AdminOrdersTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_checkout_order_lands_in_needs_review_tab_with_tracking_code(): void

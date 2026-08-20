@@ -148,7 +148,7 @@ class PromoCodeTest extends TestCase
 
     public function test_admin_can_list_and_create_promo_codes(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->create(['is_studio' => true]));
         PromoCode::create(['code' => 'SAVE10', 'type' => PromoType::Percent, 'value' => 10, 'max_discount_mmk' => 20000, 'usage_limit' => 5, 'times_used' => 2]);
 
         Livewire::test(ListPromoCodes::class)
@@ -175,7 +175,7 @@ class PromoCodeTest extends TestCase
         // tenant-scoped PromoCode query, so a duplicate in THIS shop is a form
         // error — while another shop running the same code is none of our
         // business (asserted from the other side in TenantIsolationTest).
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->create(['is_studio' => true]));
         PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 2500]);
 
         Livewire::test(CreatePromoCode::class)

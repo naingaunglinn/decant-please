@@ -7,7 +7,6 @@ use App\Filament\Widgets\LowStock;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -20,11 +19,7 @@ class DecantStockTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_stock_drops_when_an_order_is_decanted(): void

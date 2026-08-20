@@ -9,7 +9,56 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v29
+## 0. What changed in v30
+
+**v30** starts Step 34 (studio operability) with **PR-1: shop lifecycle + Shield
+roles**. Impersonation/audit (PR-2) and the registry redesign/tokens/sidebar (PR-3)
+are deferred. Two prerequisites (Steps 32, 33) were already merged.
+
+- **Shop lifecycle replaces `is_active`.** A `ShopStatus` enum
+  (`onboarding → live → suspended → archived`) plus `suspended_reason` /
+  `suspended_at` / `suspended_by`. `scopeActive()` now means `status = live` — the
+  one seam every `->active()` caller goes through, so `ResolveTenant` and the
+  storefront host resolver serve only live shops (the rest keep the existing
+  generic 404) with a one-line change. `is_active` is dropped as a column and kept
+  as a **derived read-only accessor** (`status === live`), so there is no second
+  writable state. `suspend()` requires a reason + actor; `activate()`/`archive()`
+  are the other transitions. Backfill (confirmed against the data, issue #96):
+  `is_active true → live`, `false → onboarding` — the repo does not prove `false`
+  meant "suspended" (PRODUCT.md open-Q2), and `onboarding` is the lossless
+  non-serving default; every observed shop was `true → live`.
+- **Authorization is Filament Shield 4.x** (`spatie/laravel-permission`, **non-team**;
+  ADR-0003's Step-34 amendment). Global roles `studio_admin` (= Shield super_admin,
+  platform-wide via a `Gate::before` bypass — `define_via_gate` on), `shop_owner`
+  (full control of its shop's resources), `shop_staff` (a deliberately narrow read
+  set). Shield answers *"may this user perform this action?"* through generated,
+  authorization-only model policies (verified: no query scoping); the tenancy seam
+  (`BelongsToShop`, `shop_user` membership, `canAccessTenant`, `ResolveTenant`) still
+  answers *"which shop, and which records"* — **untouched**. No Spatie teams, no
+  `scopeToTenant()`, no `users.role`/`shop_user.role`.
+- **`is_studio` is transitional.** Its three readers (`canAccessPanel`, `getTenants`,
+  `canAccessTenant`) now use `hasRole('studio_admin')`; the column stays this release
+  (dropping it is a later follow-up). Shield's role UI is on **`/studio` only**; the
+  `/admin` panel gets no Shield UI but the generated policies still enforce there.
+- **Deploy-safe, no lockout.** Roles are created and backfilled
+  (`is_studio → studio_admin`, membership owners → `shop_owner`) in a **data
+  migration** — atomic with Heroku's release-phase `migrate`, so policies never
+  enforce before `studio_admin` exists. Idempotent; guard aligned to `web`. The
+  studio-operator seed + new owner registrations assign their roles too.
+- **Suite 273 → 295 / 1,261 assertions.** New `ShopLifecycleTest` and
+  `RoleAuthorizationTest` (studio_admin super_admin, shop_owner CRUD, shop_staff
+  narrow, `/studio` denied to non-studio_admin, super_admin authorization not
+  widening the `BelongsToShop` row set, membership still gating tenant access, the
+  migration backfill's idempotency + no-lockout). Existing panel tests keep passing
+  under deny-by-default because studio operators are super_admin; `TestCase` forgets
+  the spatie cache each test (a RefreshDatabase interaction) and gives its operator
+  the `studio_admin` role.
+- **Deliberately out of scope (PR-2/PR-3):** `studio_audit_events`/impersonation, the
+  registry-table redesign (status pills, owner/activity columns, filters, detail
+  page), the pine-ramp Studio theme, sidebar grouping, and a dedicated suspended
+  "temporarily closed" storefront page.
+
+## 0.1 What changed in v29
 
 **v29** runs Step 33 — per-shop configuration. Two config groups were still
 process-global env (correct for one decanter, wrong for many); the audit found the
