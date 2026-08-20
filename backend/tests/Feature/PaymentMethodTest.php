@@ -175,6 +175,45 @@ class PaymentMethodTest extends TestCase
         $this->assertSame('09-777000111', $settings->kbzpay_number);
     }
 
+    public function test_admin_can_save_telegram_and_social_settings_and_a_blank_token_preserves_the_stored_one(): void
+    {
+        $this->actingAs(User::create([
+            'name' => 'Admin',
+            'email' => 'admin@decantplease.local',
+            'password' => 'secret-password',
+        ]));
+
+        // First save sets the token + chat + socials.
+        Livewire::test(ManagePayment::class)
+            ->fillForm([
+                'bot_token' => '123:BOTTOKEN',
+                'admin_chat_id' => '987654',
+                'tiktok_url' => 'https://tiktok.com/@decant',
+                'facebook_url' => 'https://facebook.com/decant',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $settings = ShopSetting::current();
+        $this->assertSame('123:BOTTOKEN', $settings->bot_token); // decrypted via cast
+        $this->assertSame('987654', $settings->admin_chat_id);
+        $this->assertSame('https://tiktok.com/@decant', $settings->tiktok_url);
+
+        // Mount does not echo the secret back into the form.
+        Livewire::test(ManagePayment::class)->assertFormSet(['bot_token' => null]);
+
+        // Saving again with a BLANK bot token must not wipe the stored one
+        // (the field dehydrates only when filled), while other fields update.
+        Livewire::test(ManagePayment::class)
+            ->fillForm(['bot_token' => '', 'admin_chat_id' => '111222'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $reloaded = ShopSetting::current();
+        $this->assertSame('123:BOTTOKEN', $reloaded->bot_token, 'blank token field must preserve the stored token');
+        $this->assertSame('111222', $reloaded->admin_chat_id);
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private function inStockPrice(): DecantPrice

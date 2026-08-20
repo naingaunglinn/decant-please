@@ -21,10 +21,12 @@ use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
 /**
- * Payment settings: the decanter's own MMQR + KBZPay/Wave details, set here
- * instead of in .env. Saved to the ShopSetting singleton and surfaced to the
- * storefront checkout via /api/v1/meta. Mirrors Filament's own EditProfile
- * form-page pattern (content() embeds the 'form' schema + a Save action).
+ * Payment settings: the decanter's own MMQR + KBZPay/Wave details, plus their
+ * Telegram order-alert credentials and storefront social links (step 33) — set
+ * here instead of in .env. Saved to *this shop's* ShopSetting row (resolved from
+ * the panel tenant, never a global singleton) and surfaced to the storefront via
+ * /api/v1/{shop}/meta. Mirrors Filament's own EditProfile form-page pattern
+ * (content() embeds the 'form' schema + a Save action).
  *
  * @property-read Schema $form
  */
@@ -45,8 +47,11 @@ class ManagePayment extends Page
 
     public function mount(): void
     {
+        // bot_token is deliberately NOT pre-filled — a secret isn't echoed back
+        // into the page, and leaving its field blank preserves the stored value.
         $this->form->fill(ShopSetting::current()->only([
             'kbzpay_name', 'kbzpay_number', 'wave_name', 'wave_number', 'payment_qr_path', 'payment_instructions',
+            'admin_chat_id', 'tiktok_url', 'facebook_url',
         ]));
     }
 
@@ -84,6 +89,39 @@ class ManagePayment extends Page
                             ->rows(2)
                             ->columnSpanFull()
                             ->helperText('Optional note shown with the QR, e.g. "Add your order number in the transfer note."'),
+                    ]),
+                Section::make('Telegram order alerts')
+                    ->description('Get a Telegram message the moment a website order lands. Leave both blank to turn alerts off for this shop.')
+                    ->columns(2)
+                    ->components([
+                        TextInput::make('bot_token')
+                            ->label('Bot token')
+                            ->password()
+                            ->revealable()
+                            ->autocomplete(false)
+                            ->maxLength(255)
+                            // Blank leaves the stored token untouched — so it's
+                            // safe not to pre-fill a secret. Blank with a platform
+                            // TELEGRAM_BOT_TOKEN set means "use the shared bot".
+                            ->dehydrated(fn (?string $state): bool => filled($state))
+                            ->helperText('From @BotFather. Leave blank to keep the current token, or to use the shared platform bot (only the chat id is then needed).'),
+                        TextInput::make('admin_chat_id')
+                            ->label('Admin chat ID')
+                            ->maxLength(255)
+                            ->helperText('The chat that receives alerts — run "telegram:test {shop}" to confirm it reaches you.'),
+                    ]),
+                Section::make('Social links')
+                    ->description('Shown in the storefront footer. Blank hides the link.')
+                    ->columns(2)
+                    ->components([
+                        TextInput::make('tiktok_url')
+                            ->label('TikTok URL')
+                            ->url()
+                            ->maxLength(255),
+                        TextInput::make('facebook_url')
+                            ->label('Facebook URL')
+                            ->url()
+                            ->maxLength(255),
                     ]),
             ])
             ->statePath('data');

@@ -242,9 +242,9 @@ npm run dev -- -p 3001
 |---|---|
 | `FRONTEND_URL` | Storefront origin — CORS allowlist **and** admin "View on site" links |
 | `ADMIN_PASSWORD` | Read once by the seeder for the admin login |
-| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Shown as storefront footer links; blank = hidden |
-| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details shown at checkout / on the receipt via `/api/v1/{shop}/meta`; blank fields are hidden |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram; both blank = alerts off |
+| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Storefront footer links — **platform default**; a shop's own `shop_settings` links win (step 33). Blank = hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details via `/api/v1/{shop}/meta` — **platform default**; a shop's Payment settings win. Blank fields hidden |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts — **platform default bot**; a shop can set its own (encrypted on `shop_settings`) or share this bot with its own chat id (step 33). Blank at both = off |
 | `MEDIA_DISK` | Disk for uploaded images — `public` locally (via `storage:link`), `s3` (Cloudflare R2) in production |
 | `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a second no-public-domain R2 bucket in production |
 

@@ -18,17 +18,21 @@ class NotifyAdminOfNewOrder
 
     public function handle(OrderPlaced $event): void
     {
-        if (! $this->telegram->isConfigured()) {
+        // Resolve the notifier from the ORDER's shop (step 33), not global config:
+        // each shop's alerts go to its own chat, via its own bot token or the
+        // shared platform bot. loadMissing('shop') because preventLazyLoading is on.
+        $order = $event->order->loadMissing('items', 'shop');
+
+        if (! $this->telegram->isConfiguredForShop($order->shop)) {
             return;
         }
-
-        $order = $event->order->loadMissing('items');
 
         $items = $order->items
             ->map(fn ($item) => "{$item->size_ml}ml × {$item->quantity} {$item->fragrance_name_snapshot}")
             ->implode(', ');
 
-        $adminUrl = rtrim((string) config('app.url'), '/')."/admin/orders/{$order->id}/edit";
+        // Tenant-aware admin URL: the panel carries the shop segment since 25a.
+        $adminUrl = rtrim((string) config('app.url'), '/')."/admin/{$order->shop->slug}/orders/{$order->id}/edit";
 
         // The method, never payment_status — every order is unpaid at placement,
         // so status carries no signal here. For online, say whether the checkout
@@ -51,6 +55,6 @@ class NotifyAdminOfNewOrder
             $adminUrl,
         ]);
 
-        $this->telegram->sendToAdmin($message);
+        $this->telegram->sendToShop($order->shop, $message);
     }
 }

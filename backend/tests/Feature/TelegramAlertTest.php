@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Console\Exception\RuntimeException;
 use Tests\TestCase;
 
 class TelegramAlertTest extends TestCase
@@ -191,7 +192,7 @@ class TelegramAlertTest extends TestCase
             && str_contains($request['text'], 'Aung Kyaw · 09-771234561')
             && str_contains($request['text'], 'Total: 110,000 Ks · Balance due: 100,000 Ks')
             && str_contains($request['text'], "Track: {$order->tracking_code}")
-            && str_contains($request['text'], "/admin/orders/{$order->id}/edit"));
+            && str_contains($request['text'], "/admin/decant-please/orders/{$order->id}/edit"));
     }
 
     public function test_a_replacement_slip_says_replaced_not_uploaded(): void
@@ -257,13 +258,27 @@ class TelegramAlertTest extends TestCase
         $this->configureTelegram();
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => true], 200)]);
 
-        $this->artisan('telegram:test')->assertSuccessful();
+        $this->artisan('telegram:test', ['shop' => 'decant-please'])->assertSuccessful();
     }
 
     public function test_command_fails_clearly_when_unconfigured(): void
     {
-        $this->artisan('telegram:test')
+        $this->artisan('telegram:test', ['shop' => 'decant-please'])
             ->expectsOutputToContain('not configured')
+            ->assertFailed();
+    }
+
+    public function test_command_requires_a_shop_argument(): void
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->artisan('telegram:test');
+    }
+
+    public function test_command_fails_on_an_unknown_shop(): void
+    {
+        $this->artisan('telegram:test', ['shop' => 'no-such-shop'])
+            ->expectsOutputToContain("No shop with slug 'no-such-shop'")
             ->assertFailed();
     }
 

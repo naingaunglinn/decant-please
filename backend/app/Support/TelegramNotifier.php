@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Shop;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -14,26 +15,50 @@ use Throwable;
  * - It NEVER throws. A Telegram outage must not fail a customer's order; every
  *   failure is caught and logged, and the method just returns false.
  * - It's a no-op when unconfigured, so the whole feature is off until a decanter
- *   sets a token + chat id (blank env = alerts simply don't send).
+ *   sets a token + chat id (blank at shop AND platform = alerts simply don't send).
+ *
+ * Per-shop since step 33: the token + chat id resolve through ShopConfig
+ * (shop settings row → platform env → off). `*ForShop`/`sendToShop` take the
+ * order's shop explicitly (the listeners' path); `isConfigured`/`sendToAdmin`
+ * resolve the *current* tenant (telegram:test after setting context, and the
+ * notifier's own unit tests).
  */
 class TelegramNotifier
 {
+    /** Current tenant's Telegram config is complete (token AND chat id resolve). */
     public function isConfigured(): bool
     {
-        return filled(config('services.telegram.bot_token'))
-            && filled(config('services.telegram.admin_chat_id'));
+        return ShopConfig::hasAll('telegram.bot_token', 'telegram.admin_chat_id');
     }
 
-    /** Message the decanter's configured chat. */
+    /** The given shop's Telegram config is complete. */
+    public function isConfiguredForShop(Shop $shop): bool
+    {
+        return ShopConfig::hasAllForShop($shop, 'telegram.bot_token', 'telegram.admin_chat_id');
+    }
+
+    /** Message the current tenant's configured chat. */
     public function sendToAdmin(string $message): bool
     {
-        return $this->send((string) config('services.telegram.admin_chat_id'), $message);
+        return $this->send(
+            ShopConfig::get('telegram.bot_token'),
+            ShopConfig::get('telegram.admin_chat_id'),
+            $message,
+        );
     }
 
-    public function send(?string $chatId, string $message): bool
+    /** Message a specific shop's configured chat with that shop's bot token. */
+    public function sendToShop(Shop $shop, string $message): bool
     {
-        $token = config('services.telegram.bot_token');
+        return $this->send(
+            ShopConfig::forShop($shop, 'telegram.bot_token'),
+            ShopConfig::forShop($shop, 'telegram.admin_chat_id'),
+            $message,
+        );
+    }
 
+    public function send(?string $token, ?string $chatId, string $message): bool
+    {
         if (! filled($token) || ! filled($chatId)) {
             Log::info('Telegram alert skipped — bot token or chat id not configured.');
 
