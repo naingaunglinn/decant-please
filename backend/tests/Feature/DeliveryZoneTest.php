@@ -9,7 +9,6 @@ use App\Models\Brand;
 use App\Models\DeliveryTownship;
 use App\Models\Fragrance;
 use App\Models\Order;
-use App\Models\User;
 use App\Support\DeliveryZoneImport;
 use Database\Seeders\DeliveryZoneSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -7,7 +7,6 @@ use App\Enums\Concentration;
 use App\Filament\Resources\Fragrances\Pages\ListFragrances;
 use App\Models\Brand;
 use App\Models\Fragrance;
-use App\Models\User;
 use App\Support\CatalogImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;

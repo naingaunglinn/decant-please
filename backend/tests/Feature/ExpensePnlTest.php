@@ -10,7 +10,6 @@ use App\Models\Brand;
 use App\Models\Expense;
 use App\Models\Fragrance;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;

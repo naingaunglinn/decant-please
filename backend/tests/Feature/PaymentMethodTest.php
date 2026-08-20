@@ -8,7 +8,6 @@ use App\Models\Brand;
 use App\Models\DecantPrice;
 use App\Models\Order;
 use App\Models\ShopSetting;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;

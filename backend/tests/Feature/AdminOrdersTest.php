@@ -13,7 +13,6 @@ use App\Filament\Widgets\UpcomingDecants;
 use App\Models\Brand;
 use App\Models\DecantPrice;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;

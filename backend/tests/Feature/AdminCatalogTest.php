@@ -9,7 +9,6 @@ use App\Filament\Resources\Fragrances\Pages\CreateFragrance;
 use App\Filament\Resources\Fragrances\Pages\ListFragrances;
 use App\Models\Brand;
 use App\Models\Fragrance;
-use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;

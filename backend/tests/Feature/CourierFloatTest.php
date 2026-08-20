@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Filament\Widgets\CourierFloat;
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use LogicException;
