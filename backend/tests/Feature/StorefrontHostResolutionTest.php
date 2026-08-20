@@ -35,7 +35,7 @@ class StorefrontHostResolutionTest extends TestCase
         $shop = Shop::create([
             'slug' => $slug,
             'name' => ucwords(str_replace('-', ' ', $slug)),
-            'is_active' => $active,
+            'status' => $active ? 'live' : 'onboarding',
         ]);
 
         $shop->domains()->create([
@@ -134,7 +134,7 @@ class StorefrontHostResolutionTest extends TestCase
 
     public function test_the_model_normalizes_the_host_on_save(): void
     {
-        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'is_active' => true]);
+        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'status' => 'live']);
         $domain = $shop->domains()->create([
             'host' => 'HTTPS://Client-A.COM/',
             'is_primary' => true,
@@ -147,7 +147,7 @@ class StorefrontHostResolutionTest extends TestCase
     public function test_a_host_can_only_belong_to_one_shop(): void
     {
         $this->shopWithDomain();
-        $other = Shop::create(['slug' => 'client-b', 'name' => 'Client B', 'is_active' => true]);
+        $other = Shop::create(['slug' => 'client-b', 'name' => 'Client B', 'status' => 'live']);
 
         $this->expectException(UniqueConstraintViolationException::class);
 
@@ -272,7 +272,7 @@ class StorefrontHostResolutionTest extends TestCase
 
     public function test_the_studio_manages_a_shops_domains_through_the_table_action(): void
     {
-        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'is_active' => true]);
+        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'status' => 'live']);
         $this->actingAsStudioOnStudioPanel();
 
         Livewire::test(ManageShops::class)
@@ -311,7 +311,7 @@ class StorefrontHostResolutionTest extends TestCase
 
     public function test_sync_domains_promotes_the_first_row_when_none_is_primary(): void
     {
-        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'is_active' => true]);
+        $shop = Shop::create(['slug' => 'client-a', 'name' => 'Client A', 'status' => 'live']);
 
         $shop->syncDomains([
             ['host' => 'client-a.com', 'is_primary' => false, 'verified' => true],
@@ -327,7 +327,7 @@ class StorefrontHostResolutionTest extends TestCase
     public function test_sync_domains_cannot_take_a_host_owned_by_another_shop(): void
     {
         $this->shopWithDomain(); // client-a owns client-a.com
-        $other = Shop::create(['slug' => 'client-b', 'name' => 'Client B', 'is_active' => true]);
+        $other = Shop::create(['slug' => 'client-b', 'name' => 'Client B', 'status' => 'live']);
 
         try {
             $other->syncDomains([

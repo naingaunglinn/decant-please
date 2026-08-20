@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ShopStatus;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -32,7 +33,7 @@ class DatabaseSeeder extends Seeder
         // hook fills shop_id from this context (multi-tenancy Step 23 §7).
         $shop = Shop::firstOrCreate(
             ['slug' => config('app.shop_slug')],
-            ['name' => config('app.name'), 'is_active' => true],
+            ['name' => config('app.name'), 'status' => ShopStatus::Live],
         );
         app(TenantContext::class)->set($shop);
 

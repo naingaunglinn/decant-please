@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\ShopStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -14,11 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * The tenant root. Deliberately NOT tenant-owned itself — it carries no shop_id and
- * uses no BelongsToShop trait; it is what everything else scopes to. Step A keeps it
- * minimal (slug/name/is_active); contact, Telegram, and theming columns wait for
- * Step 25 (design-doc §7).
+ * uses no BelongsToShop trait; it is what everything else scopes to. Its lifecycle
+ * is the `status` enum (Step 34 §1 — onboarding/live/suspended/archived); the old
+ * `is_active` boolean is now a derived read-only accessor (status === live).
  */
-#[Fillable(['slug', 'name', 'is_active'])]
+#[Fillable(['slug', 'name', 'status'])]
 class Shop extends Model
 {
     use HasFactory;
@@ -26,13 +29,70 @@ class Shop extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
+            'status' => ShopStatus::class,
+            'suspended_at' => 'datetime',
         ];
     }
 
+    /**
+     * Only a live shop is served by the public API and the storefront host
+     * resolver — the one seam every `->active()` caller (ResolveTenant,
+     * ShopDomain::corsOrigins, StorefrontHostController) goes through, so the
+     * lifecycle change lands in this one line.
+     */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query->where('status', ShopStatus::Live);
+    }
+
+    /**
+     * Derived, read-only: `is_active` is retired as a column (Step 34 §1) but kept
+     * as an accessor so existing readers (e.g. the studio table) keep working
+     * without a writable second state. Setting it is a no-op — status is the state.
+     */
+    protected function isActive(): Attribute
+    {
+        return Attribute::get(fn (): bool => $this->status === ShopStatus::Live);
+    }
+
+    /** Who suspended this shop (Step 34 §1), when a reason + actor were recorded. */
+    public function suspendedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'suspended_by');
+    }
+
+    /** Bring a shop live (from onboarding, or un-suspend); clears suspension metadata. */
+    public function activate(): void
+    {
+        $this->forceFill([
+            'status' => ShopStatus::Live,
+            'suspended_reason' => null,
+            'suspended_at' => null,
+            'suspended_by' => null,
+        ])->save();
+    }
+
+    /** Suspend — reason + actor are required (Step 34 §1); storefront/API then 404. */
+    public function suspend(User $actor, string $reason): void
+    {
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw new \InvalidArgumentException('A suspension reason is required.');
+        }
+
+        $this->forceFill([
+            'status' => ShopStatus::Suspended,
+            'suspended_reason' => $reason,
+            'suspended_at' => now(),
+            'suspended_by' => $actor->getKey(),
+        ])->save();
+    }
+
+    /** Archive — the soft, retention-then-export end state (Step 34 §1). */
+    public function archive(): void
+    {
+        $this->forceFill(['status' => ShopStatus::Archived])->save();
     }
 
     /** Payment / Telegram / social settings for this shop (step 33). */

@@ -96,7 +96,7 @@ class ShopManagementTest extends TestCase
             ->callAction('create', data: [
                 'name' => 'Mandalay Musk',
                 'slug' => 'mandalay-musk',
-                'is_active' => true,
+                'status' => 'live',
                 'create_owner' => false, // the studio operates this one itself
             ])
             ->assertHasNoActionErrors();
@@ -128,7 +128,7 @@ class ShopManagementTest extends TestCase
             ->callAction('create', data: [
                 'name' => 'Mandalay Musk',
                 'slug' => 'mandalay-musk',
-                'is_active' => true,
+                'status' => 'live',
                 'create_owner' => true,
                 'owner_name' => 'Ma Thida',
                 'owner_email' => 'owner@mandalaymusk.local',

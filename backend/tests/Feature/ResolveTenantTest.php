@@ -29,7 +29,7 @@ class ResolveTenantTest extends TestCase
 
     public function test_an_inactive_shop_404s(): void
     {
-        Shop::factory()->create(['slug' => 'dormant', 'is_active' => false]);
+        Shop::factory()->inactive()->create(['slug' => 'dormant']);
 
         $this->getJson('/api/v1/dormant/meta')->assertNotFound();
     }

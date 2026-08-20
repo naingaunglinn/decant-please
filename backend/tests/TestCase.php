@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Enums\Courier;
+use App\Enums\ShopStatus;
 use App\Models\DeliveryTownship;
 use App\Models\Shop;
 use App\Models\User;
@@ -27,7 +28,7 @@ abstract class TestCase extends BaseTestCase
         if (Schema::hasTable('shops')) {
             $shop = Shop::firstOrCreate(
                 ['slug' => config('app.shop_slug')],
-                ['name' => 'Test Shop', 'is_active' => true],
+                ['name' => 'Test Shop', 'status' => ShopStatus::Live],
             );
 
             app(TenantContext::class)->set($shop);

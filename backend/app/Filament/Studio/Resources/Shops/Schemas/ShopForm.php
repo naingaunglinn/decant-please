@@ -2,6 +2,8 @@
 
 namespace App\Filament\Studio\Resources\Shops\Schemas;
 
+use App\Enums\ShopStatus;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -22,9 +24,11 @@ class ShopForm
                 ->rules(['alpha_dash'])
                 ->unique(ignoreRecord: true)
                 ->helperText('Lowercase letters, numbers and dashes — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}). The storefront resolves it from the visitor\'s domain, not a per-deploy variable, but it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
-            Toggle::make('is_active')
-                ->default(true)
-                ->helperText('An inactive shop 404s on its storefront and API.'),
+            Select::make('status')
+                ->options(ShopStatus::class)
+                ->default(ShopStatus::Onboarding)
+                ->required()
+                ->helperText('Only a Live shop is served; Onboarding/Suspended/Archived all 404 on the storefront and API. New shops start Onboarding — activate once the catalog and payment settings are ready. (Suspend-with-reason lands in the registry, PR-3.)'),
             // The owner's login — a shop-level admin, never a studio account: they
             // are attached to this one shop via shop_user and get full control of
             // it (canAccessTenant), while /studio and every other shop stay out of

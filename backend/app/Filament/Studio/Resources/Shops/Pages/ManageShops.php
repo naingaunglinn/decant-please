@@ -31,7 +31,7 @@ class ManageShops extends ManageRecords
                 ->label('Register a shop')
                 ->using(function (array $data): Shop {
                     return DB::transaction(function () use ($data): Shop {
-                        $shop = Shop::create(Arr::only($data, ['name', 'slug', 'is_active']));
+                        $shop = Shop::create(Arr::only($data, ['name', 'slug', 'status']));
 
                         if ($data['create_owner'] ?? false) {
                             $owner = User::create([
