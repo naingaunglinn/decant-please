@@ -418,10 +418,6 @@ class DeliveryZoneTest extends TestCase
 
     private function actingAsAdmin(): void
     {
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 }

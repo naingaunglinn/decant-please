@@ -18,11 +18,7 @@ class DiscountCostReportTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_sums_per_code_with_a_hand_edited_row_and_excludes_cancelled_and_rejected(): void

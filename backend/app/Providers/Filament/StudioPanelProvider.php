@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -40,6 +41,10 @@ class StudioPanelProvider extends PanelProvider
                 'primary' => Color::Emerald,
             ])
             ->discoverResources(in: app_path('Filament/Studio/Resources'), for: 'App\Filament\Studio\Resources')
+            // Shield's Role management UI lives here, on /studio ONLY (Step 34 /
+            // ADR-0003 amendment). The /admin panel gets no Shield UI; its
+            // resources are still enforced by the generated model-level policies.
+            ->plugin(FilamentShieldPlugin::make())
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

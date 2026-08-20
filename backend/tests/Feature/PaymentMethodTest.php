@@ -159,11 +159,7 @@ class PaymentMethodTest extends TestCase
 
     public function test_admin_can_save_payment_settings_from_the_page(): void
     {
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
 
         Livewire::test(ManagePayment::class)
             ->fillForm([
@@ -181,11 +177,7 @@ class PaymentMethodTest extends TestCase
 
     public function test_admin_can_save_telegram_and_social_settings_and_a_blank_token_preserves_the_stored_one(): void
     {
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
 
         // First save sets the token + chat + socials.
         Livewire::test(ManagePayment::class)

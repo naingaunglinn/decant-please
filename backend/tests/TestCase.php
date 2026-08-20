@@ -11,6 +11,7 @@ use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use Spatie\Permission\PermissionRegistrar;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -24,6 +25,11 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // spatie/permission caches role+permission IDs; RefreshDatabase re-creates
+        // them with new IDs each test, so a carried-over cache makes hasRole()/can()
+        // (and Shield's super_admin Gate::before) silently miss. Forget it per test.
+        $this->app->make(PermissionRegistrar::class)->forgetCachedPermissions();
 
         if (Schema::hasTable('shops')) {
             $shop = Shop::firstOrCreate(
@@ -51,12 +57,19 @@ abstract class TestCase extends BaseTestCase
      */
     protected function studioUser(): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Admin',
             'email' => 'admin@decantplease.local',
             'password' => 'secret-password',
             'is_studio' => true,
         ]);
+
+        // Step 34: /studio access + resource authorization is the studio_admin role
+        // (Shield super_admin). The role is created by the migration; assign it so
+        // panel tests authenticate as an authorized operator under deny-by-default.
+        $user->assignRole('studio_admin');
+
+        return $user;
     }
 
     /**

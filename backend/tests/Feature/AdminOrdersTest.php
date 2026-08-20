@@ -26,11 +26,7 @@ class AdminOrdersTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_checkout_order_lands_in_needs_review_tab_with_tracking_code(): void

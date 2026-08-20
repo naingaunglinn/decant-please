@@ -19,11 +19,7 @@ class CourierFloatTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::create([
-            'name' => 'Admin',
-            'email' => 'admin@decantplease.local',
-            'password' => 'secret-password',
-        ]));
+        $this->actingAs($this->studioUser());
     }
 
     public function test_handoff_snapshots_the_carrying_amount_and_settle_releases_it(): void

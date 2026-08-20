@@ -41,6 +41,10 @@ class ManageShops extends ManageRecords
                                 'is_studio' => false,
                             ]);
                             $owner->shops()->attach($shop);
+                            // Step 34: the owner login carries the shop_owner
+                            // capability role (Shield). WHICH shop stays the
+                            // membership above + canAccessTenant/BelongsToShop.
+                            $owner->assignRole('shop_owner');
                         }
 
                         return $shop;
