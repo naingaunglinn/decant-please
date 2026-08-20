@@ -167,18 +167,31 @@ console.log(`      route-cache states: ${cacheStates.join("  ")}`);
   else ok("unknown host → 404, unbranded");
 }
 
-// ---- 6+7: secondary domain 308s to the primary, query preserved, no loop -----
-{
-  const res = await request(BASE_URL, "/track?code=PROBE12345", HOST_B_SECONDARY);
-  const expected = `http://${tenantB.primary_host}/track?code=PROBE12345`;
-  if (res.status !== 308) fail("secondary → primary redirect", `HTTP ${res.status}, expected 308`);
+// ---- 6+7: EVERY public route 308s a secondary domain to the primary, query
+// preserved, no loop on the primary. One route per row — a single-route check is
+// what let /shop (a loading.tsx Suspense boundary swallowed its redirect into a
+// meta-refresh) escape the first pass.
+for (const path of [
+  "/",
+  "/shop",
+  "/shop?brand_type=niche&sort=price_asc",
+  PROBE_PATH, // /fragrance/{shared slug}
+  "/checkout",
+  "/track?code=PROBE12345",
+  "/order/complete?code=PROBE12345",
+]) {
+  const res = await request(BASE_URL, path, HOST_B_SECONDARY);
+  const expected = `http://${tenantB.primary_host}${path}`;
+  if (res.status !== 308) fail(`secondary ${path} → 308`, `HTTP ${res.status}, expected 308`);
   else if (res.headers.location !== expected)
-    fail("secondary → primary redirect", `Location ${res.headers.location}, expected ${expected}`);
-  else ok("secondary → 308 → verified primary, query preserved");
+    fail(`secondary ${path} → 308`, `Location ${res.headers.location}, expected ${expected}`);
+  else ok(`secondary ${path} → 308 → verified primary (path + query preserved)`);
 
-  const primary = await request(BASE_URL, "/track?code=PROBE12345", HOST_B);
-  if (primary.status === 200) ok("primary host serves 200 — no redirect loop");
-  else fail("primary host serves 200", `HTTP ${primary.status}`);
+  // the primary host must NOT redirect — proves the target is a dead end, no loop
+  const primary = await request(BASE_URL, path, HOST_B);
+  if (primary.status >= 300 && primary.status < 400)
+    fail(`primary ${path} no loop`, `HTTP ${primary.status} — primary should not redirect`);
+  else ok(`primary ${path} serves ${primary.status} — no redirect loop`);
 }
 
 // ---- 8: per-tenant robots.txt -------------------------------------------------

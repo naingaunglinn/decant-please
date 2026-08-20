@@ -58,9 +58,9 @@ return [
 
     // Multi-tenancy (Step 23): the slug of the default shop. The backfill migration
     // creates it; seeders, decant:probe-postgres and the test suite pin their context
-    // to it; the matching storefront must set NEXT_PUBLIC_SHOP_SLUG to the same value.
-    // Requests resolve their own tenant now — ResolveTenant on the API path (Step 24),
-    // Filament's IdentifyTenant on the panel (Step 25a).
+    // to it. The storefront no longer bakes in a shop — it resolves the tenant from the
+    // request host (ADR-0004). Requests resolve their own tenant — ResolveTenant on the
+    // API path (Step 24), Filament's IdentifyTenant on the panel (Step 25a).
     'shop_slug' => env('SHOP_SLUG', 'decant-please'),
 
     'social' => [

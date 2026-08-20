@@ -3,8 +3,10 @@
 Two apps, deployed separately: `backend/` (Laravel + Filament admin + JSON API) on
 **Heroku**, and `frontend/` (Next.js storefront) on **Vercel**. The frontend only ever
 talks to the backend over `https://api.cornerarea.me/api/v1/{shop}/*` — the shop slug is
-the first path segment since multi-tenancy Step 24, and each storefront bakes its own in
-via `NEXT_PUBLIC_SHOP_SLUG`.
+the first path segment since multi-tenancy Step 24. One shared storefront deployment
+serves every shop: it resolves the tenant from the request host against the backend's
+`shop_domains` table (ADR-0004) and uses that shop's slug for the API path, so there is
+no per-shop Vercel project and no `NEXT_PUBLIC_SHOP_SLUG`. Domain onboarding is in §2.
 
 Production domains:
 

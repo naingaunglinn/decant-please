@@ -7,8 +7,9 @@ breaking it in production. Backend on **Heroku**, images on **Cloudflare R2**, s
 > **Scope: the single-shop production cold start** — standing the whole platform up from
 > nothing (`DEPLOY.md` is the maintained copy; this is the battle-tested walkthrough).
 > It is **not** the per-shop onboarding runbook the multi-tenancy design owes (new shop
-> row → Vercel project + `NEXT_PUBLIC_SHOP_SLUG` → Telegram chat id → zone activation);
-> that arrives with Step 25b, once a second client exists.
+> row → a verified domain mapped to the shared storefront (ADR-0004; see `DEPLOY.md` §2)
+> → Telegram chat id → zone activation); the domain half is maintained in `DEPLOY.md`,
+> and the per-tenant Telegram/theming half arrives with Step 25b, once a second client exists.
 
 - **Cost:** Basic dyno ($7/mo) + Postgres `essential-0` ($5/mo) = **$12/mo**, inside the $13/mo GitHub Student credit.
 - **Time:** ~45 min the first time.
@@ -239,11 +240,12 @@ proves the temp-disk pin (upload) *and* the R2 CORS policy (preview) are both in
 ## Phase 09 — Frontend on Vercel
 
 1. Import the repo in Vercel, set **Root Directory** to `frontend/`.
-2. Add three environment variables:
+2. Add two environment variables (the storefront resolves its tenant from the request
+   host per ADR-0004 — there is no `NEXT_PUBLIC_SHOP_SLUG` or `NEXT_PUBLIC_SITE_URL`;
+   canonical/OG/sitemap URLs come from each shop's verified primary domain):
 
 ```
 NEXT_PUBLIC_API_URL    = https://api.cornerarea.me/api
-NEXT_PUBLIC_SITE_URL   = https://decant-please.cornerarea.me
 NEXT_PUBLIC_IMAGE_URL  = https://images.cornerarea.me
 ```
 
