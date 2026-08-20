@@ -4,9 +4,11 @@ import { useState } from "react";
 import { TrackingForm } from "./TrackingForm";
 import { OrderReceipt } from "./OrderReceipt";
 import { trackOrder } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import type { OrderStatusResponse } from "@/lib/types";
 
 export function TrackClient({ initialCode }: { initialCode?: string }) {
+  const { slug: shop } = useTenant();
   const [result, setResult] = useState<OrderStatusResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -17,7 +19,7 @@ export function TrackClient({ initialCode }: { initialCode?: string }) {
     setNotFound(false);
     setFailed(false);
     try {
-      const order = await trackOrder(code, phone);
+      const order = await trackOrder(shop, code, phone);
       setResult(order);
       setNotFound(order === null);
     } catch {

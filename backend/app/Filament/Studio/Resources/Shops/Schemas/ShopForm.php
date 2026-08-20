@@ -21,7 +21,7 @@ class ShopForm
                 ->maxLength(255)
                 ->rules(['alpha_dash'])
                 ->unique(ignoreRecord: true)
-                ->helperText('Lowercase letters, numbers and dashes. It becomes the shop\'s admin + API URL (/admin/{slug}), and the storefront\'s NEXT_PUBLIC_SHOP_SLUG must match — so avoid changing it once live.'),
+                ->helperText('Lowercase letters, numbers and dashes — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}). The storefront resolves it from the visitor\'s domain, not a per-deploy variable, but it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
             Toggle::make('is_active')
                 ->default(true)
                 ->helperText('An inactive shop 404s on its storefront and API.'),

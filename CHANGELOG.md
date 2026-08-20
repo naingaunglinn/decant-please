@@ -9,7 +9,62 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v27
+## 0. What changed in v28
+
+**v28** completes ADR-0004: **PR-B, the storefront cutover** (#92). One Next.js
+deployment now serves every shop on its own domain — custom domains and platform
+subdomains through the same mechanism — with the tenant slug never appearing in a
+public URL. The N-Vercel-projects model is decommissioned in `DEPLOY.md`.
+
+- **`src/proxy.ts`** — the deterministic Host → internal `/{host}/…` rewrite, and
+  nothing else: no I/O, no authorization (the backend scope stays the boundary), a
+  static matcher that excludes `_next`/the icon but deliberately covers `robots.txt`
+  and `sitemap.xml`. The internal segment exists so every rendered page's cache key
+  carries the tenant **by construction** — the step-32 unkeyed-cache lesson applied
+  to the route cache. Found the hard way and kept as comments: the `[host]` param can
+  arrive percent-encoded in layouts, so the rewrite uses the raw host and the
+  resolver decodes defensively.
+- **The route tree moved under `app/[host]/`** (public paths unchanged). The root
+  layout is a bare shell plus an unbranded fail-closed 404 (no tenant to brand, and
+  it must reveal nothing); the tenant layout resolves the host through PR-A's
+  endpoint — `React.cache()` per render, 60s data cache across renders, null → 404,
+  **no default-shop fallback** — and provides `{slug, name}` to the tree. Per-page
+  `tenantPage(host, ownPath)` 308s secondary domains to the verified primary with
+  the path and query preserved (a layout can't know the path; the proxy must stay
+  I/O-free — so the page, which statically knows its own path, owns the redirect).
+- **`lib/api.ts` is tenant-parameterized**: every helper takes the resolved slug —
+  server callers thread it, client components read `useTenant()` from the
+  server-provided context. `NEXT_PUBLIC_SHOP_SLUG` and `NEXT_PUBLIC_SITE_URL` are
+  retired; metadata (metadataBase, canonical, OG, the shop's own name in titles,
+  navbar, footer, printed receipts) derives from the shop row and its verified
+  primary domain. Per-tenant `robots.txt` and `sitemap.xml` are route handlers under
+  `[host]` (the file conventions are host-blind), each domain referencing only its
+  own URLs.
+- **Performance held, measured not assumed.** The Next docs' rule: without
+  `generateStaticParams`, unlisted dynamic params are fully dynamic — so home, PDP,
+  and checkout export an **empty** `generateStaticParams`, the documented opt-in to
+  on-demand ISR. A production-build run shows `MISS MISS HIT HIT` with correct
+  per-tenant content on the cached hits; `/shop`, track, and order-complete keep
+  their dynamic/searchParams behavior, checkout/track fetches stay `no-store`. Only
+  the proxy plus one 60s-cached resolve run per request beyond what ran before.
+- **`verify-tenant-hosts.mjs`** — the mandatory evidence, 14 checks against a
+  production build with explicit Host headers: each host serves its own storefront;
+  the same pathname under two hosts in both orders (twice) never leaks; repeats come
+  from the route cache per-tenant; unknown hosts 404 unbranded; secondary → 308 →
+  primary with query, loop-free; per-host robots and sitemaps. Fixtures (a second
+  `verify-b` shop on `verify-b.decant.localhost:3001` + a same-slug probe fragrance
+  in both shops) are idempotent and documented in the script header.
+- **Suite truth-ups while proving the above:** `verify-responsive.mjs`'s checkout
+  matcher still said "Delivery address" — step 30 renamed the label to "Address", so
+  the check had been dead since then (proven identical on clean `develop`); fixed.
+  The 375 sticky-add-to-cart check fails on `develop` too — data-dependent since the
+  step-32 session's `fresh-start` left the dev demo catalog too short to scroll;
+  recorded in `VERIFY.md`'s known-red baseline, not chased. Dev delivery zones
+  reseeded (`DeliveryZoneSeeder` is idempotent; full `db:seed` is not — CatalogSeeder
+  is empty-DB-only). Backend suite untouched: 258 / 1,158; typecheck clean; lint
+  still exactly the four pre-existing errors.
+
+## 0.1 What changed in v27
 
 **v27** starts ADR-0004 — storefront addressing, accepted as amended (#88/#89): one
 shared storefront deployment, every tenant on its own public domain, the validated

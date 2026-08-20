@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getFragrances } from "@/lib/api";
+import { tenantPage } from "@/lib/tenant";
 import { Hero } from "@/components/home/Hero";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
 import { FeaturedRail } from "@/components/home/FeaturedRail";
@@ -32,10 +34,26 @@ const TILES = [
   { label: "Everything", sub: "The full shelf", href: "/shop", dark: false },
 ];
 
-export default async function HomePage() {
+export const metadata: Metadata = {
+  alternates: { canonical: "/" }, // composes with the tenant layout's metadataBase
+};
+
+// Empty on purpose: no host is prerendered at build (the domain list lives in the
+// database), but per the Next docs an empty generateStaticParams is exactly what
+// opts unlisted params into on-demand ISR — first visit renders, then the route
+// cache serves it, keyed by the /{host} path, revalidated on the fetches' 60s.
+// Without this the page is silently fully dynamic on every request.
+export function generateStaticParams(): Array<{ host: string }> {
+  return [];
+}
+
+export default async function HomePage({ params }: { params: Promise<{ host: string }> }) {
+  const { host } = await params;
+  const tenant = await tenantPage(host, "/");
+
   let featured: Fragrance[] = [];
   try {
-    featured = (await getFragrances({ featured: "1", per_page: "8" })).data;
+    featured = (await getFragrances(tenant.slug, { featured: "1", per_page: "8" })).data;
   } catch {
     // API unreachable (e.g. at build time) — the page still stands without the rail
   }

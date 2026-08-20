@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { OrderCompleteClient } from "@/components/checkout/OrderCompleteClient";
+import { tenantPage } from "@/lib/tenant";
 
 export const metadata: Metadata = {
   title: "Order placed",
 };
 
 export default async function OrderCompletePage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ host: string }>;
   searchParams: Promise<{ code?: string }>;
 }) {
+  const { host } = await params;
   const { code } = await searchParams;
+  // a secondary-domain 308 must keep the tracking code, or the receipt is lost
+  await tenantPage(host, `/order/complete${code ? `?code=${encodeURIComponent(code)}` : ""}`);
 
   return (
     <div className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">

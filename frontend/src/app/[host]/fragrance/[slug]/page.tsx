@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
 import { getFragrance, getFragrances } from "@/lib/api";
+import { tenantPage } from "@/lib/tenant";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
 import { PurchasePanel } from "@/components/product/PurchasePanel";
@@ -10,16 +11,16 @@ import { RecordRecentlyViewed } from "@/components/catalog/RecentlyViewed";
 import type { Fragrance } from "@/lib/types";
 
 /** Same-brand siblings first; if the brand is thin, top up with same-gender picks. */
-async function getRelated(fragrance: Fragrance): Promise<Fragrance[]> {
+async function getRelated(shop: string, fragrance: Fragrance): Promise<Fragrance[]> {
   try {
     const sameBrand = (
-      await getFragrances({ brand: fragrance.brand.slug, per_page: "8" })
+      await getFragrances(shop, { brand: fragrance.brand.slug, per_page: "8" })
     ).data.filter((f) => f.id !== fragrance.id);
 
     if (sameBrand.length >= 2) return sameBrand.slice(0, 4);
 
     const sameGender = (
-      await getFragrances({ gender: fragrance.gender, per_page: "8" })
+      await getFragrances(shop, { gender: fragrance.gender, per_page: "8" })
     ).data.filter((f) => f.id !== fragrance.id && !sameBrand.some((b) => b.id === f.id));
 
     return [...sameBrand, ...sameGender].slice(0, 4);
@@ -29,12 +30,22 @@ async function getRelated(fragrance: Fragrance): Promise<Fragrance[]> {
 }
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ host: string; slug: string }>;
+}
+
+// Empty on purpose — on-demand ISR per {host}/{slug} path (see the home page's
+// note): the tenant is in the cache key by construction, revalidate rides the
+// 60s catalog fetches.
+export function generateStaticParams(): Array<{ host: string; slug: string }> {
+  return [];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const fragrance = await getFragrance(slug);
+  const { host, slug } = await params;
+  // tenantPage here too: metadata resolves first, so the secondary-domain 308
+  // fires before any body work; resolveTenant is cached, the page's call is free
+  const tenant = await tenantPage(host, `/fragrance/${slug}`);
+  const fragrance = await getFragrance(tenant.slug, slug);
   // metadata resolves before the loading.tsx shell streams, so throwing here
   // yields a real 404 status instead of a soft 200
   if (!fragrance) notFound();
@@ -44,6 +55,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description:
       fragrance.description ??
       `${fragrance.brand.name} ${fragrance.name} (${fragrance.concentration_label}) — decants from ${fragrance.min_price_formatted ?? "—"}.`,
+    alternates: { canonical: `/fragrance/${slug}` },
   };
 }
 
@@ -51,13 +63,14 @@ const splitList = (value: string | null): string[] =>
   value ? value.split(",").map((part) => part.trim()).filter(Boolean) : [];
 
 export default async function FragrancePage({ params }: PageProps) {
-  const { slug } = await params;
-  const fragrance = await getFragrance(slug);
+  const { host, slug } = await params;
+  const tenant = await tenantPage(host, `/fragrance/${slug}`);
+  const fragrance = await getFragrance(tenant.slug, slug);
   if (!fragrance) notFound();
 
   const notes = splitList(fragrance.notes);
   const vibes = splitList(fragrance.vibes);
-  const related = await getRelated(fragrance);
+  const related = await getRelated(tenant.slug, fragrance);
 
   return (
     <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">

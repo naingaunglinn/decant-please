@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { getMeta } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { DeliveryTownshipOption, DeliveryZones, PaymentInfo } from "@/lib/types";
 
@@ -45,6 +46,7 @@ export function CheckoutForm({
   zonesFailed,
   onTownshipChange,
 }: CheckoutFormProps) {
+  const { slug: shop } = useTenant();
   const [honeypot, setHoneypot] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cod");
   const [payment, setPayment] = useState<PaymentInfo | null>(null);
@@ -55,7 +57,7 @@ export function CheckoutForm({
 
   useEffect(() => {
     let active = true;
-    getMeta()
+    getMeta(shop)
       .then((meta) => {
         if (active) {
           setPayment(meta.payment);
@@ -68,7 +70,7 @@ export function CheckoutForm({
     return () => {
       active = false;
     };
-  }, []);
+  }, [shop]);
 
   const regionTownships =
     zones?.regions.find((candidate) => candidate.value === region)?.townships ?? [];

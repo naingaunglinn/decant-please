@@ -3,8 +3,10 @@
 Two apps, deployed separately: `backend/` (Laravel + Filament admin + JSON API) on
 **Heroku**, and `frontend/` (Next.js storefront) on **Vercel**. The frontend only ever
 talks to the backend over `https://api.cornerarea.me/api/v1/{shop}/*` — the shop slug is
-the first path segment since multi-tenancy Step 24, and each storefront bakes its own in
-via `NEXT_PUBLIC_SHOP_SLUG`.
+the first path segment since multi-tenancy Step 24. One shared storefront deployment
+serves every shop: it resolves the tenant from the request host against the backend's
+`shop_domains` table (ADR-0004) and uses that shop's slug for the API path, so there is
+no per-shop Vercel project and no `NEXT_PUBLIC_SHOP_SLUG`. Domain onboarding is in §2.
 
 Production domains:
 
@@ -312,27 +314,56 @@ replaced image.
 
 ## 2. Frontend — Vercel (recommended)
 
+**One project serves every shop** (ADR-0004): the storefront resolves the tenant from
+the request Host against the backend's `shop_domains` table — there is no per-shop
+project, no per-shop build, and no per-shop env var. Do **not** create a second Vercel
+project for a new shop.
+
 1. Import the repo in Vercel, set **Root Directory** to `frontend/`.
-2. Environment variables:
+2. Environment variables (the only two):
 
    | Variable | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://api.cornerarea.me/api` |
-   | `NEXT_PUBLIC_SHOP_SLUG` | `decant-please` — which shop this storefront is (the `{shop}` API path segment, multi-tenancy Step 24). Each Vercel project sets its own; must match the shop's `slug` and the backend's `SHOP_SLUG` for the default shop. Unset currently falls back to `decant-please` — set it explicitly anyway |
-   | `NEXT_PUBLIC_SITE_URL` | `https://decant-please.cornerarea.me` |
    | `NEXT_PUBLIC_IMAGE_URL` | `https://images.cornerarea.me` |
 
-3. Deploy, then point the storefront domain (`decant-please.cornerarea.me`) at Vercel. Make
-   sure the backend's `FRONTEND_URL` config var matches it exactly, scheme included — that's
-   the CORS allowlist **and** the admin "View on site" links (comma-separate origins when a
-   second shop's domain arrives).
+3. Deploy once. Every shop after that is domains, not deployments.
+
+**Onboarding a shop's domain** (the whole flow — Admin Portal → storefront):
+
+1. Register the shop in the **Studio** (`/studio/shops`) if it doesn't exist.
+2. Studio → the shop's **Domains** action: add its host(s) — a platform subdomain
+   (`shop.decantplease-style.com`) and/or the client's own custom domain. Exactly one
+   is **primary** (canonical for SEO; secondaries 308 to it); leave new rows
+   **unverified**.
+3. **Vercel → the one project → Settings → Domains**: attach the same host. Vercel
+   shows the DNS record the client must set (CNAME/A) and issues TLS automatically
+   once DNS points here. A platform wildcard (e.g. `*.yourplatform.com`) is attached
+   once and covers every subdomain-tier shop.
+4. When DNS actually resolves and Vercel shows the domain active, flip the row to
+   **Verified** in the Studio. `verified_at` is an administrative gate, not DNS
+   proof — the storefront serves the host and CORS admits its origin only from this
+   moment, so don't set it early.
+5. Nothing to deploy: resolution is live data (60s cache), and the shop's storefront,
+   sitemap, robots, and canonical URLs all follow its primary domain.
+
+The backend's `FRONTEND_URL` config var stays as the **platform default** origin only —
+per-shop origins come from the verified `shop_domains` rows automatically (dynamic CORS,
+PR-A). "View on site" links use each shop's verified primary domain, falling back to
+`FRONTEND_URL`.
+
+> **Preview deployments are fail-closed by design.** `*.vercel.app` hosts map to no
+> `shop_domains` row, so previews render the unbranded 404 — a preview can never leak a
+> production shop. To smoke-test a preview against real rendering, add its exact
+> `<deployment>.vercel.app` host as an **unverified-then-verified** row on a throwaway
+> shop, and delete the row after; never map a preview host to a client's shop.
 
 > **Production Branch — still unverified (ADR-004).** The project's Production Branch is
 > *believed* to be `main` (captured at import, pre-`develop`-split; the Vercel bot labelled
 > a `develop`-head deployment "Preview" on PR #54) but has never been read from the
 > dashboard. Check **Settings → Git → Production Branch** on the next dashboard visit and
-> replace this note with the confirmed value — before a second project multiplies the
-> ambiguity.
+> replace this note with the confirmed value — under a single shared project it gates
+> every shop at once.
 
 > **Fragrance images from R2 (#22).** `next.config.ts` allows images from the host in
 > `NEXT_PUBLIC_IMAGE_URL` (alongside the API host and localhost). Set
@@ -342,8 +373,8 @@ replaced image.
 > broken window.
 
 **Alternative — Node on a VPS:** `npm ci && npm run build`, then `npm start` (port 3000)
-under systemd or pm2 with an Nginx `proxy_pass` + TLS in front. Same two env vars, in
-`frontend/.env.local`.
+under systemd or pm2 with an Nginx `proxy_pass` + TLS in front (Nginx must forward the
+original `Host` header — it's the tenant). Same two env vars, in `frontend/.env.local`.
 
 ---
 

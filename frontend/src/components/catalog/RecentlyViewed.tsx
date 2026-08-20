@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FragranceCard } from "./FragranceCard";
 import { getFragrance } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import type { Fragrance } from "@/lib/types";
 
 const KEY = "decant-please.recently-viewed.v1";
@@ -37,6 +38,7 @@ export function RecordRecentlyViewed({ slug }: { slug: string }) {
 
 /** The home-page rail. Renders nothing until there's something to show. */
 export function RecentlyViewedRail({ exclude = [] }: { exclude?: string[] }) {
+  const { slug: shop } = useTenant();
   const [fragrances, setFragrances] = useState<Fragrance[]>([]);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export function RecentlyViewedRail({ exclude = [] }: { exclude?: string[] }) {
     if (slugs.length === 0) return;
 
     let stale = false;
-    Promise.all(slugs.map((slug) => getFragrance(slug).catch(() => null))).then((results) => {
+    Promise.all(slugs.map((slug) => getFragrance(shop, slug).catch(() => null))).then((results) => {
       if (stale) return;
       const alive = results.filter((f): f is Fragrance => f !== null);
       setFragrances(alive);
@@ -55,7 +57,7 @@ export function RecentlyViewedRail({ exclude = [] }: { exclude?: string[] }) {
     return () => {
       stale = true;
     };
-  }, []);
+  }, [shop]);
 
   // <ViewTransition> names must be unique page-wide, and the same card twice on
   // one screen is noise anyway — skip fragrances another rail already shows.

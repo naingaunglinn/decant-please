@@ -6,11 +6,13 @@ import { OrderReceipt } from "@/components/tracking/OrderReceipt";
 import { TrackingForm } from "@/components/tracking/TrackingForm";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { trackOrder } from "@/lib/api";
+import { useTenant } from "@/lib/tenant-context";
 import type { OrderStatusResponse } from "@/lib/types";
 
 type Phase = "loading" | "ready" | "needs-phone";
 
 export function OrderCompleteClient({ code }: { code: string }) {
+  const { slug: shop } = useTenant();
   const reduced = useReducedMotion();
   const [order, setOrder] = useState<OrderStatusResponse | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
@@ -21,7 +23,7 @@ export function OrderCompleteClient({ code }: { code: string }) {
 
   const fetchReceipt = async (phone: string): Promise<boolean> => {
     try {
-      const result = await trackOrder(code, phone);
+      const result = await trackOrder(shop, code, phone);
       if (result) {
         setOrder(result);
         setPhase("ready");

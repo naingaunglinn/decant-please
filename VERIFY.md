@@ -28,6 +28,7 @@ keep editing. See `AGENTS.md` § 9.
 | An API Resource shape | `composer test` **and** `npm run typecheck` | the Resource and `lib/types.ts` are one contract |
 | Any frontend code | `npm run typecheck` + `npm run lint` | |
 | Anything visual or flow-level | the matching `verify-*.mjs` | a green build says nothing about a correct UI |
+| The proxy, the `[host]` tree, the tenant resolver, or robots/sitemap | `verify-tenant-hosts.mjs` — against a **production build** (`next start`; the run form is in the script header) | the step-32 response-cache leak class lives here, and `next dev` has no route cache to leak from |
 | A shared primitive (`components/ui/**`, `layout/**`) | `verify-responsive.mjs` at minimum | blast radius is every surface |
 | A migration | `php artisan migrate:fresh --seed` then `composer test` | seeders feed the browser checks |
 | Money anywhere — including "just formatting" | `composer test` + the money-touching Feature tests, named individually | currency bugs hide in cosmetic changes |
@@ -52,6 +53,12 @@ verification, and it is a good first candidate to run through the full loop.
 
 Update this section to say "clean" the day they are gone. A known-red baseline that nobody
 prunes becomes a permanently ignored check.
+
+Also data-dependent, not code-red: `verify-responsive.mjs`'s **375 "sticky add-to-cart"**
+check needs a PDP long enough to scroll (image + description). After the step-32 session
+ran `decant:fresh-start` against the dev database, the demo catalog's pages are too short
+and the check fails **on clean `develop` too** (proven 2026-08-18, ADR-0004 PR-B). It
+greens again once demo data with images is reseeded — don't chase it as a regression.
 
 ## Running the browser checks
 
