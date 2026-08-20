@@ -581,6 +581,54 @@ class TenantIsolationTest extends TestCase
         $this->assertTrue(Cache::has('api.meta.'.$this->shopB->slug));
     }
 
+    public function test_shop_settings_telegram_and_social_are_per_shop(): void
+    {
+        // Step 33's new columns live on the BelongsToShop-scoped ShopSetting row,
+        // so like every other tenant-owned value they can hold the same natural
+        // shape in two shops without one leaking into the other.
+        $this->forShop($this->shopA);
+        ShopSetting::current()->update([
+            'bot_token' => 'A:TOKEN', 'admin_chat_id' => 'CHAT_A', 'tiktok_url' => 'https://tiktok.com/@a',
+        ]);
+
+        $this->forShop($this->shopB);
+        ShopSetting::current()->update([
+            'bot_token' => 'B:TOKEN', 'admin_chat_id' => 'CHAT_B', 'tiktok_url' => 'https://tiktok.com/@b',
+        ]);
+
+        // Exactly one settings row per shop, each carrying its own values.
+        $this->forShop($this->shopA);
+        $a = ShopSetting::current();
+        $this->assertSame('A:TOKEN', $a->bot_token);
+        $this->assertSame('CHAT_A', $a->admin_chat_id);
+        $this->assertSame('https://tiktok.com/@a', $a->tiktok_url);
+
+        $this->forShop($this->shopB);
+        $b = ShopSetting::current();
+        $this->assertSame('B:TOKEN', $b->bot_token);
+        $this->assertSame('CHAT_B', $b->admin_chat_id);
+
+        // Two rows total (one per shop), never cross-visible.
+        $this->assertSame(2, app(TenantContext::class)->withoutTenancy(fn () => ShopSetting::count()));
+    }
+
+    public function test_telegram_credentials_are_encrypted_at_rest(): void
+    {
+        // The encrypted cast means the raw column never stores the plaintext token
+        // — a DB dump or log can't leak it. Read the raw value straight from the
+        // connection, bypassing the model's decryption.
+        $this->forShop($this->shopA);
+        ShopSetting::current()->update(['bot_token' => 'SECRET:TOKEN', 'admin_chat_id' => 'CHAT_A']);
+
+        // DB query builder — not subject to the Eloquent BelongsToShop scope.
+        $raw = \DB::table('shop_settings')->where('shop_id', $this->shopA->id)->value('bot_token');
+
+        $this->assertNotSame('SECRET:TOKEN', $raw);
+        $this->assertNotEmpty($raw);
+        // and it round-trips back to the plaintext through the cast
+        $this->assertSame('SECRET:TOKEN', ShopSetting::current()->bot_token);
+    }
+
     public function test_without_tenancy_is_a_rare_audited_escape_hatch(): void
     {
         // The design budgets withoutTenancy() to a handful of call sites (§8 ledger);

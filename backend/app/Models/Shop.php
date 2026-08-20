@@ -35,6 +35,12 @@ class Shop extends Model
         return $query->where('is_active', true);
     }
 
+    /** Payment / Telegram / social settings for this shop (step 33). */
+    public function setting(): HasOne
+    {
+        return $this->hasOne(ShopSetting::class);
+    }
+
     /** The hosts this shop's storefront answers on (ADR-0004). */
     public function domains(): HasMany
     {

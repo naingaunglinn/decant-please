@@ -283,6 +283,13 @@ Actions is down — but it bypasses the CI gate, so it's no longer the routine p
 - Config vars are read from the environment on every boot — there is no `.env` file on the
   dyno and no `config:cache` to re-run after a change. Setting a config var restarts the
   dyno with the new value.
+- **`PAYMENT_*`, `SOCIAL_*`, and `TELEGRAM_*` config vars are platform *defaults*, not a
+  shop's live values (step 33).** Each shop's own payment/Telegram/social settings live on
+  its `shop_settings` row (set from the Payment settings page) and win over these; a shop
+  falls back to the env value only where its own is blank (e.g. many shops sharing one
+  platform Telegram bot, each with its own chat id). Verify a shop's Telegram wiring with
+  `php artisan telegram:test <shop-slug>`. Telegram credentials on the row are encrypted at
+  rest.
 
 ### Backups — not optional
 

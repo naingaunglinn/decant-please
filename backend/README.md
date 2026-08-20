@@ -30,17 +30,22 @@ Admin login: `admin@decantplease.local` / whatever `ADMIN_PASSWORD` was when you
 
 ## Environment variables
 
-| Variable | Purpose |
-|---|---|
-| `APP_URL` | This app's own URL — image URLs in API responses are built from it |
-| `FRONTEND_URL` | Storefront origin **platform default** — the CORS base (verified `shop_domains` rows merge in per request since ADR-0004) and the "View on site" fallback for shops with no verified primary domain |
-| `ADMIN_PASSWORD` | Read once by `db:seed` to create the admin user |
-| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Exposed via `/api/v1/{shop}/meta` for the storefront footer; blank = hidden |
-| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details exposed via `/api/v1/{shop}/meta`; blank fields hidden, whole block null when none set |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts to the decanter's Telegram (`php artisan telegram:test` verifies); both blank = off |
-| `MEDIA_DISK` | Disk for uploaded images — `public` locally via `storage:link`, `s3` (Cloudflare R2) in production |
-| `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a separate no-public-domain R2 bucket in production |
-| `DB_*` | PostgreSQL connection. `DATABASE_URL` (not `DB_URL`) overrides them all — that's the name Heroku injects |
+Config resolution is **shop settings row → this env default → off** through
+`App\Support\ShopConfig` (step 33): the env values below are the **platform
+default**, not the live value for a shop that set its own. A blank at both levels
+means the feature is off for that shop.
+
+| Variable | Per-shop override | Purpose |
+|---|---|---|
+| `APP_URL` | — | This app's own URL — image URLs in API responses are built from it |
+| `FRONTEND_URL` | `shop_domains` (ADR-0004) | Storefront origin **platform default** — the CORS base (verified `shop_domains` rows merge in per request) and the "View on site" fallback for shops with no verified primary domain |
+| `ADMIN_PASSWORD` | — | Read once by `db:seed` to create the admin user |
+| `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | `shop_settings.tiktok_url` / `.facebook_url` | Exposed via `/api/v1/{shop}/meta` for the storefront footer; blank = hidden |
+| `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | `shop_settings.*` (Payment settings page) | Offline transfer details exposed via `/api/v1/{shop}/meta`; blank fields hidden, whole block null when none set |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | `shop_settings.bot_token` / `.admin_chat_id` (encrypted) | New-order alerts to the decanter's Telegram (`php artisan telegram:test {shop}` verifies a shop); a shop with no bot token uses this platform bot; blank at both = off |
+| `MEDIA_DISK` | — | Disk for uploaded images — `public` locally via `storage:link`, `s3` (Cloudflare R2) in production |
+| `PROOFS_DISK` (+ `PROOFS_AWS_*`) | — | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a separate no-public-domain R2 bucket in production |
+| `DB_*` | — | PostgreSQL connection. `DATABASE_URL` (not `DB_URL`) overrides them all — that's the name Heroku injects |
 
 Production values and hardening (`APP_DEBUG=false`, `SESSION_SECURE_COOKIE`, forced
 HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DEPLOY.md).
@@ -54,7 +59,7 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 | GET | `/api/v1/{shop}/fragrances` | Filterable, paginated catalog | 120/min |
 | GET | `/api/v1/{shop}/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
 | GET | `/api/v1/{shop}/brands` | Active brands | 120/min |
-| GET | `/api/v1/{shop}/meta` | Filter options, price bounds, social links, payment details | 120/min |
+| GET | `/api/v1/{shop}/meta` | Filter options, price bounds, social links, payment details — all shop-resolved (shop settings → env default → off) | 120/min |
 | GET | `/api/v1/{shop}/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
 | POST | `/api/v1/{shop}/orders` | Guest checkout — server re-derives all prices and the delivery fee (structured address since step 30) | 10/min |
 | GET | `/api/v1/{shop}/orders/track` | Full receipt by tracking code + phone | 20/min |
@@ -199,7 +204,7 @@ those against the running stack — reach for it whenever a change is engine-spe
 ```bash
 php artisan decant:fresh-start --shop=<slug>   # wipe ONE shop's demo fragrances + orders (and its proof files); keeps brands and admin user; refuses without a shop
 php artisan db:seed              # reseed demo data (idempotent admin user)
-php artisan telegram:test        # confirm the configured bot token + chat id actually reach Telegram
+php artisan telegram:test <slug> # confirm that shop's bot token + chat id (its own, or the platform bot) reach Telegram
 php artisan cache:clear          # /api/v1 responses are cached for 10 minutes
 ```
 

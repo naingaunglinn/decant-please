@@ -8,6 +8,7 @@ use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Models\DecantPrice;
 use App\Models\ShopSetting;
+use App\Support\ShopConfig;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -44,8 +45,9 @@ class MetaController extends Controller
                 ],
                 'sorts' => ['newest', 'price_asc', 'price_desc', 'name'],
                 'social' => [
-                    'tiktok_url' => config('app.social.tiktok') ?: null,
-                    'facebook_url' => config('app.social.facebook') ?: null,
+                    // Per-shop since step 33 — shop row → env default → null (ShopConfig).
+                    'tiktok_url' => ShopConfig::get('social.tiktok'),
+                    'facebook_url' => ShopConfig::get('social.facebook'),
                 ],
                 'payment' => self::payment(),
             ];
@@ -53,7 +55,7 @@ class MetaController extends Controller
     }
 
     /**
-     * @param  array<\App\Enums\BrandType|\App\Enums\Gender|\App\Enums\Concentration>  $cases
+     * @param  array<BrandType|Gender|Concentration>  $cases
      * @return array<array{value: string, label: string}>
      */
     protected function options(array $cases): array
@@ -70,17 +72,21 @@ class MetaController extends Controller
      */
     protected static function payment(): ?array
     {
-        // The decanter's admin-managed settings take precedence; env is the
-        // fallback so an existing PAYMENT_* deployment keeps working unchanged.
-        $settings = ShopSetting::current();
+        // Shop settings row → env default → off, through the one resolver
+        // (step 33). Behaviour is unchanged from the previous inline `?:`: the
+        // shop's admin-managed value wins, env is the platform fallback so an
+        // existing PAYMENT_* deployment keeps working. qr_url stays derived here
+        // — it is a stored path turned into a URL (qrUrl()), not a raw setting,
+        // with the env URL as its fallback exactly as before.
+        $qrUrl = ShopSetting::current()->qrUrl() ?: config('app.payment.qr_url');
 
         $fields = array_filter([
-            'kbzpay_name' => $settings->kbzpay_name ?: config('app.payment.kbzpay_name'),
-            'kbzpay_number' => $settings->kbzpay_number ?: config('app.payment.kbzpay_number'),
-            'wave_name' => $settings->wave_name ?: config('app.payment.wave_name'),
-            'wave_number' => $settings->wave_number ?: config('app.payment.wave_number'),
-            'qr_url' => $settings->qrUrl() ?: config('app.payment.qr_url'),
-            'instructions' => $settings->payment_instructions ?: config('app.payment.instructions'),
+            'kbzpay_name' => ShopConfig::get('payment.kbzpay_name'),
+            'kbzpay_number' => ShopConfig::get('payment.kbzpay_number'),
+            'wave_name' => ShopConfig::get('payment.wave_name'),
+            'wave_number' => ShopConfig::get('payment.wave_number'),
+            'qr_url' => $qrUrl ?: null,
+            'instructions' => ShopConfig::get('payment.instructions'),
         ], fn ($value) => filled($value));
 
         return $fields === [] ? null : $fields;

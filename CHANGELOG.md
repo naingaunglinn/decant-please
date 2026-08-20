@@ -9,7 +9,51 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v28
+## 0. What changed in v29
+
+**v29** runs Step 33 — per-shop configuration. Two config groups were still
+process-global env (correct for one decanter, wrong for many); the audit found the
+other two (payment, storefront origin) already per-shop from the seam + ADR-0004, so
+this step is scoped to Telegram + social and centralises resolution.
+
+- **One resolver, `App\Support\ShopConfig`** — every value resolves **shop settings
+  row → platform env default → off**, replacing scattered inline `?: config(...)`.
+  `get()` reads the current tenant; `forShop($shop, …)` reads an explicit shop by
+  switching the tenant context around the read (the blessed *set-the-context*
+  pattern via `TenantContext`'s public API — **not** a `withoutTenancy()` bypass, so
+  the ≤5 budget is untouched, still 1). Payment `/meta` resolution now routes through
+  it with **identical** behaviour.
+- **`shop_settings` gains `bot_token`, `admin_chat_id` (both `encrypted` cast, TEXT
+  columns), `tiktok_url`, `facebook_url`.** No backfill — env stays the platform
+  default, so existing deployments keep working with these blank. The table was
+  already per-shop (seam migration's `shop_id` + `unique`).
+- **Telegram is per shop.** `NotifyAdminOfNewOrder` / `NotifyAdminOfPaymentProof`
+  resolve the notifier from **`$event->order->shop`** (eager-loaded — lazy-loading is
+  guarded), so each shop's alerts use its own bot token + chat id, or the shared
+  platform bot when its token is blank; unconfigured at both levels is a no-op. The
+  5s bound + swallow-all rules are unchanged, and a broken token in one shop can't
+  touch another's checkout. The alert's admin link is now **tenant-aware**:
+  `/admin/{shop}/orders/{id}/edit`.
+- **`telegram:test {shop}`** now requires a shop slug and tests that shop's resolved
+  config. **`/meta` social** reads the shop row (env fallback preserved).
+- **`ManagePayment` gains "Telegram order alerts" + "Social links" sections** — it
+  already edits the tenant's `ShopSetting` row. The bot token is a revealable
+  password field that is **not** echoed back and is **preserved when left blank**
+  (dehydrated only when filled); the chat id and socials prefill and save normally.
+- **Stale "singleton" docblocks corrected** on `ShopSetting` and `ManagePayment` (the
+  row has been per-shop since the seam; only the comments lagged). Behaviour
+  unchanged elsewhere.
+- **Suite 258 → 273 / 1,210 assertions.** New `PerShopConfigTest` (per-shop
+  resolution, meta social/payment isolation + env fallback, Telegram A→A / B→B, the
+  alert following the order's shop over the ambient context, platform-bot fallback,
+  unconfigured no-op, tenant-aware URL, `telegram:test`); `TenantIsolationTest`
+  gains per-shop settings + encrypted-at-rest coverage; `PaymentMethodTest` gains the
+  ManagePayment save/read + blank-token-preserves case; `TelegramAlertTest` updated
+  for the `{shop}` argument and tenant-aware URL. **Deliberately untouched:** the
+  tenancy seam, ADR-0004 host routing / CORS / `shop_domains`, existing
+  `shop_id`/`unique`/`BelongsToShop`/payment-isolation work.
+
+## 0.1 What changed in v28
 
 **v28** completes ADR-0004: **PR-B, the storefront cutover** (#92). One Next.js
 deployment now serves every shop on its own domain — custom domains and platform

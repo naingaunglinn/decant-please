@@ -19,17 +19,20 @@ class NotifyAdminOfPaymentProof
 
     public function handle(PaymentProofUploaded $event): void
     {
-        if (! $this->telegram->isConfigured()) {
+        // Per-shop notifier resolved from the order's shop (step 33).
+        // loadMissing('shop') because preventLazyLoading is on.
+        $order = $event->order->loadMissing('shop');
+
+        if (! $this->telegram->isConfiguredForShop($order->shop)) {
             return;
         }
-
-        $order = $event->order;
 
         $headline = $event->isReplacement
             ? "🧾 Payment slip replaced — order #{$order->id}"
             : "🧾 Payment slip uploaded — order #{$order->id}";
 
-        $adminUrl = rtrim((string) config('app.url'), '/')."/admin/orders/{$order->id}/edit";
+        // Tenant-aware admin URL: the panel carries the shop segment since 25a.
+        $adminUrl = rtrim((string) config('app.url'), '/')."/admin/{$order->shop->slug}/orders/{$order->id}/edit";
 
         $message = implode("\n", [
             $headline,
@@ -39,6 +42,6 @@ class NotifyAdminOfPaymentProof
             $adminUrl,
         ]);
 
-        $this->telegram->sendToAdmin($message);
+        $this->telegram->sendToShop($order->shop, $message);
     }
 }
