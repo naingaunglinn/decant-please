@@ -115,8 +115,12 @@ class PaymentMethodTest extends TestCase
 
     // ---- MMQR / shop payment settings ---------------------------------------
 
-    public function test_shop_setting_is_a_singleton(): void
+    public function test_shop_setting_has_one_row_per_shop(): void
     {
+        // current() is an idempotent per-shop accessor: repeated calls return the
+        // same row for the current tenant. count() is 1 here because this test runs
+        // single-shop — the row is per-shop (BelongsToShop + unique(shop_id)), not a
+        // global singleton.
         $a = ShopSetting::current();
         $b = ShopSetting::current();
 
