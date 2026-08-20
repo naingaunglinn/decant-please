@@ -92,12 +92,24 @@ moves a studio user between shops**
 | `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
 | `/admin/{shop}/production-schedule/{date}` | One day's aggregated worklist, printable as an A5 bench sheet — strict `Y-m-d` param, 404 otherwise |
 
-**Studio panel — the super-admin home outside any shop (`is_studio` accounts only)**
+**Studio panel — the super-admin home outside any shop (`studio_admin` accounts only)**
 
 | Route | What it is |
 |---|---|
 | `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
 | `/studio/shops` | The shop registry: register a shop (seeds its delivery geography and, by default, creates the owner's shop-confined login), open any shop's panel |
+| `/studio/roles` | Filament Shield role/permission management (Step 34) — studio-panel only |
+
+**Access & authorization (Step 34).** Roles are **Filament Shield** (spatie/permission,
+non-team): `studio_admin` (= Shield super_admin, platform-wide via a `Gate::before`
+bypass), `shop_owner` (full control of its own shop's resources), `shop_staff` (a narrow
+read set — real staff needs are deferred). Shield answers *"may this user perform this
+action?"* via generated model policies (enforced on both panels); the existing tenancy
+seam (`BelongsToShop`, `shop_user` membership, `canAccessTenant`, `ResolveTenant`) still
+answers *"which shop, and which records."* `is_studio` is transitional — the panel/tenant
+readers now use `hasRole('studio_admin')`. **Shop lifecycle** is the `status` enum
+(`onboarding → live → suspended → archived`); only `live` is served (others 404), and
+`is_active` is a derived read-only accessor for `status === live`.
 
 **Utility**
 
@@ -143,7 +155,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 258 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts
+├── tests/Feature/                          # 295 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -188,7 +200,7 @@ backend/
 php artisan test
 ```
 
-258 tests / 1,158 assertions on an in-memory SQLite database — 40 of them in
+295 tests / 1,261 assertions on an in-memory SQLite database — 40 of them in
 `TenantIsolationTest`, the two-shop isolation suite, and 22 in
 `StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
 your dev Postgres data is never touched. N+1 queries throw outside production

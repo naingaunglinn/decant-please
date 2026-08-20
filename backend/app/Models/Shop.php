@@ -52,7 +52,12 @@ class Shop extends Model
      */
     protected function isActive(): Attribute
     {
-        return Attribute::get(fn (): bool => $this->status === ShopStatus::Live);
+        return Attribute::make(
+            get: fn (): bool => $this->status === ShopStatus::Live,
+            // Read-only: writing it is discarded (no column to persist) — status
+            // is the single writable state.
+            set: fn (): array => [],
+        );
     }
 
     /** Who suspended this shop (Step 34 §1), when a reason + actor were recorded. */

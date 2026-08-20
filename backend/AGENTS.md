@@ -68,6 +68,13 @@ the scope is missed, so **the scope is the isolation boundary**.
    checkout lookup, and public API to buy normalization of ~228 rows. Do not reintroduce
    it, and do not "fix" the duplication.
 6. **Tracking codes are globally unique** across shops even though lookup is shop-scoped.
+7. **Authorization is Filament Shield; isolation is `BelongsToShop`. Never conflate
+   them** (Step 34 / ADR-0003 amendment). Shield roles + generated policies answer
+   *"may this user perform this action?"* — global, non-team, `studio_admin` = Shield
+   super_admin. The tenancy seam answers *"which shop, and which records?"* A Shield
+   policy is authorization-only and must never scope queries or bypass `BelongsToShop`.
+   **Do not** enable Spatie teams / `scopeToTenant()`, and do not add `users.role` or
+   `shop_user.role` — roles live in spatie tables. Shield's role UI is `/studio` only.
 
 **Adding a new model — decide tenancy first, before writing the migration**
 
