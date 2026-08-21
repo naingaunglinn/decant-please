@@ -4,9 +4,13 @@ namespace App\Providers;
 
 use App\Events\OrderPlaced;
 use App\Events\PaymentProofUploaded;
+use App\Listeners\GuardAndLogImpersonatedWrites;
+use App\Listeners\LogImpersonationEntry;
 use App\Listeners\NotifyAdminOfNewOrder;
 use App\Listeners\NotifyAdminOfPaymentProof;
 use App\Listeners\SyncTenantContextFromFilament;
+use App\Support\AuditLogger;
+use App\Support\Impersonation;
 use App\Support\TenantContext;
 use Filament\Events\TenantSet;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -32,6 +36,14 @@ class AppServiceProvider extends ServiceProvider
         // If this app ever moves to Octane (persistent container), switch to scoped()
         // and reset it in an Octane RequestReceived listener.
         $this->app->singleton(TenantContext::class);
+
+        // Step 34 §3 — impersonation state + audit writer + the model-layer write
+        // guard. Singletons for the same per-request reasons as TenantContext (and so
+        // the guard, which fires on every model write, isn't re-resolved each time).
+        // Impersonation reads auth()/session()/TenantContext live and holds no state.
+        $this->app->singleton(Impersonation::class);
+        $this->app->singleton(AuditLogger::class);
+        $this->app->singleton(GuardAndLogImpersonatedWrites::class);
     }
 
     /**
@@ -78,5 +90,14 @@ class AppServiceProvider extends ServiceProvider
         // Multi-tenancy Step 25a: mirror Filament's resolved panel tenant into our
         // own TenantContext so the app scope stays the single source of truth.
         Event::listen(TenantSet::class, SyncTenantContextFromFilament::class);
+
+        // Step 34 §3 — impersonation audit. Panel-entry logging MUST follow the sync
+        // above (it reads TenantContext, which the sync just set). The write guard +
+        // logger sit on Eloquent's lifecycle so they catch every write path,
+        // including custom Filament actions a policy hook would miss; both early-return
+        // unless a studio operator is impersonating, so normal ops are untouched.
+        Event::listen(TenantSet::class, LogImpersonationEntry::class);
+        Event::listen(['eloquent.saving: *', 'eloquent.deleting: *'], [GuardAndLogImpersonatedWrites::class, 'guard']);
+        Event::listen(['eloquent.created: *', 'eloquent.updated: *', 'eloquent.deleted: *'], [GuardAndLogImpersonatedWrites::class, 'log']);
     }
 }
