@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Enums\ShopStatus;
 use App\Filament\Studio\Resources\Shops\Pages\ManageShops;
@@ -9,9 +10,12 @@ use App\Filament\Studio\Resources\Shops\ShopResource;
 use App\Models\Order;
 use App\Models\Shop;
 use App\Models\ShopSetting;
+use App\Models\StudioAuditEvent;
 use App\Models\User;
+use App\Support\Impersonation;
 use App\Support\StudioShopStats;
 use App\Support\TenantContext;
+use Filament\Events\TenantSet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -215,6 +219,60 @@ class StudioRegistryTest extends TestCase
         $this->actingAs($owner); // shop_owner, not studio_admin
 
         $this->get(ShopResource::getUrl('view', ['record' => $shop], panel: 'studio'))->assertForbidden();
+    }
+
+    // ---- read-only completeness (regression for the PR-3 blocker) -----------
+
+    public function test_evaluating_completeness_never_creates_a_shop_setting_row(): void
+    {
+        $shop = $this->shop('nosettings', ShopStatus::Live);
+        $this->assertSame(0, ShopSetting::query()->where('shop_id', $shop->id)->count());
+
+        // Evaluated as incomplete (no payment) purely by reading — no row is created.
+        $this->assertFalse(StudioShopStats::paymentConfigured($shop));
+        $this->assertContains($shop->id, StudioShopStats::paymentIncompleteShopIds());
+
+        $this->assertSame(0, ShopSetting::query()->where('shop_id', $shop->id)->count());
+    }
+
+    public function test_registry_and_detail_render_under_active_read_only_impersonation(): void
+    {
+        // A studio operator who entered a settings-less shop's /admin panel (read-only
+        // impersonation) must be able to use the needs-attention filter and open the
+        // shop detail without a 500 — completeness is read-only, so the guard never fires.
+        $op = User::factory()->create(['is_studio' => true]);
+        $shop = $this->shop('entered', ShopStatus::Live); // no ShopSetting
+        $this->actingAs($op);
+        app(TenantContext::class)->set($shop);
+        event(new TenantSet($shop, $op)); // ENTERED_KEY set → read-only impersonation
+        $this->assertTrue(app(Impersonation::class)->isReadOnly());
+
+        Livewire::test(ManageShops::class)
+            ->filterTable('status', array_map(fn (ShopStatus $s) => $s->value, ShopStatus::cases()))
+            ->filterTable('needs_attention')
+            ->assertOk()
+            ->assertCanSeeTableRecords([$shop]); // onboarding-less but payment-incomplete
+
+        $this->get(ShopResource::getUrl('view', ['record' => $shop], panel: 'studio'))->assertOk();
+
+        // No empty ShopSetting was created by either render.
+        $this->assertSame(0, ShopSetting::query()->where('shop_id', $shop->id)->count());
+    }
+
+    public function test_detail_recent_audit_is_scoped_to_the_displayed_shop(): void
+    {
+        $shopA = $this->shop('audit-a');
+        $shopB = $this->shop('audit-b');
+        $alpha = User::factory()->create(['is_studio' => true, 'name' => 'Auditor Alpha']);
+        $beta = User::factory()->create(['is_studio' => true, 'name' => 'Auditor Beta']);
+        StudioAuditEvent::create(['actor_id' => $alpha->id, 'shop_id' => $shopA->id, 'action' => AuditAction::PanelEnter]);
+        StudioAuditEvent::create(['actor_id' => $beta->id, 'shop_id' => $shopB->id, 'action' => AuditAction::PanelEnter]);
+        $this->actingAs($this->studioUser());
+
+        $this->get(ShopResource::getUrl('view', ['record' => $shopA], panel: 'studio'))
+            ->assertOk()
+            ->assertSee('Auditor Alpha')
+            ->assertDontSee('Auditor Beta');
     }
 
     // ---- budget -------------------------------------------------------------

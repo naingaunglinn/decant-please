@@ -57,7 +57,10 @@ class ShopConfig
 
         [$column, $configKey] = self::MAP[$key];
 
-        $shopValue = ShopSetting::current()->{$column};
+        // Read-only: currentOrNull() (never current()) so resolving config never
+        // creates a ShopSetting row. A settings-less shop resolves the shop half to
+        // null and falls through to the platform default — identical values, no write.
+        $shopValue = ShopSetting::currentOrNull()?->{$column};
         if (filled($shopValue)) {
             return (string) $shopValue;
         }
