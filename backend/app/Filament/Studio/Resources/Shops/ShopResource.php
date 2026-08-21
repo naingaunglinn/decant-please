@@ -3,6 +3,7 @@
 namespace App\Filament\Studio\Resources\Shops;
 
 use App\Filament\Studio\Resources\Shops\Pages\ManageShops;
+use App\Filament\Studio\Resources\Shops\Pages\ViewShop;
 use App\Filament\Studio\Resources\Shops\Schemas\ShopForm;
 use App\Filament\Studio\Resources\Shops\Tables\ShopsTable;
 use App\Models\Shop;
@@ -30,6 +31,8 @@ class ShopResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Registry';
+
     protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
@@ -51,6 +54,7 @@ class ShopResource extends Resource
     {
         return [
             'index' => ManageShops::route('/'),
+            'view' => ViewShop::route('/{record}'),
         ];
     }
 }
