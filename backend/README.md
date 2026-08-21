@@ -170,7 +170,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 311 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit
+├── tests/Feature/                          # 313 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -215,7 +215,7 @@ backend/
 php artisan test
 ```
 
-311 tests / 1,300 assertions on an in-memory SQLite database — 40 of them in
+313 tests / 1,303 assertions on an in-memory SQLite database — 40 of them in
 `TenantIsolationTest`, the two-shop isolation suite, and 22 in
 `StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
 your dev Postgres data is never touched. N+1 queries throw outside production

@@ -33,6 +33,16 @@ use Illuminate\Support\Str;
  *
  * This is a guardrail + audit trail, NOT a tenant boundary: a write allowed after
  * take-control still lands in the current tenant, stamped shop_id by BelongsToShop.
+ *
+ * Known boundary — this catches per-model writes only. A raw query-builder / mass
+ * write (Model::query()->update(...), ->whereKey(...)->delete(), DB::table(...), or a
+ * bulk action with ->fetchSelectedRecords(false)) fires NO Eloquent events and would
+ * bypass both the block and the audit. Today every write path is per-model: all ten
+ * tenant-owned models (roots and sub-models — OrderItem/DecantPrice/
+ * DeliveryTownshipCourier included) use BelongsToShop, Filament's DeleteBulkAction
+ * fetches records by default (per-record delete), and every custom bulk action
+ * iterates (->each->update / foreach ->save). Any future mass write on a tenant-owned
+ * model must route through Eloquent instances (or add its own guard) to stay covered.
  */
 class GuardAndLogImpersonatedWrites
 {

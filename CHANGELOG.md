@@ -54,7 +54,7 @@ tenancy boundary. PR-3 (registry redesign, Studio tokens, sidebar) is still defe
 - **Studio audit page** — a read-only `StudioAuditEventResource` on `/studio` only
   (filterable by shop/action), gated by `canAccess(studio_admin)` + the studio-panel
   gate; owners/staff can't reach it and it has no `/admin` route.
-- **Suite 295 → 311 / 1,300 assertions.** New `ImpersonationAuditTest` (16): entry
+- **Suite 295 → 313 / 1,303 assertions.** New `ImpersonationAuditTest` (18): entry
   dedup + switch + owner-zero, read-only blocks create/update/delete, Filament-action
   notification (not 500), take-control enable/log/scope/reset, one write event per row,
   full field capture, isolation-not-widened, controlled-write-stays-in-shop, and audit

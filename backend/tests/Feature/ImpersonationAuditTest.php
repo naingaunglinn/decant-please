@@ -226,6 +226,24 @@ class ImpersonationAuditTest extends TestCase
         $this->assertSame(3, StudioAuditEvent::where('action', AuditAction::WriteUpdated)->count());
     }
 
+    public function test_a_controlled_delete_logs_one_write_deleted_event(): void
+    {
+        $op = $this->studioOperator();
+        $shop = $this->foreignShop('alpha');
+        $brand = $this->seedBrandIn($shop, 'Doomed');
+
+        $this->enter($op, $shop);
+        app(Impersonation::class)->takeControl();
+
+        $brand->delete();
+
+        $events = StudioAuditEvent::where('action', AuditAction::WriteDeleted)
+            ->where('subject_type', Brand::class)
+            ->get();
+        $this->assertCount(1, $events);
+        $this->assertSame($brand->getKey(), $events->first()->subject_id);
+    }
+
     public function test_a_write_audit_captures_actor_shop_action_subject_ip_and_user_agent(): void
     {
         $op = $this->studioOperator();
@@ -299,6 +317,17 @@ class ImpersonationAuditTest extends TestCase
         $owner->shops()->attach($shop);
         $owner->assignRole('shop_owner');
         $this->actingAs($owner);
+
+        $this->get('/studio/studio-audit-events')->assertForbidden();
+    }
+
+    public function test_shop_staff_cannot_reach_the_audit_resource(): void
+    {
+        $shop = $this->foreignShop('alpha');
+        $staff = User::factory()->create(['is_studio' => false]);
+        $staff->shops()->attach($shop);
+        $staff->assignRole('shop_staff');
+        $this->actingAs($staff);
 
         $this->get('/studio/studio-audit-events')->assertForbidden();
     }
