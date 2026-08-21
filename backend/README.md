@@ -97,7 +97,8 @@ moves a studio user between shops**
 | Route | What it is |
 |---|---|
 | `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
-| `/studio/shops` | The shop registry: register a shop (seeds its delivery geography and, by default, creates the owner's shop-confined login), open any shop's panel |
+| `/studio/shops` | The shop registry (Step 34 PR-3): status pills, Owner, Last activity, Orders this month; status + needs-attention filters (archived hidden by default); register a shop (seeds its delivery geography and, by default, creates the owner's login) |
+| `/studio/shops/{shop}` | Read-only shop detail — owner/contact, configuration completeness (payment/Telegram/social/domain), activity counts, recent audit entries |
 | `/studio/roles` | Filament Shield role/permission management (Step 34) — studio-panel only |
 | `/studio/studio-audit-events` | The impersonation audit log (Step 34 PR-2) — read-only, filterable by shop; studio-panel only |
 
@@ -170,7 +171,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 313 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit
+├── tests/Feature/                          # 324 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -215,7 +216,7 @@ backend/
 php artisan test
 ```
 
-313 tests / 1,303 assertions on an in-memory SQLite database — 40 of them in
+324 tests / 1,337 assertions on an in-memory SQLite database — 40 of them in
 `TenantIsolationTest`, the two-shop isolation suite, and 22 in
 `StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
 your dev Postgres data is never touched. N+1 queries throw outside production

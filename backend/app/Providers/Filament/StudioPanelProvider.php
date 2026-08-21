@@ -40,6 +40,13 @@ class StudioPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Emerald,
             ])
+            // Step 34 PR-3 — one item didn't need groups; three do. Registry holds the
+            // shop registry; Operations holds the impersonation audit log. (Platform /
+            // Stats / support-search are §6 non-goals — no empty groups.)
+            ->navigationGroups([
+                'Registry',
+                'Operations',
+            ])
             ->discoverResources(in: app_path('Filament/Studio/Resources'), for: 'App\Filament\Studio\Resources')
             // Shield's Role management UI lives here, on /studio ONLY (Step 34 /
             // ADR-0003 amendment). The /admin panel gets no Shield UI; its

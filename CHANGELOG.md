@@ -9,7 +9,49 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v31
+## 0. What changed in v32
+
+**v32** is Step 34 **PR-3: the Studio registry redesign + shop detail page + sidebar
+groups** — the last of the three Step-34 PRs. Studio design tokens / the pine-ramp
+theme are deferred to a separate PR-3b. No migrations, no dependencies, no frontend,
+and no tenancy/Shield/PR-1/PR-2 change.
+
+- **Registry, redesigned.** The `Active` check icon becomes a **ShopStatus pill**
+  (Live/Onboarding/Suspended/Archived — a reason-carrying, colour-blind-safe state).
+  New columns: **Owner** (the member holding `shop_owner`, deterministic by id — `—`
+  when none), **Last activity** (last order), **Orders this month**. Rows are
+  **navigable** to a new detail page; `Domains` + `Open panel` move into an overflow
+  action group. **Filters:** a multi-select **status** filter defaulting to the live
+  states (archived hidden by default, revealable), and a **needs-attention** filter.
+  A real **zero state** ("Register your first shop") replaces the empty table.
+- **Needs attention (Option A).** `onboarding OR suspended OR payment not configured`;
+  archived is never flagged. "Payment configured" = at least one payment field
+  resolves through **ShopConfig** (the `/meta` payment rule); Telegram, social, and a
+  verified domain are shown but optional (blank is a valid "off", §33). No
+  order-review / catalog / domain attention rules were invented.
+- **Shop detail page (`ViewShop`).** Read-only: owner + email, configuration status
+  (payment / Telegram / social / verified domain — each via its established rule:
+  `ShopConfig::forShop`, `TelegramNotifier::isConfiguredForShop`, `domains`), activity
+  counts, and this shop's recent impersonation-audit entries. Config resolution goes
+  through the **blessed `ShopConfig::forShop` set-context** (no `withoutTenancy`, no
+  duplicated resolution). Studio-only (owners get 403).
+- **Sidebar groups.** **Registry** (Shops) and **Operations** (Audit log) — the two
+  that have pages. No Platform/Stats/support-search placeholders (§6 non-goals).
+- **One budgeted cross-shop read.** Owner resolves through platform tables; per-shop
+  order figures are the single metered `TenantContext::withoutTenancy()` in
+  `StudioShopStats` (design §8 ledger: "the studio's cross-shop views"). It is
+  correlated by `shop_id` (GROUP BY), so no shop's rows enter another's totals, and it
+  uses portable `SUM(CASE …)`. The app's `->withoutTenancy(` count is now **2** — well
+  within the ≤5 ledger cap, which a test in `StudioRegistryTest` (and the existing
+  `TenantIsolationTest`) pins.
+- **Suite 313 → 324 / 1,337 assertions.** New `StudioRegistryTest` (11): status pill +
+  owner + orders columns, deterministic/absent owner, per-shop aggregate (no leak),
+  last activity, archived-hidden-by-default + reveal, needs-attention, zero state,
+  detail-page completeness, studio-only access, and the withoutTenancy budget. All
+  prior tenancy-isolation, lifecycle, role, and impersonation-audit tests stay green.
+- **Deferred (PR-3b):** the pine-ramp Studio theme / `design-tokens.json` work.
+
+## 0.1 What changed in v31
 
 **v31** is Step 34 **PR-2: impersonation audit** — the accountability layer over the
 cross-shop access PR-1 formalised. It builds on PR-1's Shield roles and changes no

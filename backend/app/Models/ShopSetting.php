@@ -52,6 +52,18 @@ class ShopSetting extends Model
         return static::firstOrCreate([]);
     }
 
+    /**
+     * The current shop's settings row if it exists, else null — WITHOUT creating one.
+     * Config *resolution* (ShopConfig) must read through this, never current(): a read
+     * that writes creates empty rows and, for a shop being viewed read-only under Step
+     * 34's impersonation guard, would trip that guard (a 500 on the Studio registry /
+     * detail page). Returns the model so encrypted casts still decrypt on access.
+     */
+    public static function currentOrNull(): ?self
+    {
+        return static::query()->first();
+    }
+
     /** Public URL to the MMQR image, or null when none uploaded. */
     public function qrUrl(): ?string
     {

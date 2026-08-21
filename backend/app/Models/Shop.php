@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -104,6 +105,17 @@ class Shop extends Model
     public function setting(): HasOne
     {
         return $this->hasOne(ShopSetting::class);
+    }
+
+    /**
+     * Members of this shop via shop_user (Step 25a). The shop's OWNER is the member
+     * holding the shop_owner role — membership carries no role column (roles live in
+     * Shield, PR-1). The Studio registry reads this cross-shop; User is a platform
+     * table (no BelongsToShop), so no tenant scope applies.
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class);
     }
 
     /** The hosts this shop's storefront answers on (ADR-0004). */

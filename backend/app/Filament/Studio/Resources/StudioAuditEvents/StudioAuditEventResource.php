@@ -29,6 +29,8 @@ class StudioAuditEventResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Operations';
+
     protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationLabel = 'Audit log';
