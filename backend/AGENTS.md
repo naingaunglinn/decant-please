@@ -75,6 +75,15 @@ the scope is missed, so **the scope is the isolation boundary**.
    policy is authorization-only and must never scope queries or bypass `BelongsToShop`.
    **Do not** enable Spatie teams / `scopeToTenant()`, and do not add `users.role` or
    `shop_user.role` — roles live in spatie tables. Shield's role UI is `/studio` only.
+8. **Impersonation read-only is a guardrail, not a tenant boundary** (Step 34 PR-2).
+   A `studio_admin` in a foreign shop's `/admin` panel is impersonating; the model-layer
+   guard (`GuardAndLogImpersonatedWrites`) makes it read-only until an explicit, audited
+   *take control*, and audits entry + each write to `studio_audit_events` (platform-owned,
+   append-only, no `BelongsToShop`). It prevents *accidental* writes — it never confines a
+   write to a shop: a controlled write still lands in the current `TenantContext`, stamped
+   by `BelongsToShop`. Detection reads auth + `TenantContext` + a session entry flag; it
+   adds **no** `withoutTenancy`/`scopeToTenant` and touches no tenancy seam. Refusal must
+   stay a `Halt` subclass (Filament catches it as a notification, never a 500).
 
 **Adding a new model — decide tenancy first, before writing the migration**
 

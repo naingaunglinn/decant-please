@@ -99,6 +99,21 @@ moves a studio user between shops**
 | `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
 | `/studio/shops` | The shop registry: register a shop (seeds its delivery geography and, by default, creates the owner's shop-confined login), open any shop's panel |
 | `/studio/roles` | Filament Shield role/permission management (Step 34) — studio-panel only |
+| `/studio/studio-audit-events` | The impersonation audit log (Step 34 PR-2) — read-only, filterable by shop; studio-panel only |
+
+**Impersonation audit (Step 34 PR-2).** A `studio_admin` operating a shop's `/admin`
+panel that isn't theirs is *impersonating* it — a privacy event, since it exposes
+another decanter's customers, transfer slips, and P&L. Entering a shop's panel logs one
+`panel.enter` (deduped per entry/switch). Impersonation is **read-only by default**: a
+single model-layer guard (`GuardAndLogImpersonatedWrites` on Eloquent
+saving/deleting) refuses tenant-owned writes — including from custom Filament actions a
+policy hook would miss — surfacing a Filament notification, not a 500. An explicit,
+audited **Take control** (the `/admin` banner) lifts read-only for the current shop only
+(it resets on shop switch); each controlled write logs one `write.*` event per persisted
+row. It is a **guardrail, not a boundary**: `studio_admin` stays super_admin, and a
+controlled write still lands in the current tenant, stamped `shop_id` by
+`BelongsToShop` — take-control never crosses a shop boundary (no `withoutTenancy`, no
+membership bypass). `studio_audit_events` is platform-owned (no `BelongsToShop`).
 
 **Access & authorization (Step 34).** Roles are **Filament Shield** (spatie/permission,
 non-team): `studio_admin` (= Shield super_admin, platform-wide via a `Gate::before`
@@ -155,7 +170,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 295 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles
+├── tests/Feature/                          # 311 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -200,7 +215,7 @@ backend/
 php artisan test
 ```
 
-295 tests / 1,261 assertions on an in-memory SQLite database — 40 of them in
+311 tests / 1,300 assertions on an in-memory SQLite database — 40 of them in
 `TenantIsolationTest`, the two-shop isolation suite, and 22 in
 `StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
 your dev Postgres data is never touched. N+1 queries throw outside production
