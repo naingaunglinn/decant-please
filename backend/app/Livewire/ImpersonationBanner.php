@@ -20,7 +20,11 @@ class ImpersonationBanner extends Component
 {
     public function takeControl(Impersonation $impersonation, AuditLogger $logger): void
     {
-        if (! $impersonation->active() || $impersonation->hasControl()) {
+        // The TakeControl permission is a nominal Shield gate (studio_admin, the only
+        // impersonator, bypasses it as super_admin) — the real guardrail is the
+        // read-only default + this explicit, audited step. Checked anyway so the
+        // intent is expressed through Shield, not just code.
+        if (! $impersonation->active() || $impersonation->hasControl() || auth()->user()?->can('TakeControl') !== true) {
             return;
         }
 
