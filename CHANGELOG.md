@@ -9,7 +9,60 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v30
+## 0. What changed in v31
+
+**v31** is Step 34 **PR-2: impersonation audit** — the accountability layer over the
+cross-shop access PR-1 formalised. It builds on PR-1's Shield roles and changes no
+tenancy boundary. PR-3 (registry redesign, Studio tokens, sidebar) is still deferred.
+
+- **Impersonation = a studio operator in a foreign shop's panel.** A `studio_admin`
+  has no shop membership, so any shop whose `/admin` panel they open is someone else's
+  — that is the impersonation, and "Open panel" hands them its customers, transfer
+  slips, expenses, and P&L. Detection: `studio_admin` + `TenantContext` set + not a
+  member, **and** an actual panel entry (session-recorded on Filament's `TenantSet`) —
+  so the public API, console, and test data-setup, which never enter a panel, are
+  never mislabelled and write freely.
+- **`studio_audit_events`** — a **platform-owned, append-only** table (no
+  `BelongsToShop`, like `shops`/`users`): actor, shop, action, morph subject, IP, user
+  agent, metadata, `created_at` only. Read cross-shop on `/studio` with no
+  `withoutTenancy()`.
+- **Panel entry logs one `panel.enter`,** deduped per entry/switch (a repeat in the
+  same shop doesn't re-log; a switch does). A normal owner in their own shop logs
+  nothing.
+- **Read-only by default, enforced at the model layer.** A single Eloquent
+  saving/deleting guard refuses tenant-owned writes while impersonating read-only —
+  deliberately at the model layer because custom Filament actions (order accept/reject,
+  mark paid, ManagePayment save, bulk fee/cost) mutate without a CRUD ability a
+  Gate/policy hook would see. Refusal is a `ReadOnlyImpersonationException` (a Filament
+  `Halt` subclass) after a notification — validated to cancel the write and surface as
+  a notification, never a 500, even inside a custom `->action()` closure.
+- **Take control is explicit and audited.** An `/admin` banner (rendered only while
+  impersonating) names the shop and read-only/controlling state; "Take control" logs
+  one `take_control` and lifts read-only **for the current shop only** — it resets to
+  read-only on a shop switch by construction (a single session key holds the controlled
+  shop). Each controlled write logs one `write.{created,updated,deleted}` **per
+  persisted row** (a 5-row bulk edit → 5 events), each naming its subject.
+- **Guardrail, not a tenant boundary — Rule 0 intact.** `studio_admin` stays Shield
+  super_admin; the `TakeControl` permission is a nominal Shield marker (super_admin
+  bypasses it). A controlled write still executes in the current `TenantContext` and is
+  stamped `shop_id` by `BelongsToShop` = the shop being viewed. A test proves a write
+  while controlling shop X lands in X, never Y; another proves super-admin
+  impersonation does **not** widen the `BelongsToShop` row set. No `withoutTenancy`, no
+  `scopeToTenant`, no teams, no membership bypass. `TenantContext`, `BelongsToShop`,
+  `ResolveTenant`, `shop_user`, `ShopDomain`/CORS, ADR-0004, and the frontend are
+  untouched; `is_studio` is left transitional.
+- **Studio audit page** — a read-only `StudioAuditEventResource` on `/studio` only
+  (filterable by shop/action), gated by `canAccess(studio_admin)` + the studio-panel
+  gate; owners/staff can't reach it and it has no `/admin` route.
+- **Suite 295 → 313 / 1,303 assertions.** New `ImpersonationAuditTest` (18): entry
+  dedup + switch + owner-zero, read-only blocks create/update/delete, Filament-action
+  notification (not 500), take-control enable/log/scope/reset, one write event per row,
+  full field capture, isolation-not-widened, controlled-write-stays-in-shop, and audit
+  access control. Existing tenant-isolation tests stay green.
+- **Deliberately out of scope (PR-3):** the registry-table redesign, the shop detail
+  page, the pine-ramp Studio theme, and sidebar grouping.
+
+## 0.1 What changed in v30
 
 **v30** starts Step 34 (studio operability) with **PR-1: shop lifecycle + Shield
 roles**. Impersonation/audit (PR-2) and the registry redesign/tokens/sidebar (PR-3)

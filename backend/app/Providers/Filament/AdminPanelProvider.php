@@ -16,12 +16,14 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -88,6 +90,13 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => Filament::getPanel('studio')->getUrl())
                     ->visible(fn (): bool => (bool) auth()->user()?->is_studio),
             ])
+            // Step 34 §3 — the impersonation banner rides above the topbar on every
+            // /admin page. The Livewire component renders nothing unless a studio
+            // operator is impersonating this shop, so it is invisible in normal use.
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_BEFORE,
+                fn (): string => Blade::render('@livewire(\'impersonation-banner\')'),
+            )
             // authenticatedTenantRoutes(), NOT authenticatedRoutes() or routes():
             // routes() closures register alongside login/password-reset, outside the
             // panel's auth middleware, and authenticatedRoutes() closures sit inside
