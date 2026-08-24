@@ -6,6 +6,23 @@
   --color-ink-strong: #000000;
   --color-pine: #013E37;
   --color-pine-soft: #E7ECE3;
+
+  /* Pine ramp — pine's OKLCH hue (182.455°) at raised lightness, muted to a teal-
+     green (chroma ~0.11), for the dark Studio admin panel (Step 34 PR-3b — a
+     deliberate "control room" register). Mirrored in the repo-root design-tokens.json
+     and backend StudioPanelProvider's primary; change all three together. Tailwind v4
+     only emits the shades actually referenced, so unused shades add no storefront CSS. */
+  --color-pine-50: #F1FAF8;
+  --color-pine-100: #E0F4F0;
+  --color-pine-200: #C3E9E2;
+  --color-pine-300: #98DACE;
+  --color-pine-400: #5EC3B4;
+  --color-pine-500: #2FAF9F;
+  --color-pine-600: #009485;
+  --color-pine-700: #00796C;
+  --color-pine-800: #006258;
+  --color-pine-900: #0F5149;
+  --color-pine-950: #04302A;
   --color-rule: #D6E4EB;
   --color-surface-alt: #E3EEF4;
   --color-muted: #63707A;
