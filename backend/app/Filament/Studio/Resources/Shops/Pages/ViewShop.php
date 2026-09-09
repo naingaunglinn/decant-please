@@ -56,7 +56,8 @@ class ViewShop extends ViewRecord
             Section::make('Shop')->columns(2)->schema([
                 TextEntry::make('name'),
                 TextEntry::make('status')->badge(),
-                TextEntry::make('slug')->badge()->copyable(),
+                // Vial-label chip (§3 motif) — hairline pill, scoped by the class (see ShopsTable).
+                TextEntry::make('slug')->badge()->extraAttributes(['class' => 'dp-vial-label'])->copyable(),
                 TextEntry::make('created_at')->label('Registered')->dateTime(),
             ]),
 

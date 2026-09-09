@@ -67,6 +67,11 @@ class ShopsTable
                     ->color('gray'),
                 TextColumn::make('slug')
                     ->badge()
+                    // §3 vial-label motif (frontend/AGENTS.md UI rule 2): in the Studio
+                    // the slug chip is a hairline-bordered pill, not a filled badge. The
+                    // class scopes that restyle to this cell only (CSS in
+                    // StudioPanelProvider); no other badge in the panel changes.
+                    ->extraCellAttributes(['class' => 'dp-vial-label'])
                     ->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('primaryDomain.host')

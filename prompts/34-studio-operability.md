@@ -100,6 +100,18 @@ build step.
 - If a dark Studio is a deliberate third register — control room vs. the mist storefront
   — say so in §3. Right now it reads as a Filament default rather than a choice.
 
+**Resolved in PR-3b (v33).** The ramp is pine's OKLCH hue (182.455°) raised in lightness and
+*muted* to a teal-green (chroma ~0.11): Filament's stock `generatePalette` keeps the hue but
+triples pine's chroma to a vivid turquoise, rejected as the same "unbranded" problem emerald
+had. Dark Studio **is** a deliberate third register — but forced per-panel via a `HEAD_START`
+hook, **not** `darkMode(isForced:)`, because Filament persists the theme in one origin-global
+`localStorage['theme']` key shared with `/admin`, so forcing would flip the Admin panel dark;
+the toggle is hidden. Slug chips are restyled to the hairline vial-label pill, scoped to
+`.dp-vial-label` (Studio only). The ramp is recorded in §3 (`design-tokens.json` + `globals.css`)
+and mirrored a third time in `StudioPanelProvider` — mirrored, not read at runtime, since
+Heroku's `backend/` slug does not ship the repo-root token file. Contrast checks pass (400/500
+≈ 9.5:1 / 7.4:1 on the dark surface).
+
 ## 6. Sidebar
 
 One item doesn't need groups; four will. Group now: **Registry** (Shops), **Operations**

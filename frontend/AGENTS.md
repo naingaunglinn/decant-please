@@ -73,6 +73,22 @@ Defined as a Tailwind v4 `@theme` block in `src/app/globals.css`. There is no
 Never introduce a raw hex in a component. If a shade is missing, that is a token
 decision, not an implementation detail — ask.
 
+**Studio pine ramp (Step 34 PR-3b).** The dark `/studio` admin panel is a deliberate
+third register — a "control room", distinct from the mist storefront and the amber shop
+panel. Its accent is a `pine-50…950` ramp: pine's own OKLCH hue (182.455°) raised in
+lightness and muted to a teal-green (chroma ~0.11), legible on the dark surface at WCAG
+AA (400/500 ≈ 9.5:1 / 7.4:1). One ramp, three mirrors — `../design-tokens.json`, the
+`@theme` block here, and the backend `StudioPanelProvider` `primary` — changed together.
+This is **not** a storefront change: the storefront still uses flat `pine`/`pine-soft`,
+and Tailwind v4 emits only referenced shades, so the ramp adds no storefront CSS. Dark is
+forced per-panel via a `HEAD_START` hook that never writes the origin-global
+`localStorage['theme']` key `/admin` shares, so the Admin panel's theme is untouched.
+
+**The pill motif (rule 2) extends to the admin/Studio panels.** The hairline-bordered pill
+— not a filled badge — is the intended treatment for atomic metadata everywhere, Filament
+included. The Studio slug chip follows it (the filled-badge default was the exception, now
+resolved); this is the admin/Studio answer §3 asked for, not a divergence.
+
 ## UI rules
 
 1. **Every control is ≥16px (`text-base`).** Below 16px, iOS Safari zooms the viewport

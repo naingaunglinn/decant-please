@@ -127,6 +127,17 @@ readers now use `hasRole('studio_admin')`. **Shop lifecycle** is the `status` en
 (`onboarding → live → suspended → archived`); only `live` is served (others 404), and
 `is_active` is a derived read-only accessor for `status === live`.
 
+**Studio theme (Step 34 PR-3b).** `/studio` is a deliberate dark "control room" register,
+set apart from the amber `/admin` panel. Its `primary` is the **pine ramp** — pine's OKLCH
+hue raised in lightness and muted to a teal-green (WCAG AA on the dark surface), registered
+as an explicit hex array that mirrors `design-tokens.json` / `globals.css` (Heroku's
+`backend/` slug can't read the repo-root token file, so the values are mirrored by
+same-commit discipline, not read at runtime). Dark is forced per-panel by a `HEAD_START`
+hook that adds the `dark` class **without** writing the origin-global `localStorage['theme']`
+key `/admin` shares — so the Admin panel's own theme is untouched — and the light/dark
+switch is hidden. The slug chip is §3's hairline **vial-label** pill (not a filled badge),
+scoped to `.dp-vial-label` so no other badge in the panel changes.
+
 **Utility**
 
 | Route | What it is |
@@ -171,7 +182,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 324 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
+├── tests/Feature/                          # 332 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry, studio theme
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```

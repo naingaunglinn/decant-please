@@ -9,7 +9,39 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v32
+## 0. What changed in v33
+
+**v33** is Step 34 **PR-3b: the Studio pine-ramp theme** — the design-token half deferred
+from PR-3. Studio becomes a deliberate dark "control room" register, visually distinct from
+the mist storefront and the amber shop panel. No migrations, no dependencies, no Node/Vite
+build step, no `tailwind.config`, and no tenancy/Shield/PR-1/PR-2 change.
+
+- **Pine ramp (§3 design tokens).** A `pine-50…950` ramp is added to `design-tokens.json`
+  and the `globals.css` `@theme` block, and mirrored a third time as the Studio panel's
+  `primary`. It is pine's own OKLCH hue (182.455°) raised in lightness and **muted to a
+  teal-green** (chroma ~0.11 — not Filament's stock vivid turquoise), so it reads as an
+  intentional brand accent, not the "unbranded" default emerald. The 400/500 accent steps
+  clear WCAG AA (≈9.5:1 / 7.4:1) on the dark surface. The three copies stay in sync by the
+  same same-commit discipline `design-tokens.json` already declares — **no runtime read**:
+  the Heroku backend slug is `backend/`, which does not ship the repo-root token file.
+- **Deliberate dark Studio, no toggle.** Filament persists the theme in one origin-global
+  `localStorage['theme']` key shared by `/admin` and `/studio`, so `darkMode(isForced:)` on
+  Studio would drag the Admin panel dark too. Instead Studio sets `defaultThemeMode(Dark)`
+  and a Studio-only `HEAD_START` hook adds the `dark` class before first paint **without**
+  writing that shared key; a Studio-only CSS rule hides the light/dark switch. `/admin`'s
+  own theme is left exactly as it was.
+- **Slug chip = the vial-label motif.** The Studio slug chip was a filled badge; §3's motif
+  is a hairline-bordered pill (frontend/AGENTS.md UI rule 2). It is restyled to that pill,
+  scoped to `.dp-vial-label` (the registry cell + the detail entry) so no other Filament
+  badge in the panel changes.
+- **Tests.** `StudioThemeTest` pins the ramp registration, AA contrast on the dark surface
+  (in Filament's own colour math), `defaultThemeMode(Dark)`, that dark is forced **without**
+  the shared-key write (the Admin-bleed regression guard), and the `.dp-vial-label` scope.
+  Suite 327 → **332** (1,367 assertions).
+
+---
+
+## 0.1 What changed in v32
 
 **v32** is Step 34 **PR-3: the Studio registry redesign + shop detail page + sidebar
 groups** — the last of the three Step-34 PRs. Studio design tokens / the pine-ramp
