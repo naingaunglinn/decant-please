@@ -9,7 +9,33 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v32
+## 0. What changed in v33
+
+**v33** is a **docs-only** foundation for the generic-shop refactor — Decant becomes the
+first *template*, not the whole product. No code, no migrations, no dependency change.
+
+- **Principles charter (P1–P6)** added to the top of `AGENTS.md` — enterprise-grade
+  reliability, small-shop simplicity. Every spec/issue/PR is now judged against it, and
+  **P6 is a PR checklist** authors answer before building.
+- **Guidance reframed generic.** `AGENTS.md §1` **and** `PRODUCT.md` now describe a
+  multi-category platform for Myanmar social sellers (perfume decants, clothing, bakery,
+  cosmetics) with Decant as the first template. Every tenancy/money invariant is unchanged;
+  §1 also corrects the record — multi-tenancy is **already built** (steps 23–25, 32–34),
+  not planned.
+- **Six live rules lifted** out of these version notes into `AGENTS.md`'s durable
+  sections, so they load every turn instead of living only in history: private data has no
+  public/presigned URL, and panel routes go through `authenticatedRoutes()` (§4);
+  explicit listeners / discovery off, `whereDate` windows + bare `Y-m-d` on the wire, and
+  `phpunit.xml` Telegram blanked (§8).
+- **Plan of record:** `prompts/35-generic-shop-plan.md` (steps **35–42** — 30–34 are
+  already shipped, so the range moved up) + a `prompts/README.md` step-table entry. Baked-in
+  sequencing: **#67 (correct money) runs before the parity baseline (35)**, a **gate after
+  step 38** for a real-seller trial before 39–41, and **#40/#41 parked under P5**.
+- History stays in `CHANGELOG.md` (no `HISTORY.md`) — the §0 history was already
+  externalized here (ADR-0001), which is exactly the on-demand outcome the refactor prompt
+  asked for.
+
+## 0.1 What changed in v32
 
 **v32** is Step 34 **PR-3: the Studio registry redesign + shop detail page + sidebar
 groups** — the last of the three Step-34 PRs. Studio design tokens / the pine-ramp
