@@ -354,11 +354,25 @@ class Order extends Model
         $this->save();
     }
 
-    /** The courier handed the cash over — the float lets go of this order. */
-    public function settleCourier(CarbonInterface $date): void
+    /**
+     * The courier handed the collected cash over. Records what they *actually* collected as
+     * received (#67) — the caller passes it, never assumed from the handoff snapshot, so a
+     * failed delivery (0) or a short collection credits only what arrived. Uncapped, like
+     * Mark paid: a genuine overpayment reads as overpaid. A settle that clears the balance
+     * is itself the payment — an Unpaid order flips to Paid (the saving hook stamps
+     * paid_at); a partial leaves it Unpaid. The credit lands at settle (cash in hand), so
+     * the float's handoff snapshot is never shrunk early; then the float lets go.
+     */
+    public function settleCourier(CarbonInterface $date, int $collectedMmk): void
     {
         if ($this->handed_to_courier_at === null) {
             throw new LogicException('Only orders handed to a courier can be settled.');
+        }
+
+        $this->deposit_mmk += max(0, $collectedMmk);
+
+        if ($this->payment_status === PaymentStatus::Unpaid && $this->balanceDue() <= 0) {
+            $this->payment_status = PaymentStatus::Paid;
         }
 
         $this->courier_settled_at = $date;

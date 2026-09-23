@@ -212,6 +212,105 @@ class PaymentReceivedTest extends TestCase
             ->assertJsonPath('balance_due_mmk', -15000);
     }
 
+    // ---- Courier settle credits the collected cash (#67 review gap) --------
+
+    public function test_courier_settle_credits_the_collected_fee_and_clears_an_online_order(): void
+    {
+        $this->actingAs($this->studioUser());
+        // Online: customer transferred the 50,000 items; the 3,000 fee rides the courier.
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Online, status: OrderStatus::Delivered);
+        $order->markPaid(50000);
+        $this->assertSame(3000, $order->balanceDue());
+
+        $order->handToCourier(today(), 3000);
+        $order->settleCourier(today(), 3000); // courier collected the fee in full
+
+        $order->refresh();
+        $this->assertSame(0, $order->balanceDue());
+        $this->assertSame(PaymentStatus::Paid, $order->payment_status);
+
+        // …and it drops out of "Balance outstanding" (the symptom that surfaced this).
+        // Assert the count, not the amount: "3,000 Ks" is a substring of the "53,000 Ks"
+        // revenue stat, so assertDontSee on it would false-fail.
+        Livewire::test(OrderStats::class)
+            ->assertSee('Balance outstanding')
+            ->assertSee('0 order(s) with a balance due');
+    }
+
+    public function test_courier_settle_of_a_cod_order_clears_the_balance_and_marks_it_paid(): void
+    {
+        // COD, never marked paid: the courier collecting IS the payment.
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Cod, status: OrderStatus::Delivered);
+        $this->assertSame(53000, $order->balanceDue());
+        $this->assertSame(PaymentStatus::Unpaid, $order->payment_status);
+
+        $order->handToCourier(today(), 53000);
+        $order->settleCourier(today(), 53000);
+
+        $order->refresh();
+        $this->assertSame(0, $order->balanceDue());
+        $this->assertSame(PaymentStatus::Paid, $order->payment_status);
+        $this->assertNotNull($order->paid_at);
+    }
+
+    public function test_a_failed_delivery_settled_with_zero_leaves_the_balance_and_next_handoff(): void
+    {
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Cod, status: OrderStatus::Delivered);
+        $order->handToCourier(today(), 53000);
+
+        $order->settleCourier(today(), 0); // nothing collected
+
+        $order->refresh();
+        $this->assertSame(53000, $order->balanceDue());                 // unchanged
+        $this->assertSame(0, $order->deposit_mmk);                      // nothing credited
+        $this->assertSame(PaymentStatus::Unpaid, $order->payment_status);
+        $this->assertSame(53000, max(0, $order->balanceDue()));         // next handoff's default, unchanged
+    }
+
+    public function test_a_partial_collection_leaves_the_remainder_unpaid_and_the_next_handoff_carries_it(): void
+    {
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Cod, status: OrderStatus::Delivered);
+        $order->handToCourier(today(), 53000);
+
+        $order->settleCourier(today(), 20000); // courier collected only part
+
+        $order->refresh();
+        $this->assertSame(33000, $order->balanceDue());                 // 53,000 − 20,000 remainder
+        $this->assertSame(20000, $order->deposit_mmk);
+        $this->assertSame(PaymentStatus::Unpaid, $order->payment_status);
+        $this->assertSame(33000, max(0, $order->balanceDue()));         // a re-handoff carries only the remainder
+    }
+
+    public function test_an_over_collection_at_settle_reads_as_overpaid(): void
+    {
+        // No cap on the entered amount — a genuine overpayment is honoured, per #67.
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Cod, status: OrderStatus::Delivered);
+        $order->handToCourier(today(), 53000);
+
+        $order->settleCourier(today(), 60000);
+
+        $order->refresh();
+        $this->assertSame(-7000, $order->balanceDue());
+        $this->assertSame(PaymentStatus::Paid, $order->payment_status); // balance ≤ 0 → paid
+    }
+
+    public function test_the_courier_settled_action_defaults_to_the_carried_balance_and_credits_it(): void
+    {
+        $this->actingAs($this->studioUser());
+        $order = $this->orderWithLines(itemsTotal: 50000, fee: 3000, method: PaymentMethod::Online, status: OrderStatus::Delivered);
+        $order->markPaid(50000);
+        $order->handToCourier(today(), 3000);
+
+        // no data → the action fills its default min(carried, balance) = 3,000
+        Livewire::test(ListOrders::class)
+            ->set('activeTab', 'all')
+            ->callTableAction('courierSettled', $order);
+
+        $order->refresh();
+        $this->assertSame(0, $order->balanceDue());
+        $this->assertNotNull($order->courier_settled_at);
+    }
+
     // ---- helper -----------------------------------------------------------
 
     private function orderWithLines(

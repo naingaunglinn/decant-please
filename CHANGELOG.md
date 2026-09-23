@@ -30,12 +30,22 @@ money; no schema change, no dependency.
 - **Dashboard "Balance outstanding"** replaces the payment-status-based "Unpaid orders":
   Σ positive per-order balances (item subtotal via a portable, shop-scoped `withSum`) over
   orders in play; overpaid and cancelled/rejected excluded, never netted.
+- **A settled courier delivery now credits what it collected** (found in review — a gap in
+  #67's spec the balance-based stat exposed). `settleCourier()` takes the amount collected
+  from the customer — a "Collected from customer" field on the Settle action, defaulting to
+  the carried balance, editable, `0` for a failed delivery — and adds it to `deposit_mmk`, so
+  a delivered order's fee (online) or full amount (COD) stops standing as a perpetual balance
+  and inflating "Balance outstanding". A clearing settle marks an Unpaid order paid (the
+  courier's cash is the payment); a partial leaves it Unpaid; an over-collection reads as
+  overpaid.
 - **Reconciled to the current repo** (the issue predates tenancy and #71/#75): the stat is
   shop-scoped and pinned in `TenantIsolationTest`; test fixtures that faked `total_mmk`
   without items now carry a real line, since `balanceDue()` is item-based.
-- **Suite 340 tests / 1,395 assertions** — new `PaymentReceivedTest` (capture defaults,
+- **Suite 346 tests / 1,419 assertions** — new `PaymentReceivedTest` (capture defaults,
   downward correction, prefill guard, discount rule, signed balance, invoice overpaid,
-  outstanding stat, signed receipt) plus a tenancy case. Postgres-portability green.
+  outstanding stat, signed receipt, and the courier-settle credit: online/COD clear,
+  failed-delivery no-op, partial remainder, over-collection) plus a tenancy case.
+  Postgres-portability green.
 
 ## 0.1 What changed in v33
 

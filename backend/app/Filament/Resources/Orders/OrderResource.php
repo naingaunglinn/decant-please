@@ -12,7 +12,6 @@ use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
-use App\Support\Money;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -265,15 +264,26 @@ class OrderResource extends Resource
             ->visible(fn (Order $record): bool => $record->handed_to_courier_at !== null
                 && $record->courier_settled_at === null)
             ->modalHeading('Courier settled')
-            ->modalDescription(fn (Order $record): string => 'Confirms '.Money::kyat((int) $record->courier_carrying_mmk).' reached you — the float lets go of this order.')
+            ->modalDescription('Records the cash the courier collected and handed back, then releases this order from the float.')
             ->modalSubmitActionLabel('Settled')
             ->schema([
                 DatePicker::make('date')
                     ->default(today())
                     ->required(),
+                TextInput::make('collected_mmk')
+                    ->label('Collected from customer')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->required()
+                    // Default = the balance they were carrying; editable down for a partial
+                    // or failed delivery (0 is fine). A settle that clears the balance marks
+                    // the order paid — the courier handing the cash over IS the payment.
+                    ->default(fn (Order $record): int => min((int) $record->courier_carrying_mmk, max(0, $record->balanceDue())))
+                    ->helperText('What the courier actually collected and handed back.'),
             ])
             ->action(function (Order $record, array $data): void {
-                $record->settleCourier(Carbon::parse($data['date']));
+                $record->settleCourier(Carbon::parse($data['date']), (int) $data['collected_mmk']);
 
                 Notification::make()->success()->title('Courier settled.')->send();
             })
