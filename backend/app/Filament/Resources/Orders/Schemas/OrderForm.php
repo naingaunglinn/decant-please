@@ -191,6 +191,11 @@ class OrderForm
                             ->label('Discount')
                             ->numeric()
                             ->minValue(0)
+                            // A discount can't exceed the item subtotal — re-checked on save
+                            // against the live repeater lines, so removing a line that
+                            // stranded a once-valid discount is caught (#67). The promo path
+                            // already caps at the subtotal; this closes the hand-entry writer.
+                            ->maxValue(fn (Get $get): int => self::liveItemsTotal($get))
                             ->default(0)
                             ->suffix('Ks')
                             ->live(onBlur: true)
@@ -209,9 +214,20 @@ class OrderForm
                         Placeholder::make('total')
                             ->content(fn (Get $get): string => Money::kyat(self::liveTotal($get))),
                         Placeholder::make('balance_due')
-                            ->content(fn (Get $get): string => Money::kyat(
-                                max(0, self::liveTotal($get) - (int) ($get('deposit_mmk') ?: 0))
-                            )),
+                            ->content(function (Get $get): string {
+                                // Same signed primitive as Order::balanceDue() and the
+                                // invoice — a negative reads as overpaid, never a clamped 0.
+                                $balance = Order::balanceDueFrom(
+                                    self::liveItemsTotal($get),
+                                    (int) ($get('discount_mmk') ?: 0),
+                                    (int) ($get('delivery_fee_mmk') ?: 0),
+                                    (int) ($get('deposit_mmk') ?: 0),
+                                );
+
+                                return $balance < 0
+                                    ? Money::kyat(0).' — overpaid by '.Money::kyat(-$balance)
+                                    : Money::kyat($balance);
+                            }),
                         Placeholder::make('gross_margin')
                             ->label('Gross margin (liquid only)')
                             // Saved-state figure, from the stored snapshots — unsaved
@@ -305,10 +321,14 @@ class OrderForm
      */
     protected static function liveTotal(Get $get): int
     {
-        $items = collect($get('items') ?? [])
-            ->sum(fn (array $item): int => (int) ($item['unit_price_mmk'] ?: 0) * (int) ($item['quantity'] ?: 0));
+        return max(0, self::liveItemsTotal($get) + (int) ($get('delivery_fee_mmk') ?: 0) - (int) ($get('discount_mmk') ?: 0));
+    }
 
-        return max(0, $items + (int) ($get('delivery_fee_mmk') ?: 0) - (int) ($get('discount_mmk') ?: 0));
+    /** The repeater's item subtotal — Σ unit_price × quantity — before fee and discount. */
+    protected static function liveItemsTotal(Get $get): int
+    {
+        return collect($get('items') ?? [])
+            ->sum(fn (array $item): int => (int) ($item['unit_price_mmk'] ?: 0) * (int) ($item['quantity'] ?: 0));
     }
 
     protected static function autofillUnitPrice(Get $get, Set $set): void

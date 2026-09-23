@@ -93,7 +93,7 @@ class CourierFloatTest extends TestCase
 
     private function order(int $total, int $deposit = 0, OrderStatus $status = OrderStatus::Decanted): Order
     {
-        return Order::create([
+        $order = Order::create([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
             'address' => 'Sanchaung, Yangon',
@@ -102,5 +102,16 @@ class CourierFloatTest extends TestCase
             'deposit_mmk' => $deposit,
             'total_mmk' => $total,
         ]);
+
+        // balanceDue() reads line snapshots since #67 — one item worth $total.
+        $order->items()->create([
+            'fragrance_id' => $this->itemFragrance()->id,
+            'fragrance_name_snapshot' => 'Fixture Brand Fixture',
+            'size_ml' => 10,
+            'unit_price_mmk' => $total,
+            'quantity' => 1,
+        ]);
+
+        return $order->refresh();
     }
 }

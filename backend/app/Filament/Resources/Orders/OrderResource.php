@@ -175,14 +175,26 @@ class OrderResource extends Resource
             ->icon(Heroicon::OutlinedBanknotes)
             ->color('success')
             ->visible(fn (Order $record): bool => $record->payment_status === PaymentStatus::Unpaid)
-            ->requiresConfirmation()
             ->modalHeading('Mark order paid')
-            ->modalDescription('Confirms the offline transfer landed and records the time.')
+            ->modalDescription('Confirms the offline transfer landed, records the time, and captures how much arrived.')
             ->modalSubmitActionLabel('Mark paid')
-            ->action(function (Order $record): void {
-                $record->markPaid();
+            ->schema([
+                TextInput::make('amount_received')
+                    ->label('Amount received')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->required()
+                    // Pre-fill: the larger of what this order should collect and any
+                    // deposit already recorded — a convenience, NOT a floor. Editing it
+                    // lower (a customer under-transferred) saves; markUnpaid never zeroes it.
+                    ->default(fn (Order $record): int => max($record->deposit_mmk, $record->amountReceivedDefault()))
+                    ->helperText('What actually landed (KBZPay/Wave/bank). Defaults to what this order should collect — edit if they sent more or less.'),
+            ])
+            ->action(function (Order $record, array $data): void {
+                $record->markPaid((int) $data['amount_received']);
 
-                Notification::make()->success()->title('Marked paid.')->send();
+                Notification::make()->success()->title('Marked paid — amount recorded.')->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
     }
@@ -231,7 +243,7 @@ class OrderResource extends Resource
                     ->numeric()
                     ->minValue(0)
                     ->suffix('Ks')
-                    ->default(fn (Order $record): int => $record->balanceDue())
+                    ->default(fn (Order $record): int => max(0, $record->balanceDue()))
                     ->required()
                     ->helperText('Defaults to the balance due right now — edit if you agreed something different.'),
             ])

@@ -83,6 +83,23 @@ class TenantIsolationTest extends TestCase
         ])->refresh();
     }
 
+    /** An unpaid order with one item worth $itemsTotal — a positive balance for the
+     *  outstanding stat, created in the CURRENT shop. */
+    private function orderWithBalance(int $itemsTotal): Order
+    {
+        $order = $this->makeOrder(OrderStatus::Pending, totalMmk: $itemsTotal);
+
+        $order->items()->create([
+            'fragrance_id' => $this->itemFragrance()->id,
+            'fragrance_name_snapshot' => 'Fixture Brand Fixture',
+            'size_ml' => 10,
+            'unit_price_mmk' => $itemsTotal,
+            'quantity' => 1,
+        ]);
+
+        return $order->refresh();
+    }
+
     /** One priced 10ml fragrance in the CURRENT shop's catalog (55,000 Ks). */
     private function makeFragrance(): Fragrance
     {
@@ -417,6 +434,25 @@ class TenantIsolationTest extends TestCase
             ->assertSee('70,000 Ks')       // A's revenue, exactly
             ->assertDontSee('999,999')     // never B's order…
             ->assertDontSee('1,069,999');  // …and never A+B pooled
+    }
+
+    public function test_balance_outstanding_is_scoped_to_the_shop(): void
+    {
+        // "Balance outstanding" (#67) sums per-order balances via a withSum subquery — a
+        // custom widget query Filament's own tenancy never scopes; the app scope isolates it.
+        $this->actingAs($this->studioUser());
+
+        $this->forShop($this->shopA);
+        $this->orderWithBalance(70000);
+
+        $this->forShop($this->shopB);
+        $this->orderWithBalance(444000);
+
+        $this->forShop($this->shopA);
+        Livewire::test(OrderStats::class)
+            ->assertSee('70,000 Ks')     // A's balance outstanding (and its revenue)
+            ->assertDontSee('444,000')   // never B's balance
+            ->assertDontSee('514,000');  // never A+B pooled
     }
 
     public function test_csv_export_contains_zero_other_shop_rows(): void

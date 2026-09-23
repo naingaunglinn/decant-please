@@ -4,7 +4,9 @@ namespace Tests;
 
 use App\Enums\Courier;
 use App\Enums\ShopStatus;
+use App\Models\Brand;
 use App\Models\DeliveryTownship;
+use App\Models\Fragrance;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -90,5 +92,21 @@ abstract class TestCase extends BaseTestCase
         );
 
         return $township;
+    }
+
+    /**
+     * A shared catalog fragrance for order-item fixtures. Since #67, balanceDue() and
+     * the "Balance outstanding" stat read line snapshots, so an order needs a real item —
+     * callers add one with unit_price_mmk = the intended line total. firstOrCreate keeps
+     * it to one per shop, idempotent across repeated helper calls in a test.
+     */
+    protected function itemFragrance(): Fragrance
+    {
+        $brand = Brand::firstOrCreate(['name' => 'Fixture Brand'], ['type' => 'designer']);
+
+        return $brand->fragrances()->firstOrCreate(
+            ['name' => 'Fixture'],
+            ['concentration' => 'edp', 'gender' => 'unisex'],
+        );
     }
 }
