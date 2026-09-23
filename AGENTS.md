@@ -6,15 +6,105 @@ Step specs → `prompts/NN-*.md`. Verification → `VERIFY.md`. Process → `pro
 
 ---
 
+## Principles — simple is timeless
+
+> Read this first. Every spec, issue, and implementation decision is judged against
+> these principles. If a request conflicts with them, say so in the PR instead of
+> quietly building around them.
+
+**In one line: enterprise-grade reliability, small-shop simplicity.** A seller should
+never lose data, money, or an order because of us — and should never have to learn
+anything to get that.
+
+Simple is timeless: a simple system is still understandable, fixable, and cheap to run
+years from now. Complexity ages; simplicity doesn't.
+
+### P1. Who we build for
+
+A one-person Myanmar social seller who runs the shop from a phone, on a slow or
+intermittent connection, and sells through chat (Telegram, Viber, TikTok) with COD or
+transfer-slip payments. Every screen, flow, and default is judged against that person —
+not against a hypothetical larger business.
+
+### P2. Reliability is never optional
+
+The "enterprise" half. Applies to every shop on every plan; never traded for speed.
+
+- Money is integer Kyat, derived server-side, never trusted from the client. Snapshots
+  are written once and never rewritten.
+- Personal data (payment proofs, addresses, phones) lives on private storage with no
+  public or presigned URL. Backups run nightly.
+- Side channels never break the core path: notifications, PDFs, and integrations are
+  time-bounded, log their errors, and can't fail or delay an order.
+- Anything touching money, stock, or personal data ships with tests; engine-specific
+  queries are verified on PostgreSQL, not only SQLite.
+
+### P3. Simple on the surface
+
+The "small shop" half.
+
+- The default is the smallest thing that works. A new feature adds no field, step, or
+  menu item for a shop that doesn't use it.
+- Extra power is an opt-in module, off unless the shop's template enables it.
+- The admin is mobile-first too: the core loop — see order → check slip → mark paid →
+  accept — works one-handed on a phone over a slow connection.
+- Plain words in the UI, in English and Burmese. No jargon a seller would have to ask
+  about.
+
+### P4. Simple underneath
+
+For the one developer who maintains all of it.
+
+- Fewer tables, fewer moving parts, fewer dependencies. JSON columns before normalized
+  option tables, until a real query needs more.
+- Configuration lives in code (templates, modules) until a real seller needs to edit it
+  themselves.
+- Fixed state machines with configurable labels — never configurable states.
+- Each business rule lives in one domain method; Filament, the API, and the storefront
+  call it, never re-derive it.
+- No new dependency without the PR stating what it replaces and what it costs on the
+  Heroku/Vercel build.
+
+### P5. Features follow real sellers
+
+- A feature needs a reason from a real shop: an issue quoting what the seller said or
+  did. "Nice to have" and "competitors have it" are not reasons.
+- Until the first real shops are live, the only work in scope is work that removes an
+  onboarding blocker — including making the product fit a new shop category.
+- Build the smallest version that answers the reason, and record what was deliberately
+  left out (the §8 pattern).
+- Unused features are candidates for hiding or removal. Less surface is less to learn,
+  break, and maintain.
+
+### P6. Before building, answer in the PR
+
+1. Which seller needs this, and what were they doing when they hit the problem?
+2. What does a shop that doesn't need it see after it ships? (The answer should be
+   "nothing new.")
+3. Core or module? If core, why does every shop need it?
+4. What is the smallest version?
+5. Does it touch money, stock, or personal data? Where are the tests?
+6. What was deliberately not built?
+
+---
+
 ## 1. What this is
 
-A **multi-tenant SaaS** for perfume decant resellers in Myanmar. One codebase serves many
-independent shops: each gets a Next.js storefront on its own domain (browse → guest
-checkout → track, no login, no payment gateway) and a Laravel + Filament admin panel
-scoped to its own data. The studio operator sees across all shops. Full brief in
-`PRODUCT.md`; tenancy design in `prompts/multi-tenancy-design.md`.
+A **multi-tenant SaaS** that lets a Myanmar social seller — in **any category** — run a
+shop from their phone. One codebase serves many independent shops: each gets a Next.js
+storefront on its own domain (browse → guest checkout → track, no login, no payment
+gateway) and a Laravel + Filament admin panel scoped to its own data. The studio operator
+sees across all shops. Full brief in `PRODUCT.md`; tenancy design in
+`prompts/multi-tenancy-design.md`.
 
-Older docs describe this as a single-decanter tool. They are superseded.
+**Decant is the first template, not the whole product.** The system is being generalized
+so one platform fits perfume decants, clothing, bakery pre-orders, cosmetics, and more —
+each category is a *template* (attributes, variants, status labels, default modules)
+defined in code. The generic-shop refactor is planned in `prompts/35-generic-shop-plan.md`
+(steps 35–42); **multi-tenancy is already built** (steps 23–25 in #58, plus 32–34) and the
+refactor builds on that seam.
+
+Older docs describe this as a single-decanter perfume tool. They are superseded.
 
 ## 2. Repo map
 
@@ -81,6 +171,16 @@ These are invariants, not preferences. Breaking one is a bug even if tests pass.
    See `PRODUCT.md` § Non-goals before adding anything in these areas.
 6. **Every list endpoint is paginated. Every query is eager-loaded** (no N+1).
 7. **Claude/Codex never merges a PR.** Open it and stop. See `prompts/WORKFLOW.md`.
+8. **Private data has no public or presigned URL** (P2). Payment proofs — and any object
+   on private storage — are served **only** through the panel's authenticated streaming
+   route (`PaymentProofViewController`): never a public disk, never a temporary/presigned
+   URL. The public API carries at most a `has_payment_proof` boolean, so losing a URL
+   leaks nothing. (Lifted from the vN history; enforced since v14/v20.)
+9. **Panel routes that must sit behind tenant auth go through `authenticatedRoutes()`**
+   (`authenticatedTenantRoutes()` on the tenant panel), **never `routes()`**. A `routes()`
+   closure sits outside the panel's auth + tenancy middleware — that misregistration once
+   streamed one shop's invoice under another shop's URL (§0). New panel routes for
+   invoices/proofs/exports belong in the authenticated group.
 
 ## 5. Working boundaries
 
@@ -131,6 +231,18 @@ A change is done when **all** of these hold, and you have said so with evidence:
 - **Next.js:** App Router, server components for catalog fetching, Tailwind v4 `@theme`
   in CSS (there is no `tailwind.config.ts` and there must not be), cart state client-only.
   Details in `frontend/AGENTS.md`.
+- **Event listeners are wired explicitly; discovery is off.** `bootstrap/app.php` sets
+  `->withEvents(discover: false)` and every listener is registered by hand in
+  `AppServiceProvider`. A new event/listener that isn't wired there simply never fires —
+  add it explicitly, don't rely on auto-discovery.
+- **Date windows use `whereDate`; dates cross the wire as bare `Y-m-d` strings.** Report
+  and dashboard date filters use `whereDate` (`MonthlyPnl`, `OrderStats`, `Order`,
+  `ListOrders`), not string ranges or raw casts. The API emits **and** accepts dates as
+  bare `Y-m-d` (`decant_date`, `delivery_date`), never ISO datetimes — the storefront and
+  the contract in `frontend/src/lib/types.ts` depend on that.
+- **Tests never reach a real Telegram bot.** `phpunit.xml` pins
+  `TELEGRAM_BOT_TOKEN`/`TELEGRAM_ADMIN_CHAT_ID` blank with `force="true"`; keep them blank
+  so the suite exercises the "unconfigured" path and never sends.
 - **Stack versions are fixed** — Laravel 13, Filament 5, PHP 8.3+, Postgres 17,
   Next.js 16, Node 24 LTS, TypeScript 5, Tailwind 4. Do not substitute or "upgrade"
   as a side effect of another task.

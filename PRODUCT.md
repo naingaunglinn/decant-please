@@ -8,24 +8,32 @@ Multi-tenancy design and its ADRs live in `prompts/multi-tenancy-design.md`.
 
 ## What this is
 
-A **multi-tenant SaaS** for perfume decant resellers in Myanmar. One codebase serves
-many independent shops. Each shop gets a storefront on its own domain and an admin panel
-scoped to its own data; the studio operator sees across all of them.
+A **multi-tenant SaaS** for Myanmar social sellers — in **any category** — who run a shop
+from their phone. One codebase serves many independent shops. Each shop gets a storefront
+on its own domain and an admin panel scoped to its own data; the studio operator sees
+across all of them.
+
+**Decant is the first template, not the whole product.** The platform is being generalized
+so it fits perfume decants, clothing, bakery pre-orders, cosmetics, and more — each category
+is a *template* (attributes, variants, status labels, default modules) defined in code
+(see `prompts/35-generic-shop-plan.md`). Perfume-decant vocabulary elsewhere in this file is
+the first template's flavour, not a scope limit.
 
 **The shorthand is "one backend, many storefronts"** — one Laravel instance and one
 database serving every shop, with a separate storefront deployment per shop domain.
 Writing it the other way round has caused confusion twice; don't.
 
-Formerly a single-decanter tool. That is no longer true, and any statement in an older
-doc describing it as "a one-person business tool" or listing multi-tenancy as out of
-scope is superseded by this file.
+Formerly a single-decanter, perfume-only tool. Neither is true now: it is a multi-tenant
+platform being generalized across shop categories. Any older doc describing it as "a
+one-person business tool", as perfume-only, or listing multi-tenancy as out of scope is
+superseded by this file.
 
 ## WHO — three roles, not one
 
 | Role | Who | Uses |
 |---|---|---|
 | **Studio operator** | you | cross-shop views, onboarding a new shop, billing |
-| **Shop owner** (the paying customer) | a decant reseller in Myanmar. Not technical. Runs the business on TikTok/Facebook today. Phone-first. | Filament admin, scoped to their shop |
+| **Shop owner** (the paying customer) | a social seller in Myanmar (perfume decants today; clothing, bakery, cosmetics next). Not technical. Runs the business on TikTok/Facebook/Viber today. Phone-first. | Filament admin, scoped to their shop |
 | **End customer** | buys decants from a shop. No account, mobile-first. | that shop's storefront |
 
 The product is sold to the **shop owner**. Their end customers are the reason it's worth
@@ -34,10 +42,11 @@ shop owner's day when the two conflict.
 
 ## WHY
 
-Decant resellers lose orders in DMs: customers can't see what's in stock, and the seller
+Social sellers lose orders in DMs: customers can't see what's in stock, and the seller
 re-answers the same question all day. Existing e-commerce platforms don't fit — no
-Myanmar payment rails, no decant-sized pricing model, no Kyat-native money handling, and
-a monthly price that doesn't work at Myanmar small-business scale.
+Myanmar payment rails, no variant-sized pricing that suits how these shops sell (decants
+by the ml, clothes by size/colour, bakery by pre-order), no Kyat-native money handling,
+and a monthly price that doesn't work at Myanmar small-business scale.
 
 ## WHAT
 
