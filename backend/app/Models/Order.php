@@ -369,6 +369,13 @@ class Order extends Model
             throw new LogicException('Only orders handed to a courier can be settled.');
         }
 
+        // Settling moves money now, so a repeat would double-credit — guard it in the
+        // domain method, not just the action's visibility. A re-handoff clears
+        // courier_settled_at, so a genuine re-delivery still settles.
+        if ($this->courier_settled_at !== null) {
+            throw new LogicException('This order has already been settled — hand it off again to re-deliver.');
+        }
+
         $this->deposit_mmk += max(0, $collectedMmk);
 
         if ($this->payment_status === PaymentStatus::Unpaid && $this->balanceDue() <= 0) {

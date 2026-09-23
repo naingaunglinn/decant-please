@@ -294,6 +294,17 @@ class PaymentReceivedTest extends TestCase
         $this->assertSame(PaymentStatus::Paid, $order->payment_status); // balance ≤ 0 → paid
     }
 
+    public function test_settling_a_second_time_throws_and_never_double_credits(): void
+    {
+        $order = $this->orderWithLines(itemsTotal: 50000, method: PaymentMethod::Cod, status: OrderStatus::Delivered);
+        $order->handToCourier(today(), 50000);
+        $order->settleCourier(today(), 50000);
+        $this->assertSame(50000, $order->fresh()->deposit_mmk); // credited exactly once
+
+        $this->expectException(\LogicException::class);
+        $order->settleCourier(today(), 50000); // a repeat must not add another 50,000
+    }
+
     public function test_the_courier_settled_action_defaults_to_the_carried_balance_and_credits_it(): void
     {
         $this->actingAs($this->studioUser());

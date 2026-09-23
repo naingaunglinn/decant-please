@@ -37,15 +37,16 @@ money; no schema change, no dependency.
   a delivered order's fee (online) or full amount (COD) stops standing as a perpetual balance
   and inflating "Balance outstanding". A clearing settle marks an Unpaid order paid (the
   courier's cash is the payment); a partial leaves it Unpaid; an over-collection reads as
-  overpaid.
+  overpaid. A repeat settle throws (a domain guard, like the handoff guard), so a
+  double-submit can't double-credit.
 - **Reconciled to the current repo** (the issue predates tenancy and #71/#75): the stat is
   shop-scoped and pinned in `TenantIsolationTest`; test fixtures that faked `total_mmk`
   without items now carry a real line, since `balanceDue()` is item-based.
-- **Suite 346 tests / 1,419 assertions** — new `PaymentReceivedTest` (capture defaults,
+- **Suite 347 tests / 1,421 assertions** — new `PaymentReceivedTest` (capture defaults,
   downward correction, prefill guard, discount rule, signed balance, invoice overpaid,
   outstanding stat, signed receipt, and the courier-settle credit: online/COD clear,
-  failed-delivery no-op, partial remainder, over-collection) plus a tenancy case.
-  Postgres-portability green.
+  failed-delivery no-op, partial remainder, over-collection, double-settle guard) plus a
+  tenancy case. Postgres-portability green.
 
 ## 0.1 What changed in v33
 

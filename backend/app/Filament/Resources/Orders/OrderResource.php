@@ -12,6 +12,7 @@ use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
+use App\Support\Money;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -188,7 +189,12 @@ class OrderResource extends Resource
                     // deposit already recorded — a convenience, NOT a floor. Editing it
                     // lower (a customer under-transferred) saves; markUnpaid never zeroes it.
                     ->default(fn (Order $record): int => max($record->deposit_mmk, $record->amountReceivedDefault()))
-                    ->helperText('What actually landed (KBZPay/Wave/bank). Defaults to what this order should collect — edit if they sent more or less.'),
+                    // When a deposit already exists (e.g. a courier collected part), this
+                    // field is the TOTAL received — markPaid() sets it, not adds — so name
+                    // what's already recorded, or a seller types just the latest transfer.
+                    ->helperText(fn (Order $record): string => $record->deposit_mmk > 0
+                        ? 'Total received for this order, including '.Money::kyat($record->deposit_mmk).' already recorded — enter the full amount now in hand, not just the latest transfer.'
+                        : 'What actually landed (KBZPay/Wave/bank). Defaults to what this order should collect — edit if they sent more or less.'),
             ])
             ->action(function (Order $record, array $data): void {
                 $record->markPaid((int) $data['amount_received']);
