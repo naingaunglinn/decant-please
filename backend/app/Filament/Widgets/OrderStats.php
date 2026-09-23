@@ -19,12 +19,25 @@ class OrderStats extends StatsOverviewWidget
             ->where('created_at', '>=', now()->startOfMonth())
             ->sum('total_mmk');
 
-        // Money owed: unpaid orders still in play (not cancelled/rejected).
-        $unpaid = Order::query()
-            ->unpaid()
-            ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]);
-        $unpaidCount = $unpaid->clone()->count();
-        $owed = max(0, (int) $unpaid->clone()->sum('total_mmk') - (int) $unpaid->clone()->sum('deposit_mmk'));
+        // Balance outstanding: Σ positive per-order balances (Σ line_total − discount +
+        // fee − deposit) over orders still in play. Keyed off balance > 0, NOT
+        // payment_status — a "paid" order with a partial deposit still owes, and an
+        // unpaid order fully deposited owes nothing (#67). The item subtotal comes from a
+        // withSum correlated subquery (portable, and shop-scoped like the outer query, so
+        // no shop's lines enter another's total); positives are summed in PHP because a
+        // positive-only sum can't be one portable aggregate over that subquery. Overpaid
+        // (negative) balances are excluded, never netted against what is owed.
+        $outstandingBalances = Order::query()
+            ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected])
+            ->withSum('items as items_total_mmk', 'line_total_mmk')
+            ->get()
+            ->map(fn (Order $order): int => Order::balanceDueFrom(
+                (int) ($order->items_total_mmk ?? 0),
+                $order->discount_mmk,
+                $order->delivery_fee_mmk,
+                $order->deposit_mmk,
+            ))
+            ->filter(fn (int $balance): bool => $balance > 0);
 
         // Gross margin (liquid only) — same window and status exclusion as the
         // revenue stat beside it (awaiting_confirmation included, matching it).
@@ -48,9 +61,9 @@ class OrderStats extends StatsOverviewWidget
             Stat::make('Gross margin (liquid only)', Money::kyat((int) $orderMargins->sum()))
                 ->description("Excludes vial, label, spillage & delivery — on {$orderMargins->count()} of {$monthOrders->count()} orders"),
             Stat::make('Orders this month', Order::where('created_at', '>=', now()->startOfMonth())->count()),
-            Stat::make('Unpaid orders', $unpaidCount)
-                ->description(Money::kyat($owed).' outstanding')
-                ->color($unpaidCount > 0 ? 'warning' : 'gray'),
+            Stat::make('Balance outstanding', Money::kyat((int) $outstandingBalances->sum()))
+                ->description($outstandingBalances->count().' order(s) with a balance due')
+                ->color($outstandingBalances->isNotEmpty() ? 'warning' : 'gray'),
             Stat::make('Awaiting confirmation', Order::where('status', OrderStatus::AwaitingConfirmation)->count())
                 ->description('Needs review')
                 ->color('warning'),

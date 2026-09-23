@@ -66,9 +66,11 @@ the step-38 gate, because their order and scope are decided then.
 
 ## Branching (deliberate override of `WORKFLOW.md`)
 
-Branches **stack**: step 35 off fresh `develop`; each later step off the **previous step's
-branch**; each PR targets the **previous branch**. The owner merges them in order. I never
-merge, never touch `main`. Commits/PRs carry the owner's name alone.
+Branches **stack**, with **#67 at the bottom** (owner's amendment 1): the
+`67-payment-received-capture` branch is cut off fresh `develop`, and **step 35 branches off
+`67-payment-received-capture`**; each later step off the **previous step's branch**; each PR
+targets the branch below it. The owner merges them in order. I never merge, never touch
+`main`. Commits/PRs carry the owner's name alone.
 
 ## Before each PR opens (Definition of done)
 

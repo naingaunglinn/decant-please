@@ -32,7 +32,7 @@ class CourierFloatTest extends TestCase
         $this->assertSame(50000, $order->courier_carrying_mmk);
         $this->assertNull($order->courier_settled_at);
 
-        $order->settleCourier(today()->addDay());
+        $order->settleCourier(today()->addDay(), 50000); // courier collected the full balance
         $this->assertTrue($order->refresh()->courier_settled_at->isTomorrow());
     }
 
@@ -40,7 +40,7 @@ class CourierFloatTest extends TestCase
     {
         $this->expectException(LogicException::class);
 
-        $this->order(total: 65000)->settleCourier(today());
+        $this->order(total: 65000)->settleCourier(today(), 0);
     }
 
     public function test_marking_paid_after_handoff_never_shrinks_the_float(): void
@@ -66,7 +66,7 @@ class CourierFloatTest extends TestCase
 
         $settled = $this->order(total: 20000);
         $settled->handToCourier(today()->subDay(), 20000);
-        $settled->settleCourier(today());
+        $settled->settleCourier(today(), 20000);
 
         // §4: a cancelled order's cash is a refund conversation, not float.
         $cancelledOut = $this->order(total: 99000, status: OrderStatus::AwaitingConfirmation);
@@ -93,7 +93,7 @@ class CourierFloatTest extends TestCase
 
     private function order(int $total, int $deposit = 0, OrderStatus $status = OrderStatus::Decanted): Order
     {
-        return Order::create([
+        $order = Order::create([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
             'address' => 'Sanchaung, Yangon',
@@ -102,5 +102,16 @@ class CourierFloatTest extends TestCase
             'deposit_mmk' => $deposit,
             'total_mmk' => $total,
         ]);
+
+        // balanceDue() reads line snapshots since #67 — one item worth $total.
+        $order->items()->create([
+            'fragrance_id' => $this->itemFragrance()->id,
+            'fragrance_name_snapshot' => 'Fixture Brand Fixture',
+            'size_ml' => 10,
+            'unit_price_mmk' => $total,
+            'quantity' => 1,
+        ]);
+
+        return $order->refresh();
     }
 }

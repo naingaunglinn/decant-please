@@ -48,13 +48,15 @@ class PaymentTest extends TestCase
         $this->assertNull($order->fresh()->paid_at);
     }
 
-    public function test_balance_due_subtracts_the_deposit(): void
+    public function test_balance_due_is_signed_and_subtracts_the_deposit(): void
     {
         $order = $this->order(total: 55000, deposit: 20000);
         $this->assertSame(35000, $order->balanceDue());
 
-        // never negative, even if a deposit somehow exceeds the total
-        $this->assertSame(0, $this->order(total: 10000, deposit: 15000)->balanceDue());
+        // Signed since #67: an overpayment reads as a negative balance (the invoice
+        // prints "Overpaid by", the storefront shows an overpaid state), never a
+        // clamped 0. Here 10,000 owed − 15,000 received = −5,000.
+        $this->assertSame(-5000, $this->order(total: 10000, deposit: 15000)->balanceDue());
     }
 
     public function test_deleting_an_order_removes_its_proof_file(): void
@@ -314,13 +316,13 @@ class PaymentTest extends TestCase
             ->assertCanNotSeeTableRecords([$paid]);
     }
 
-    public function test_dashboard_shows_unpaid_count_and_outstanding_amount(): void
+    public function test_dashboard_shows_balance_outstanding(): void
     {
         $this->actingAsAdmin();
         $this->order(status: OrderStatus::Pending, total: 55000, deposit: 5000); // owes 50,000
 
         Livewire::test(OrderStats::class)
-            ->assertSee('Unpaid orders')
+            ->assertSee('Balance outstanding')
             ->assertSee('50,000 Ks');
     }
 
@@ -340,7 +342,7 @@ class PaymentTest extends TestCase
         int $total = 55000,
         int $deposit = 0,
     ): Order {
-        return Order::create([
+        $order = Order::create([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-771234561',
             'address' => 'Sanchaung, Yangon',
@@ -348,7 +350,19 @@ class PaymentTest extends TestCase
             'status' => $status,
             'total_mmk' => $total,
             'deposit_mmk' => $deposit,
-        ])->refresh();
+        ]);
+
+        // balanceDue()/outstanding read line snapshots since #67 — give the order one
+        // item worth $total (no fee/discount, so total_mmk stays $total and conforms).
+        $order->items()->create([
+            'fragrance_id' => $this->itemFragrance()->id,
+            'fragrance_name_snapshot' => 'Fixture Brand Fixture',
+            'size_ml' => 10,
+            'unit_price_mmk' => $total,
+            'quantity' => 1,
+        ]);
+
+        return $order->refresh();
     }
 
     private function actingAsAdmin(): void

@@ -328,11 +328,13 @@ class TelegramAlertTest extends TestCase
             'fragrance_id' => $price->fragrance_id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => $price->size_ml,
-            'unit_price_mmk' => $price->price_mmk,
+            // One line worth $total so the item-based balanceDue() (since #67) matches
+            // total_mmk — the fixture previously set a 110k total against a 55k line.
+            'unit_price_mmk' => $total,
             'quantity' => 1,
         ]);
 
-        return $order;
+        return $order->refresh();
     }
 
     private function uploadProof(Order $order)

@@ -295,13 +295,38 @@ class Order extends Model
 
     /**
      * The decanter confirms an offline transfer landed. Payment is manual and
-     * out-of-band (KBZPay/Wave/bank); this only records the confirmation.
+     * out-of-band (KBZPay/Wave/bank); this records the confirmation and, when the
+     * caller passes it, the amount actually received into deposit_mmk (#67). The
+     * amount is editable in both directions — customers transfer the wrong sum in
+     * both — so a downward correction is honoured, never floored to the prior deposit.
      */
-    public function markPaid(): void
+    public function markPaid(?int $amountReceived = null): void
     {
+        if ($amountReceived !== null) {
+            $this->deposit_mmk = max(0, $amountReceived);
+        }
+
         $this->payment_status = PaymentStatus::Paid;
         $this->paid_at = now();
         $this->save();
+    }
+
+    /**
+     * The Mark-paid capture's default "amount received", derived from the line
+     * snapshots and the discount — never the composite total_mmk. Online orders
+     * prepay the discounted item subtotal; COD adds the delivery fee the courier
+     * collects on top. This is only the pre-fill; the decanter edits it to the sum
+     * that actually landed.
+     */
+    public function amountReceivedDefault(): int
+    {
+        $this->loadMissing('items');
+
+        $itemsNet = max(0, (int) $this->items->sum('line_total_mmk') - $this->discount_mmk);
+
+        return $this->payment_method === PaymentMethod::Cod
+            ? $itemsNet + $this->delivery_fee_mmk
+            : $itemsNet;
     }
 
     /** Undo a confirmation — a mistaken "paid", or a bounced transfer. */
@@ -329,11 +354,32 @@ class Order extends Model
         $this->save();
     }
 
-    /** The courier handed the cash over — the float lets go of this order. */
-    public function settleCourier(CarbonInterface $date): void
+    /**
+     * The courier handed the collected cash over. Records what they *actually* collected as
+     * received (#67) — the caller passes it, never assumed from the handoff snapshot, so a
+     * failed delivery (0) or a short collection credits only what arrived. Uncapped, like
+     * Mark paid: a genuine overpayment reads as overpaid. A settle that clears the balance
+     * is itself the payment — an Unpaid order flips to Paid (the saving hook stamps
+     * paid_at); a partial leaves it Unpaid. The credit lands at settle (cash in hand), so
+     * the float's handoff snapshot is never shrunk early; then the float lets go.
+     */
+    public function settleCourier(CarbonInterface $date, int $collectedMmk): void
     {
         if ($this->handed_to_courier_at === null) {
             throw new LogicException('Only orders handed to a courier can be settled.');
+        }
+
+        // Settling moves money now, so a repeat would double-credit — guard it in the
+        // domain method, not just the action's visibility. A re-handoff clears
+        // courier_settled_at, so a genuine re-delivery still settles.
+        if ($this->courier_settled_at !== null) {
+            throw new LogicException('This order has already been settled — hand it off again to re-deliver.');
+        }
+
+        $this->deposit_mmk += max(0, $collectedMmk);
+
+        if ($this->payment_status === PaymentStatus::Unpaid && $this->balanceDue() <= 0) {
+            $this->payment_status = PaymentStatus::Paid;
         }
 
         $this->courier_settled_at = $date;
@@ -364,10 +410,38 @@ class Order extends Model
         return $query->where('payment_status', PaymentStatus::Unpaid);
     }
 
-    /** Money still owed after any partial deposit — the figure the receipt emphasises. */
+    /**
+     * Money still owed, SIGNED — a negative value means the customer overpaid (#67).
+     * Computed from the line snapshots, not the composite total_mmk, so it never
+     * inherits total_mmk's max(0, …) clamp (which would swallow the delivery fee for a
+     * discount that exceeds the item subtotal — a state the order form now rejects,
+     * see OrderForm's discount rule). For any order whose discount ≤ item subtotal this
+     * equals total_mmk − deposit exactly; the primitive form only diverges on a legacy
+     * over-discounted row. Presentation of a negative is each surface's job: the invoice
+     * prints "Overpaid by X", the storefront receipt/panel show an overpaid state (#70).
+     */
     public function balanceDue(): int
     {
-        return max(0, $this->total_mmk - $this->deposit_mmk);
+        $this->loadMissing('items');
+
+        return self::balanceDueFrom(
+            (int) $this->items->sum('line_total_mmk'),
+            $this->discount_mmk,
+            $this->delivery_fee_mmk,
+            $this->deposit_mmk,
+        );
+    }
+
+    /**
+     * The one balance-due arithmetic, shared verbatim by the model, the invoice, the
+     * order-form live preview, and the Mark-paid capture default, so they can never
+     * disagree (#67). Signed: positive = still owed, negative = overpaid. The delivery
+     * fee is on the collect side; the deposit reduces it. Takes primitives, never
+     * total_mmk — one arithmetic, not two that happen to agree in the common case.
+     */
+    public static function balanceDueFrom(int $itemsTotalMmk, int $discountMmk, int $deliveryFeeMmk, int $depositMmk): int
+    {
+        return $itemsTotalMmk - $discountMmk + $deliveryFeeMmk - $depositMmk;
     }
 
     /**

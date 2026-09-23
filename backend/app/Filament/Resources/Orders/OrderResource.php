@@ -175,14 +175,31 @@ class OrderResource extends Resource
             ->icon(Heroicon::OutlinedBanknotes)
             ->color('success')
             ->visible(fn (Order $record): bool => $record->payment_status === PaymentStatus::Unpaid)
-            ->requiresConfirmation()
             ->modalHeading('Mark order paid')
-            ->modalDescription('Confirms the offline transfer landed and records the time.')
+            ->modalDescription('Confirms the offline transfer landed, records the time, and captures how much arrived.')
             ->modalSubmitActionLabel('Mark paid')
-            ->action(function (Order $record): void {
-                $record->markPaid();
+            ->schema([
+                TextInput::make('amount_received')
+                    ->label('Amount received')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->required()
+                    // Pre-fill: the larger of what this order should collect and any
+                    // deposit already recorded — a convenience, NOT a floor. Editing it
+                    // lower (a customer under-transferred) saves; markUnpaid never zeroes it.
+                    ->default(fn (Order $record): int => max($record->deposit_mmk, $record->amountReceivedDefault()))
+                    // When a deposit already exists (e.g. a courier collected part), this
+                    // field is the TOTAL received — markPaid() sets it, not adds — so name
+                    // what's already recorded, or a seller types just the latest transfer.
+                    ->helperText(fn (Order $record): string => $record->deposit_mmk > 0
+                        ? 'Total received for this order, including '.Money::kyat($record->deposit_mmk).' already recorded — enter the full amount now in hand, not just the latest transfer.'
+                        : 'What actually landed (KBZPay/Wave/bank). Defaults to what this order should collect — edit if they sent more or less.'),
+            ])
+            ->action(function (Order $record, array $data): void {
+                $record->markPaid((int) $data['amount_received']);
 
-                Notification::make()->success()->title('Marked paid.')->send();
+                Notification::make()->success()->title('Marked paid — amount recorded.')->send();
             })
             ->after(fn (Order $record, Component $livewire) => self::refreshEditPage($record, $livewire));
     }
@@ -231,7 +248,7 @@ class OrderResource extends Resource
                     ->numeric()
                     ->minValue(0)
                     ->suffix('Ks')
-                    ->default(fn (Order $record): int => $record->balanceDue())
+                    ->default(fn (Order $record): int => max(0, $record->balanceDue()))
                     ->required()
                     ->helperText('Defaults to the balance due right now — edit if you agreed something different.'),
             ])
@@ -253,15 +270,26 @@ class OrderResource extends Resource
             ->visible(fn (Order $record): bool => $record->handed_to_courier_at !== null
                 && $record->courier_settled_at === null)
             ->modalHeading('Courier settled')
-            ->modalDescription(fn (Order $record): string => 'Confirms '.Money::kyat((int) $record->courier_carrying_mmk).' reached you — the float lets go of this order.')
+            ->modalDescription('Records the cash the courier collected and handed back, then releases this order from the float.')
             ->modalSubmitActionLabel('Settled')
             ->schema([
                 DatePicker::make('date')
                     ->default(today())
                     ->required(),
+                TextInput::make('collected_mmk')
+                    ->label('Collected from customer')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->required()
+                    // Default = the balance they were carrying; editable down for a partial
+                    // or failed delivery (0 is fine). A settle that clears the balance marks
+                    // the order paid — the courier handing the cash over IS the payment.
+                    ->default(fn (Order $record): int => min((int) $record->courier_carrying_mmk, max(0, $record->balanceDue())))
+                    ->helperText('What the courier actually collected and handed back.'),
             ])
             ->action(function (Order $record, array $data): void {
-                $record->settleCourier(Carbon::parse($data['date']));
+                $record->settleCourier(Carbon::parse($data['date']), (int) $data['collected_mmk']);
 
                 Notification::make()->success()->title('Courier settled.')->send();
             })

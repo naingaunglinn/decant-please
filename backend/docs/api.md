@@ -283,9 +283,17 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
   "promo_code": "WELCOME10",         // null when no code was used
   "deposit_mmk": 0,
   "total_mmk": 68400,
-  "total_formatted": "68,400 Ks"
+  "total_formatted": "68,400 Ks",
+  "balance_due_mmk": 68400           // SIGNED — negative means overpaid (see below)
 }
 ```
+
+`balance_due_mmk` is the one money field that can be **negative** (#67): it is
+`Σ line_total − discount + delivery_fee − deposit`, derived from the line snapshots so a
+hand-edited discount can't distort it. A negative value means the customer **overpaid** —
+render an overpaid state, not a debt; `0` means settled. (This receipt also carries
+`payment_status`, `payment_method`, `has_payment_proof`, and `paid_at` from the payment
+steps; they are documented in the panel, not re-listed here.)
 
 `status` is one of `awaiting_confirmation | pending | decanted | delivered |
 cancelled | rejected`; `status_label` is its human-ready form. Statuses only move

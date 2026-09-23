@@ -9,7 +9,46 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v33
+## 0. What changed in v34
+
+**v34** fixes **#67** — record the amount received at payment confirmation so balance due
+is real (backend half; the storefront's signed/overpaid tolerance shipped in #70). Touches
+money; no schema change, no dependency.
+
+- **Mark paid captures "Amount received"** into `deposit_mmk`. The default is derived from
+  the line snapshots, never `total_mmk`: online = `Σ line_total − discount`; COD adds the
+  delivery fee. Editable in both directions (the pre-fill `max(existing, default)` is a
+  convenience, not a floor); `markUnpaid()` leaves it.
+- **`balanceDue()` is now one signed arithmetic**, shared verbatim by the model, the A5
+  invoice, the order-form preview, and the mark-paid default via
+  `Order::balanceDueFrom(items, discount, fee, deposit)`. Negative = overpaid (the invoice
+  prints "Overpaid by"; the tracking receipt carries a signed `balance_due_mmk`). Computed
+  from line snapshots, so it never inherits `total_mmk`'s clamp; `total_mmk` /
+  `recalculateTotal()` are untouched (revenue reads them).
+- **The order form rejects a discount that exceeds the item subtotal** (re-checked on save
+  against the live lines), closing the only writer that could — the promo path already caps.
+- **Dashboard "Balance outstanding"** replaces the payment-status-based "Unpaid orders":
+  Σ positive per-order balances (item subtotal via a portable, shop-scoped `withSum`) over
+  orders in play; overpaid and cancelled/rejected excluded, never netted.
+- **A settled courier delivery now credits what it collected** (found in review — a gap in
+  #67's spec the balance-based stat exposed). `settleCourier()` takes the amount collected
+  from the customer — a "Collected from customer" field on the Settle action, defaulting to
+  the carried balance, editable, `0` for a failed delivery — and adds it to `deposit_mmk`, so
+  a delivered order's fee (online) or full amount (COD) stops standing as a perpetual balance
+  and inflating "Balance outstanding". A clearing settle marks an Unpaid order paid (the
+  courier's cash is the payment); a partial leaves it Unpaid; an over-collection reads as
+  overpaid. A repeat settle throws (a domain guard, like the handoff guard), so a
+  double-submit can't double-credit.
+- **Reconciled to the current repo** (the issue predates tenancy and #71/#75): the stat is
+  shop-scoped and pinned in `TenantIsolationTest`; test fixtures that faked `total_mmk`
+  without items now carry a real line, since `balanceDue()` is item-based.
+- **Suite 347 tests / 1,421 assertions** — new `PaymentReceivedTest` (capture defaults,
+  downward correction, prefill guard, discount rule, signed balance, invoice overpaid,
+  outstanding stat, signed receipt, and the courier-settle credit: online/COD clear,
+  failed-delivery no-op, partial remainder, over-collection, double-settle guard) plus a
+  tenancy case. Postgres-portability green.
+
+## 0.1 What changed in v33
 
 **v33** is a **docs-only** foundation for the generic-shop refactor — Decant becomes the
 first *template*, not the whole product. No code, no migrations, no dependency change.

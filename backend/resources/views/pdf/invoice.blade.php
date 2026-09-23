@@ -97,7 +97,9 @@
 @foreach ($orders as $order)
     @php
         $subtotal = (int) $order->items->sum('line_total_mmk');
-        $balanceDue = max(0, $order->total_mmk - $order->deposit_mmk);
+        // Signed balance, shared verbatim with Order::balanceDue() and the storefront
+        // receipt: a negative means the customer overpaid. Collect is max(0, balance).
+        $balanceDue = \App\Models\Order::balanceDueFrom($subtotal, $order->discount_mmk, $order->delivery_fee_mmk, $order->deposit_mmk);
     @endphp
     <div @if (! $loop->last) style="page-break-after: always;" @endif>
         <p class="letterhead">Decant Please!</p>
@@ -183,8 +185,14 @@
             @endif
             <tr class="balance">
                 <td class="row-label">Balance due</td>
-                <td class="num">{{ Money::kyat($balanceDue) }}</td>
+                <td class="num">{{ Money::kyat(max(0, $balanceDue)) }}</td>
             </tr>
+            @if ($balanceDue < 0)
+                <tr>
+                    <td class="row-label">Overpaid by</td>
+                    <td class="num">{{ Money::kyat(-$balanceDue) }}</td>
+                </tr>
+            @endif
         </table>
 
         <p class="note">No online payment is taken — payment is arranged by bank transfer, mobile banking, or cash on delivery once the order is confirmed.</p>
