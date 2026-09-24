@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -54,9 +55,14 @@ class UserFactory extends Factory
     public function studio(): static
     {
         return $this->afterCreating(function (User $user): void {
-            if (Schema::hasTable('roles') && Role::where('name', 'studio_admin')->exists()) {
-                $user->assignRole('studio_admin');
+            // Fail loud if the role isn't seeded. A silent skip would leave the
+            // user role-less, and a test that calls ->studio() and expects a
+            // denial would then pass for the wrong reason (issue #110 review).
+            if (! Schema::hasTable('roles') || ! Role::where('name', 'studio_admin')->exists()) {
+                throw new RuntimeException('UserFactory::studio() requires the studio_admin role — run the role migration before creating a studio user.');
             }
+
+            $user->assignRole('studio_admin');
         });
     }
 }
