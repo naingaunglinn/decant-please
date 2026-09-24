@@ -37,7 +37,7 @@ class ShopResource extends Resource
 
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->is_studio;
+        return (bool) auth()->user()?->isStudioAdmin();
     }
 
     public static function form(Schema $schema): Schema

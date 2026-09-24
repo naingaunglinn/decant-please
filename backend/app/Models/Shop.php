@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ShopStatus;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -78,9 +79,20 @@ class Shop extends Model
         ])->save();
     }
 
-    /** Suspend — reason + actor are required (Step 34 §1); storefront/API then 404. */
+    /**
+     * Suspend — reason + actor are required (Step 34 §1); storefront/API then 404.
+     *
+     * Authorization lives HERE, in the one domain method, not in a future UI action
+     * (issue #110): suspending a shop is a platform-admin power, so only a
+     * studio_admin may do it. Any UI that wires this — when it ships — inherits the
+     * guard for free instead of having to re-remember it (AGENTS.md P4).
+     */
     public function suspend(User $actor, string $reason): void
     {
+        if (! $actor->isStudioAdmin()) {
+            throw new AuthorizationException('Only a studio_admin can suspend a shop.');
+        }
+
         $reason = trim($reason);
 
         if ($reason === '') {

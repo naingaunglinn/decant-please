@@ -22,8 +22,8 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
  * shop. No ->tenant(): everything here is cross-shop by nature, starting with the
  * shop registry (App\Filament\Studio\Resources); the 25b features that belong to
  * no single shop (all-shops dashboard, per-tenant Telegram, theming) land here
- * too. Entry is gated by User::canAccessPanel — is_studio only; a future shop
- * owner's login reaches only the tenant panel (/admin/{shop}).
+ * too. Entry is gated by User::canAccessPanel — the studio_admin role only; a
+ * future shop owner's login reaches only the tenant panel (/admin/{shop}).
  *
  * Same session guard as the admin panel, so one login serves both; the emerald
  * primary (vs the shop panel's amber) is the "which panel am I in?" cue.

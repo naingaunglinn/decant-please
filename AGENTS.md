@@ -223,6 +223,8 @@ A change is done when **all** of these hold, and you have said so with evidence:
 - [ ] No unrelated module was modified
 - [ ] Docs updated in the same branch: `CHANGELOG.md`, the step file if the spec was
       wrong, and `README.md`'s step table
+- [ ] Any PR that adds a migration also updates `backend/docs/schema.dbml` (the schema
+      diagram is regenerated from the migrated database, not edited by hand)
 
 ## 8. Conventions
 

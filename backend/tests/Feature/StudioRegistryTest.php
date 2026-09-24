@@ -38,7 +38,7 @@ class StudioRegistryTest extends TestCase
 
     private function ownerFor(Shop $shop, string $name): User
     {
-        $owner = User::factory()->create(['is_studio' => false, 'name' => $name]);
+        $owner = User::factory()->create(['name' => $name]);
         $owner->shops()->attach($shop);
         $owner->assignRole('shop_owner');
 
@@ -93,7 +93,7 @@ class StudioRegistryTest extends TestCase
     {
         $shop = $this->shop('noowner');
         // A member WITHOUT the shop_owner role must not be shown as owner.
-        $staff = User::factory()->create(['is_studio' => false, 'name' => 'Just Staff']);
+        $staff = User::factory()->create(['name' => 'Just Staff']);
         $staff->shops()->attach($shop);
         $staff->assignRole('shop_staff');
 
@@ -240,7 +240,7 @@ class StudioRegistryTest extends TestCase
         // A studio operator who entered a settings-less shop's /admin panel (read-only
         // impersonation) must be able to use the needs-attention filter and open the
         // shop detail without a 500 — completeness is read-only, so the guard never fires.
-        $op = User::factory()->create(['is_studio' => true]);
+        $op = User::factory()->studio()->create();
         $shop = $this->shop('entered', ShopStatus::Live); // no ShopSetting
         $this->actingAs($op);
         app(TenantContext::class)->set($shop);
@@ -263,8 +263,8 @@ class StudioRegistryTest extends TestCase
     {
         $shopA = $this->shop('audit-a');
         $shopB = $this->shop('audit-b');
-        $alpha = User::factory()->create(['is_studio' => true, 'name' => 'Auditor Alpha']);
-        $beta = User::factory()->create(['is_studio' => true, 'name' => 'Auditor Beta']);
+        $alpha = User::factory()->studio()->create(['name' => 'Auditor Alpha']);
+        $beta = User::factory()->studio()->create(['name' => 'Auditor Beta']);
         StudioAuditEvent::create(['actor_id' => $alpha->id, 'shop_id' => $shopA->id, 'action' => AuditAction::PanelEnter]);
         StudioAuditEvent::create(['actor_id' => $beta->id, 'shop_id' => $shopB->id, 'action' => AuditAction::PanelEnter]);
         $this->actingAs($this->studioUser());

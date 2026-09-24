@@ -794,7 +794,6 @@ class TenantIsolationTest extends TestCase
             'name' => 'Owner A',
             'email' => 'owner@shop-a.test',
             'password' => 'secret-password',
-            'is_studio' => false,
         ]);
         $owner->shops()->attach($this->shopA);
         $this->actingAs($owner);

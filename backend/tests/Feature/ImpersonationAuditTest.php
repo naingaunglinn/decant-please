@@ -30,7 +30,7 @@ class ImpersonationAuditTest extends TestCase
     /** A studio operator (studio_admin, Shield super_admin) who belongs to no shop. */
     private function studioOperator(): User
     {
-        return User::factory()->create(['is_studio' => true]);
+        return User::factory()->studio()->create();
     }
 
     private function foreignShop(string $slug): Shop
@@ -108,7 +108,7 @@ class ImpersonationAuditTest extends TestCase
     public function test_an_owner_in_their_own_shop_logs_no_impersonation_event(): void
     {
         $shop = $this->foreignShop('alpha');
-        $owner = User::factory()->create(['is_studio' => false]);
+        $owner = User::factory()->create();
         $owner->shops()->attach($shop);
         $owner->assignRole('shop_owner');
 
@@ -313,7 +313,7 @@ class ImpersonationAuditTest extends TestCase
     public function test_shop_owner_cannot_reach_the_audit_resource(): void
     {
         $shop = $this->foreignShop('alpha');
-        $owner = User::factory()->create(['is_studio' => false]);
+        $owner = User::factory()->create();
         $owner->shops()->attach($shop);
         $owner->assignRole('shop_owner');
         $this->actingAs($owner);
@@ -324,7 +324,7 @@ class ImpersonationAuditTest extends TestCase
     public function test_shop_staff_cannot_reach_the_audit_resource(): void
     {
         $shop = $this->foreignShop('alpha');
-        $staff = User::factory()->create(['is_studio' => false]);
+        $staff = User::factory()->create();
         $staff->shops()->attach($shop);
         $staff->assignRole('shop_staff');
         $this->actingAs($staff);

@@ -63,7 +63,6 @@ abstract class TestCase extends BaseTestCase
             'name' => 'Admin',
             'email' => 'admin@decantplease.local',
             'password' => 'secret-password',
-            'is_studio' => true,
         ]);
 
         // Step 34: /studio access + resource authorization is the studio_admin role

@@ -122,8 +122,9 @@ bypass), `shop_owner` (full control of its own shop's resources), `shop_staff` (
 read set — real staff needs are deferred). Shield answers *"may this user perform this
 action?"* via generated model policies (enforced on both panels); the existing tenancy
 seam (`BelongsToShop`, `shop_user` membership, `canAccessTenant`, `ResolveTenant`) still
-answers *"which shop, and which records."* `is_studio` is transitional — the panel/tenant
-readers now use `hasRole('studio_admin')`. **Shop lifecycle** is the `status` enum
+answers *"which shop, and which records."* Platform-admin access is the `studio_admin`
+role alone, read through `User::isStudioAdmin()` (issue #110 dropped the transitional
+`is_studio` column). **Shop lifecycle** is the `status` enum
 (`onboarding → live → suspended → archived`); only `live` is served (others 404), and
 `is_active` is a derived read-only accessor for `status === live`.
 

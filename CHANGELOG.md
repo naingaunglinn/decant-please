@@ -9,7 +9,35 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v34
+## 0. What changed in v35
+
+**v35** drops the transitional `users.is_studio` column (**#110**): the `studio_admin`
+role is the only source of truth for platform access. Touches personal-data access
+authorization; one migration, no dependency.
+
+- **`User::isStudioAdmin()` is the single reader** (P4). The three `HasTenants` methods
+  already read the role; this PR routes the last two UI readers through it too — the
+  `/admin` "Studio" menu link and `ShopResource::canAccess`. `$fillable`/`$casts` and the
+  `ManageShops` owner-create no longer mention the column.
+- **The drop migration is rollback-safe.** `up()` drops the column (index first, for
+  SQLite); `down()` re-adds it and sets `is_studio = true` **from the `studio_admin`
+  role**, never the reverse — a user whose role was removed at go-live is not re-granted
+  access by a rollback. Verified up→down→up on Postgres 17.
+- **Deploy-safe as one PR.** No runtime query filters on `is_studio`, and
+  `preventAccessingMissingAttributes()` is off in production, so every old-code read during
+  the release window is `(bool) null` → access **denied** (fail-closed), never a throw.
+- **`Shop::suspend()` gained its authorization guard** — throws unless the actor
+  `isStudioAdmin()`, before the reason check. The schema's "only a studio_admin can
+  suspend" is now enforced in the one domain method, not left to a future UI.
+- **Seeders/factory/tests** assign the role instead of the flag (`UserFactory::studio()`).
+  The historical role-backfill test (which re-ran the now-uncallable `is_studio` query) is
+  replaced by one asserting the rollback re-derivation.
+- **`backend/docs/schema.dbml`** added — the whole schema as DBML, regenerated from the
+  migrated Postgres. AGENTS.md now requires any migration PR to update it.
+- **Deliberately not built:** locking suspended/archived members out of `/admin`, and
+  restrict-delete FKs on the money tables — each its own follow-up issue.
+
+## 0.1 What changed in v34
 
 **v34** fixes **#67** — record the amount received at payment confirmation so balance due
 is real (backend half; the storefront's signed/overpaid tolerance shipped in #70). Touches

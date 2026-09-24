@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
 
         $admin = User::updateOrCreate(
             ['email' => 'admin@decantplease.local'],
-            ['name' => 'Admin', 'password' => Hash::make($password), 'is_studio' => true],
+            ['name' => 'Admin', 'password' => Hash::make($password)],
         );
         // Step 34: the studio operator's account holds studio_admin (Shield
         // super_admin). Idempotent; the role is created by the migration. Guarded

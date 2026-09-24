@@ -1,0 +1,429 @@
+// ============================================================================
+//  Decant Please! — database schema (DBML)  ·  paste into https://dbdiagram.io/d
+//
+//  Regenerated from the migrated Postgres 17 database (`decant_please`), NOT hand-
+//  edited. Any PR that adds a migration regenerates this file (AGENTS.md §7).
+//
+//  Scope: the application schema — platform, tenant, and Spatie authorization
+//  tables. Laravel framework plumbing (cache, jobs, sessions, migrations,
+//  password_reset_tokens, failed_jobs) is intentionally omitted.
+//
+//  Conventions:
+//   - Money is integer Myanmar Kyat (Postgres has no unsigned int; these are `int`).
+//   - `*_snapshot` and the order_items price/cost columns are frozen at write.
+//   - FK on-delete rules are the standalone `Ref … [delete: …]` block at the bottom
+//     (inline refs can't carry the setting). Partial/expression indexes live in a
+//     table `Note` (DBML `indexes` can't express a WHERE clause).
+// ============================================================================
+
+
+// ---------- Platform-owned (no shop_id scope; these PRODUCE/rule the tenant) -----
+
+Table shops {
+  id bigint [pk, increment]
+  slug varchar [unique, not null]
+  name varchar [not null]
+  status varchar [not null, default: 'onboarding', note: 'ShopStatus enum: onboarding | live | suspended | archived. Only `live` is served; archived is the soft delete (shops are never hard-deleted).']
+  suspended_reason varchar [null]
+  suspended_at timestamp [null]
+  suspended_by bigint [null, note: 'FK → users, SET NULL — deleting the actor never deletes the shop']
+  created_at timestamp [null]
+  updated_at timestamp [null]
+}
+
+Table users {
+  id bigint [pk, increment]
+  name varchar [not null]
+  email varchar [unique, not null]
+  email_verified_at timestamp [null]
+  password varchar [not null]
+  remember_token varchar [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  Note: 'Platform-admin access is the `studio_admin` Spatie role alone, read via User::isStudioAdmin(). The transitional `is_studio` column was dropped (issue #110) — the role is the only source of truth.'
+}
+
+Table shop_user {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  user_id bigint [not null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, user_id) [unique]
+  }
+  Note: 'Membership pivot: which users operate which shop. No role column yet — the shop owner is the member holding the shop_owner role (roles live in Spatie).'
+}
+
+Table shop_domains {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  host varchar [unique, not null, note: 'normalized lowercase host, port kept (dev: localhost:3001)']
+  is_primary boolean [not null, default: false]
+  verified_at timestamp [null, note: 'null = never resolves on the storefront and never enters the CORS allowlist']
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  Note: 'ADR-0004 host→shop map, read before any tenant context exists. A shop has many domains. A PARTIAL unique index enforces at most one primary per shop: CREATE UNIQUE INDEX shop_domains_one_primary_per_shop ON shop_domains (shop_id) WHERE is_primary — it is one-primary-per-shop, NOT one-domain-per-shop.'
+}
+
+Table studio_audit_events {
+  id bigint [pk, increment]
+  actor_id bigint [null, note: 'FK → users, SET NULL — the audit row outlives the actor']
+  shop_id bigint [null, note: 'impersonated shop; plain FK → shops, SET NULL. NOT a tenant scope.']
+  action varchar [not null, note: 'AuditAction enum: panel.enter | take_control | write.created | write.updated | write.deleted']
+  subject_type varchar [null]
+  subject_id bigint [null]
+  ip_address varchar [null]
+  user_agent text [null]
+  metadata json [null]
+  created_at timestamp [null]
+  indexes {
+    (shop_id, created_at)
+    actor_id
+    action
+    (subject_type, subject_id)
+  }
+  Note: 'Append-only impersonation trail (no updated_at; rows immutable). Platform-owned — no BelongsToShop. `subject_type`/`subject_id` are a polymorphic morph to the written record; no DB FK.'
+}
+
+
+// ---------- Tenant-owned (BelongsToShop global scope → shop_id) -------------------
+
+Table brands {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  name varchar [not null]
+  slug varchar [not null]
+  type varchar [not null, default: 'designer', note: 'BrandType enum']
+  logo_path varchar [null]
+  is_active boolean [not null, default: true]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, name) [unique]
+    (shop_id, slug) [unique]
+  }
+}
+
+Table fragrances {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  brand_id bigint [not null]
+  name varchar [not null]
+  slug varchar [not null]
+  concentration varchar [not null, note: 'Concentration enum']
+  gender varchar [not null, note: 'Gender enum']
+  notes text [null]
+  vibes text [null]
+  performance varchar [null]
+  description text [null]
+  image_path varchar [null]
+  is_active boolean [not null, default: true]
+  is_featured boolean [not null, default: false]
+  stock_ml int [null, note: 'null = stock not tracked (opt-in)']
+  low_stock_threshold_ml int [not null, default: 30]
+  bottle_cost_mmk int [null, note: 'live reference cost — liquid only; null = cost not tracked']
+  bottle_volume_ml int [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, slug) [unique]
+    gender
+    is_active
+  }
+}
+
+Table decant_prices {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  fragrance_id bigint [not null]
+  size_ml smallint [not null]
+  price_mmk int [not null]
+  in_stock boolean [not null, default: true]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (fragrance_id, size_ml) [unique]
+  }
+}
+
+Table promo_codes {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  code varchar [not null, note: 'stored uppercase, matched case-insensitively']
+  type varchar [not null, note: 'percent | fixed']
+  value int [not null, note: 'percent: 1-100; fixed: whole Kyat']
+  max_discount_mmk int [null]
+  min_order_mmk int [null]
+  usage_limit int [null, note: 'null = unlimited']
+  times_used int [not null, default: 0]
+  starts_at date [null]
+  expires_at date [null]
+  is_active boolean [not null, default: true]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, code) [unique]
+  }
+}
+
+Table orders {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  customer_name varchar [not null]
+  phone varchar [not null]
+  address text [not null]
+  order_from varchar [not null, default: 'website']
+  tracking_code varchar [unique, not null]
+  decant_date date [null]
+  delivery_date date [null]
+  handed_to_courier_at date [null]
+  courier_carrying_mmk int [null, note: 'COD float SNAPSHOT taken at handoff — not derived live']
+  courier_settled_at date [null]
+  status varchar [not null, default: 'awaiting_confirmation', note: 'OrderStatus enum']
+  rejection_reason varchar [null]
+  deposit_mmk int [not null, default: 0]
+  delivery_fee_mmk int [not null, default: 0]
+  discount_mmk int [not null, default: 0]
+  promo_code varchar [null, note: 'snapshot of the code that set the discount']
+  total_mmk int [not null, default: 0]
+  payment_status varchar [not null, default: 'unpaid', note: 'PaymentStatus enum: unpaid | paid']
+  payment_method varchar [not null, default: 'cod', note: 'PaymentMethod enum: cod | online']
+  paid_at timestamp [null]
+  payment_proof_path varchar [null, note: 'private storage only — never a public or presigned URL']
+  delivery_township_id bigint [null, note: 'FK → delivery_townships, SET NULL — snapshots below preserve the destination']
+  region_snapshot varchar [null, note: 'frozen at write']
+  township_snapshot varchar [null, note: 'frozen at write']
+  address_line text [null]
+  address_extra text [null]
+  delivery_courier varchar [null, note: 'snapshot at Accept — no FK, no cost']
+  notes text [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    order_from
+    decant_date
+    delivery_date
+    status
+    payment_status
+  }
+}
+
+Table order_items {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  order_id bigint [not null]
+  fragrance_id bigint [not null, note: 'FK → fragrances, RESTRICT — a fragrance on any order line cannot be deleted']
+  fragrance_name_snapshot varchar [not null, note: 'frozen at write']
+  size_ml smallint [not null]
+  unit_price_mmk int [not null, note: 'frozen at write']
+  unit_cost_mmk int [null, note: 'immutable cost snapshot; null = unknown, never coalesced to 0']
+  quantity smallint [not null, default: 1]
+  line_total_mmk int [not null, note: 'frozen at write']
+  line_cost_mmk int [null, note: 'immutable cost snapshot; null = unknown']
+  created_at timestamp [null]
+  updated_at timestamp [null]
+}
+
+Table shop_settings {
+  id bigint [pk, increment]
+  shop_id bigint [not null, unique, note: 'one settings row per shop']
+  kbzpay_name varchar [null]
+  kbzpay_number varchar [null]
+  wave_name varchar [null]
+  wave_number varchar [null]
+  payment_qr_path varchar [null, note: 'MMQR image on the media disk']
+  payment_instructions text [null]
+  bot_token text [null, note: 'encrypted at rest (Laravel encrypted cast)']
+  admin_chat_id text [null, note: 'encrypted at rest']
+  tiktok_url varchar [null]
+  facebook_url varchar [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+}
+
+Table expenses {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  spent_on date [not null]
+  category varchar [not null, note: 'ExpenseCategory enum']
+  amount_mmk int [not null]
+  note varchar [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    spent_on
+  }
+}
+
+Table delivery_townships {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  region varchar [not null, note: 'Region enum']
+  district varchar [null]
+  name varchar [not null]
+  name_mm varchar [null]
+  fee_mmk int [not null, default: 0]
+  is_active boolean [not null, default: true]
+  sort_order int [not null, default: 0]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, region, name) [unique]
+    region
+    district
+    is_active
+  }
+}
+
+Table delivery_township_couriers {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  delivery_township_id bigint [not null]
+  courier varchar [not null]
+  courier_name varchar [not null, note: 'that courier''s own spelling of the destination']
+  cost_mmk int [null, note: 'reference only — never enters fees/margins/P&L']
+  is_available boolean [not null, default: true]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (delivery_township_id, courier) [unique]
+  }
+}
+
+
+// ---------- Authorization (Spatie laravel-permission, teams off) ------------------
+
+Table permissions {
+  id bigint [pk, increment]
+  name varchar [not null]
+  guard_name varchar [not null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (name, guard_name) [unique]
+  }
+}
+
+Table roles {
+  id bigint [pk, increment]
+  name varchar [not null]
+  guard_name varchar [not null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (name, guard_name) [unique]
+  }
+  Note: 'studio_admin = super_admin (grants every ability via Gate::before); shop_owner = full control of its own shop; shop_staff = narrow read set.'
+}
+
+Table model_has_permissions {
+  permission_id bigint [not null]
+  model_type varchar [not null]
+  model_id bigint [not null]
+  indexes {
+    (permission_id, model_id, model_type) [pk]
+    (model_id, model_type)
+  }
+  Note: 'Polymorphic: (model_type, model_id) point at the owning model — for this app always App\\Models\\User (FQCN, no morph map). No DB FK on model_id.'
+}
+
+Table model_has_roles {
+  role_id bigint [not null]
+  model_type varchar [not null]
+  model_id bigint [not null]
+  indexes {
+    (role_id, model_id, model_type) [pk]
+    (model_id, model_type)
+  }
+  Note: 'Polymorphic: (model_type, model_id) point at the owning model — for this app always App\\Models\\User (FQCN, no morph map). No DB FK on model_id.'
+}
+
+Table role_has_permissions {
+  permission_id bigint [not null]
+  role_id bigint [not null]
+  indexes {
+    (permission_id, role_id) [pk]
+  }
+}
+
+
+// ---------- Foreign keys (with on-delete rule; the DB, not policy, enforces these) -
+
+// Platform
+Ref: shops.suspended_by > users.id [delete: set null]
+Ref: shop_user.shop_id > shops.id [delete: cascade]
+Ref: shop_user.user_id > users.id [delete: cascade]
+Ref: shop_domains.shop_id > shops.id [delete: cascade]
+Ref: studio_audit_events.actor_id > users.id [delete: set null]
+Ref: studio_audit_events.shop_id > shops.id [delete: set null]
+
+// Tenant
+Ref: brands.shop_id > shops.id [delete: cascade]
+Ref: fragrances.shop_id > shops.id [delete: cascade]
+Ref: fragrances.brand_id > brands.id [delete: cascade]
+Ref: decant_prices.shop_id > shops.id [delete: cascade]
+Ref: decant_prices.fragrance_id > fragrances.id [delete: cascade]
+Ref: promo_codes.shop_id > shops.id [delete: cascade]
+Ref: orders.shop_id > shops.id [delete: cascade]
+Ref: orders.delivery_township_id > delivery_townships.id [delete: set null]
+Ref: order_items.shop_id > shops.id [delete: cascade]
+Ref: order_items.order_id > orders.id [delete: cascade]
+Ref: order_items.fragrance_id > fragrances.id [delete: restrict]
+Ref: shop_settings.shop_id > shops.id [delete: cascade]
+Ref: expenses.shop_id > shops.id [delete: cascade]
+Ref: delivery_townships.shop_id > shops.id [delete: cascade]
+Ref: delivery_township_couriers.shop_id > shops.id [delete: cascade]
+Ref: delivery_township_couriers.delivery_township_id > delivery_townships.id [delete: cascade]
+
+// Authorization
+Ref: model_has_permissions.permission_id > permissions.id [delete: cascade]
+Ref: model_has_roles.role_id > roles.id [delete: cascade]
+Ref: role_has_permissions.permission_id > permissions.id [delete: cascade]
+Ref: role_has_permissions.role_id > roles.id [delete: cascade]
+
+// NOTE — orders.shop_id / order_items.shop_id / expenses.shop_id are CASCADE today:
+// deleting a shop would delete its money records. This is safe only because shops are
+// never hard-deleted (archived is the soft delete). A follow-up issue changes these to
+// RESTRICT so the database, not policy, guarantees money records can't be lost.
+
+
+// ---------- Layout groups ----------
+
+TableGroup platform {
+  shops
+  users
+  shop_user
+  shop_domains
+  studio_audit_events
+}
+
+TableGroup catalog {
+  brands
+  fragrances
+  decant_prices
+  promo_codes
+}
+
+TableGroup orders_group {
+  orders
+  order_items
+}
+
+TableGroup delivery {
+  delivery_townships
+  delivery_township_couriers
+}
+
+TableGroup shop_config {
+  shop_settings
+  expenses
+}
+
+TableGroup authorization {
+  permissions
+  roles
+  model_has_permissions
+  model_has_roles
+  role_has_permissions
+}

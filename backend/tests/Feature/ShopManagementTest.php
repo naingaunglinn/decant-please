@@ -29,7 +29,7 @@ class ShopManagementTest extends TestCase
     {
         $panel = Filament::getPanel('admin');
 
-        $studio = User::factory()->create(['is_studio' => true]);
+        $studio = User::factory()->studio()->create();
         $a = Shop::factory()->create();
         $b = Shop::factory()->create();
 
@@ -44,7 +44,7 @@ class ShopManagementTest extends TestCase
     {
         $panel = Filament::getPanel('admin');
 
-        $owner = User::factory()->create(['is_studio' => false]);
+        $owner = User::factory()->create();
         $a = Shop::factory()->create();
         $b = Shop::factory()->create();
         $owner->shops()->attach($a);
@@ -59,8 +59,8 @@ class ShopManagementTest extends TestCase
 
     public function test_only_studio_users_can_access_the_shops_screen(): void
     {
-        $studio = User::factory()->create(['is_studio' => true]);
-        $owner = User::factory()->create(['is_studio' => false]);
+        $studio = User::factory()->studio()->create();
+        $owner = User::factory()->create();
 
         $this->actingAs($studio);
         $this->assertTrue(ShopResource::canAccess());
@@ -77,10 +77,10 @@ class ShopManagementTest extends TestCase
         $this->get('/studio/shops')
             ->assertRedirect('/studio/login');
 
-        $this->actingAs(User::factory()->create(['is_studio' => false]));
+        $this->actingAs(User::factory()->create());
         $this->get('/studio/shops')->assertForbidden();
 
-        $this->actingAs(User::factory()->create(['is_studio' => true]));
+        $this->actingAs(User::factory()->studio()->create());
         $this->get('/studio/shops')->assertOk();
         $this->get('/studio')->assertRedirect(); // home → the shop registry
     }
@@ -90,7 +90,7 @@ class ShopManagementTest extends TestCase
         // The REAL registration flow — ManageShops' CreateAction, not Shop::create —
         // because onboarding side effects hang off the action: a shop with zero
         // townships has nothing offerable at checkout (design-doc §7 / prompts/25).
-        $this->actingAs(User::factory()->create(['is_studio' => true]));
+        $this->actingAs(User::factory()->studio()->create());
 
         Livewire::test(ManageShops::class)
             ->callAction('create', data: [
@@ -120,9 +120,9 @@ class ShopManagementTest extends TestCase
     public function test_registering_a_shop_creates_its_owner_login(): void
     {
         // Registration's second fact: the owner's account. A SHOP-level admin —
-        // full control of their shop through membership — never is_studio, which
+        // full control of their shop through membership — never studio_admin, which
         // would hand them every shop on the platform.
-        $this->actingAs(User::factory()->create(['is_studio' => true]));
+        $this->actingAs(User::factory()->studio()->create());
 
         Livewire::test(ManageShops::class)
             ->callAction('create', data: [
@@ -139,7 +139,7 @@ class ShopManagementTest extends TestCase
         $shop = Shop::where('slug', 'mandalay-musk')->firstOrFail();
         $owner = User::where('email', 'owner@mandalaymusk.local')->firstOrFail();
 
-        $this->assertFalse($owner->is_studio);
+        $this->assertFalse($owner->isStudioAdmin());
         $this->assertTrue(Hash::check('a-strong-password', $owner->password));
         $this->assertTrue($owner->canAccessTenant($shop));
         $this->assertSame(1, $owner->shops()->count()); // exactly their shop
@@ -153,7 +153,7 @@ class ShopManagementTest extends TestCase
         $a = Shop::factory()->create(['slug' => 'shop-a']);
         $b = Shop::factory()->create(['slug' => 'shop-b']);
 
-        $owner = User::factory()->create(['is_studio' => false]);
+        $owner = User::factory()->create();
         $owner->shops()->attach($a);
         $this->actingAs($owner);
 
@@ -172,7 +172,7 @@ class ShopManagementTest extends TestCase
 
         $this->assertSame('Decant Please!', $panel->getBrandName()); // no tenant (login)
 
-        $this->actingAs(User::factory()->create(['is_studio' => true]));
+        $this->actingAs(User::factory()->studio()->create());
         Filament::setTenant($shop);
 
         $this->assertSame('Fragnant by Pop', $panel->getBrandName());

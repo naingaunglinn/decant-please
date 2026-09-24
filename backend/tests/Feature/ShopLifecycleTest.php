@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ShopStatus;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -85,7 +86,7 @@ class ShopLifecycleTest extends TestCase
 
     public function test_suspension_requires_a_reason_and_records_the_actor(): void
     {
-        $actor = User::factory()->create(['is_studio' => true]);
+        $actor = User::factory()->studio()->create();
         $shop = Shop::factory()->create(['status' => ShopStatus::Live]);
 
         $shop->suspend($actor, 'Non-payment');
@@ -99,7 +100,7 @@ class ShopLifecycleTest extends TestCase
 
     public function test_suspension_rejects_a_blank_reason(): void
     {
-        $actor = User::factory()->create(['is_studio' => true]);
+        $actor = User::factory()->studio()->create();
         $shop = Shop::factory()->create(['status' => ShopStatus::Live]);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -107,9 +108,28 @@ class ShopLifecycleTest extends TestCase
         $shop->suspend($actor, '   ');
     }
 
+    public function test_suspension_requires_a_studio_admin_actor(): void
+    {
+        // A shop member (shop_owner, not studio) must not be able to suspend — the
+        // guard lives in the domain method, so it holds no matter who calls it and
+        // fires before the reason is even checked (issue #110).
+        $seller = User::factory()->create(); // no studio_admin role
+        $shop = Shop::factory()->create(['status' => ShopStatus::Live]);
+
+        $this->expectException(AuthorizationException::class);
+
+        try {
+            $shop->suspend($seller, 'Non-payment');
+        } finally {
+            // The shop must be untouched — no half-suspend.
+            $this->assertSame(ShopStatus::Live, $shop->fresh()->status);
+            $this->assertNull($shop->fresh()->suspended_at);
+        }
+    }
+
     public function test_activate_brings_a_suspended_shop_live_and_clears_suspension(): void
     {
-        $actor = User::factory()->create(['is_studio' => true]);
+        $actor = User::factory()->studio()->create();
         $shop = Shop::factory()->create(['status' => ShopStatus::Onboarding]);
         $shop->suspend($actor, 'temporary');
 

@@ -19,7 +19,7 @@ class StudioAuditEventFactory extends Factory
     public function definition(): array
     {
         return [
-            'actor_id' => User::factory()->state(['is_studio' => true]),
+            'actor_id' => User::factory()->studio(),
             'shop_id' => Shop::factory(),
             'action' => AuditAction::PanelEnter,
             'ip_address' => fake()->ipv4(),

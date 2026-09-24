@@ -20,9 +20,10 @@ class ManageShops extends ManageRecords
         return [
             // Registering a shop is three facts, not one (prompts/25 §25a):
             //   1. the shop row;
-            //   2. its owner's login (optional) — a NON-studio user attached via
-            //      shop_user, so they fully control this shop and see nothing
-            //      else. Never is_studio: that flag means "sees every shop".
+            //   2. its owner's login (optional) — attached via shop_user and
+            //      carrying only the shop_owner role, so they fully control this
+            //      shop and see nothing else. Never studio_admin: that role means
+            //      "sees every shop".
             //   3. its delivery geography (after-hook) — all inactive at fee 0;
             //      activation and pricing are the owner's go-live steps.
             // Shop + owner commit together: a shop whose owner creation failed
@@ -38,7 +39,6 @@ class ManageShops extends ManageRecords
                                 'name' => $data['owner_name'],
                                 'email' => $data['owner_email'],
                                 'password' => $data['owner_password'], // hashed cast
-                                'is_studio' => false,
                             ]);
                             $owner->shops()->attach($shop);
                             // Step 34: the owner login carries the shop_owner
