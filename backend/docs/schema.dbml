@@ -29,6 +29,9 @@ Table shops {
   suspended_by bigint [null, note: 'FK → users, SET NULL — deleting the actor never deletes the shop']
   created_at timestamp [null]
   updated_at timestamp [null]
+  indexes {
+    status
+  }
 }
 
 Table users {
@@ -37,7 +40,7 @@ Table users {
   email varchar [unique, not null]
   email_verified_at timestamp [null]
   password varchar [not null]
-  remember_token varchar [null]
+  remember_token varchar(100) [null]
   created_at timestamp [null]
   updated_at timestamp [null]
   Note: 'Platform-admin access is the `studio_admin` Spatie role alone, read via User::isStudioAdmin(). The transitional `is_studio` column was dropped (issue #110) — the role is the only source of truth.'
@@ -63,6 +66,9 @@ Table shop_domains {
   verified_at timestamp [null, note: 'null = never resolves on the storefront and never enters the CORS allowlist']
   created_at timestamp [null]
   updated_at timestamp [null]
+  indexes {
+    shop_id
+  }
   Note: 'ADR-0004 host→shop map, read before any tenant context exists. A shop has many domains. A PARTIAL unique index enforces at most one primary per shop: CREATE UNIQUE INDEX shop_domains_one_primary_per_shop ON shop_domains (shop_id) WHERE is_primary — it is one-primary-per-shop, NOT one-domain-per-shop.'
 }
 
@@ -73,7 +79,7 @@ Table studio_audit_events {
   action varchar [not null, note: 'AuditAction enum: panel.enter | take_control | write.created | write.updated | write.deleted']
   subject_type varchar [null]
   subject_id bigint [null]
-  ip_address varchar [null]
+  ip_address varchar(45) [null]
   user_agent text [null]
   metadata json [null]
   created_at timestamp [null]
@@ -384,8 +390,8 @@ Ref: role_has_permissions.role_id > roles.id [delete: cascade]
 
 // NOTE — orders.shop_id / order_items.shop_id / expenses.shop_id are CASCADE today:
 // deleting a shop would delete its money records. This is safe only because shops are
-// never hard-deleted (archived is the soft delete). A follow-up issue changes these to
-// RESTRICT so the database, not policy, guarantees money records can't be lost.
+// never hard-deleted (archived is the soft delete). Follow-up issue #112 changes these
+// to RESTRICT so the database, not policy, guarantees money records can't be lost.
 
 
 // ---------- Layout groups ----------
