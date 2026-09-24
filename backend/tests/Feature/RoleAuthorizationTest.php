@@ -9,8 +9,9 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
-use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,6 @@ class RoleAuthorizationTest extends TestCase
             'name' => ucfirst($role),
             'email' => "{$role}@example.test",
             'password' => 'secret-password',
-            'is_studio' => false,
         ]);
         $user->shops()->attach($this->defaultShop());
         $user->assignRole($role);
@@ -140,28 +140,35 @@ class RoleAuthorizationTest extends TestCase
         $this->get("/admin/{$other->slug}")->assertNotFound();
     }
 
-    // ---- migration backfill (deploy-safe, idempotent, no lockout) -----------
+    // ---- the is_studio drop migration is rollback-safe (issue #110) ----------
 
-    public function test_the_role_migration_backfills_existing_users_idempotently(): void
+    public function test_rolling_back_the_is_studio_drop_restores_the_flag_from_the_role_only(): void
     {
-        // Bare users via User::create bypass the factory's is_studio → role hook,
-        // reproducing pre-migration production rows.
-        $studio = User::create(['name' => 'S', 'email' => 's@x.test', 'password' => 'x', 'is_studio' => true]);
-        $owner = User::create(['name' => 'O', 'email' => 'o@x.test', 'password' => 'x', 'is_studio' => false]);
+        // A sibling test used to prove the Step-34 role backfill read is_studio
+        // without locking anyone out. That column is gone now, so the deploy-safety
+        // guarantee that matters is the reverse: a rollback must rebuild is_studio
+        // FROM the studio_admin role, and never hand the role back to a user it was
+        // taken from at go-live. RefreshDatabase has already run the drop, so the
+        // column is absent here.
+        $studio = User::factory()->studio()->create();          // holds studio_admin
+        $owner = User::create(['name' => 'O', 'email' => 'o@x.test', 'password' => 'x']);
         $owner->shops()->attach($this->defaultShop());
+        $owner->assignRole('shop_owner');
 
-        $this->assertFalse($studio->hasRole('studio_admin'));
-        $this->assertFalse($owner->hasRole('shop_owner'));
+        $this->assertFalse(Schema::hasColumn('users', 'is_studio'));
 
-        $migration = require database_path('migrations/2026_08_22_000000_seed_shield_roles.php');
+        $migration = require database_path('migrations/2026_09_24_000000_drop_is_studio_from_users_table.php');
+
+        // Rollback: the column returns, set from the role — studio_admin → true,
+        // everyone else → false. Never role-from-flag.
+        $migration->down();
+
+        $this->assertTrue(Schema::hasColumn('users', 'is_studio'));
+        $this->assertTrue((bool) DB::table('users')->where('id', $studio->id)->value('is_studio'));
+        $this->assertFalse((bool) DB::table('users')->where('id', $owner->id)->value('is_studio'));
+
+        // Re-applying the drop is clean.
         $migration->up();
-        $migration->up(); // idempotent — running twice must not duplicate
-
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-
-        $this->assertTrue($studio->fresh()->hasRole('studio_admin'), 'studio operator must not be locked out');
-        $this->assertTrue($owner->fresh()->hasRole('shop_owner'));
-        $this->assertCount(1, $studio->fresh()->roles);
-        $this->assertCount(1, $owner->fresh()->roles);
+        $this->assertFalse(Schema::hasColumn('users', 'is_studio'));
     }
 }

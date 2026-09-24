@@ -159,7 +159,7 @@ API=http://localhost:8010/api/v1/decant-please sh scripts/verify-postgres-portab
 - Custom pages go in `Filament/Pages/`, widgets in `Filament/Widgets/`.
 - **Two panels.** `Filament/Resources|Pages|Widgets` belong to the tenant panel
   (`/admin/{shop}`, AdminPanelProvider); `Filament/Studio/Resources` belongs to the
-  studio panel (`/studio`, StudioPanelProvider — no tenancy, `is_studio` users only).
+  studio panel (`/studio`, StudioPanelProvider — no tenancy, `studio_admin` role only).
   Anything cross-shop by nature (the shop registry, future all-shops views) lives in
   Studio; anything a single shop operates lives in the tenant panel. Never register
   a tenant-owned model's resource in Studio without the design saying so.

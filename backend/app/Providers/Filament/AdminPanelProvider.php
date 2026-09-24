@@ -88,7 +88,7 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Studio')
                     ->icon(Heroicon::OutlinedBuildingLibrary)
                     ->url(fn (): string => Filament::getPanel('studio')->getUrl())
-                    ->visible(fn (): bool => (bool) auth()->user()?->is_studio),
+                    ->visible(fn (): bool => (bool) auth()->user()?->isStudioAdmin()),
             ])
             // Step 34 §3 — the impersonation banner rides above the topbar on every
             // /admin page. The Livewire component renders nothing unless a studio

@@ -221,4 +221,7 @@ guard.
 6. [x] Shield UI on `/studio` only; generated resource policies (enforced on `/admin` too)
 7. [x] `canAccessPanel`/`getTenants`/`canAccessTenant` read `hasRole('studio_admin')`;
        `is_studio` kept transitionally (removal is a later follow-up)
-8. [ ] Later: drop the `is_studio` column once nothing reads it
+8. [x] Issue #110: dropped the `is_studio` column — the `studio_admin` role is the
+       only source of truth, read through `User::isStudioAdmin()`. `down()` restores
+       the flag from the role (never the reverse). `Shop::suspend()` gained the
+       `studio_admin` authorization guard in the same PR.

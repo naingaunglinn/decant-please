@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -46,17 +47,22 @@ class UserFactory extends Factory
     }
 
     /**
-     * Step 34: keep the transitional `is_studio` flag and the studio_admin role in
-     * step for factory-made users, so existing tests that create `is_studio` users
-     * still reach /studio under Shield's role-backed access. Guarded so the factory
-     * works before the roles migration has run.
+     * A platform (studio) admin. The `studio_admin` role IS the grant now — issue
+     * #110 retired the `is_studio` column, so tests say `->studio()` instead of
+     * `create(['is_studio' => true])`. Guarded so the factory still works if it runs
+     * before the roles migration has seeded `studio_admin`.
      */
-    public function configure(): static
+    public function studio(): static
     {
         return $this->afterCreating(function (User $user): void {
-            if ($user->is_studio && Schema::hasTable('roles') && Role::where('name', 'studio_admin')->exists()) {
-                $user->assignRole('studio_admin');
+            // Fail loud if the role isn't seeded. A silent skip would leave the
+            // user role-less, and a test that calls ->studio() and expects a
+            // denial would then pass for the wrong reason (issue #110 review).
+            if (! Schema::hasTable('roles') || ! Role::where('name', 'studio_admin')->exists()) {
+                throw new RuntimeException('UserFactory::studio() requires the studio_admin role — run the role migration before creating a studio user.');
             }
+
+            $user->assignRole('studio_admin');
         });
     }
 }
