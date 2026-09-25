@@ -4,7 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\ShopStatus;
+use App\Filament\Resources\Orders\Pages\ListOrders;
+use App\Filament\Widgets\CourierFloat;
 use App\Filament\Widgets\OrderStats;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
@@ -18,6 +22,7 @@ use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -63,6 +68,19 @@ use Tests\TestCase;
  *   G  checkout, 2026-02-20 · Aventus 5ml ×2 · awaiting
  *      items 130,000; total 132,500; cost 33,334; margin 96,666; balance 132,500
  *   plus a second shop's March order that must move none of these figures.
+ *
+ * Payments and couriers (#67/#109) — built only by the tests that use them
+ * (seedCourierOrders), in January so no March or February figure above moves.
+ * Every step runs through the panel's own action with its default, as a seller taps it:
+ *   H  checkout, online · Allure 10ml ×1 · fee 2,500 · total 57,500
+ *      Mark paid default (online = items − discount) 55,000 → balance 2,500 (the fee), Paid
+ *      handoff default = balance 2,500; settle default min(2,500, 2,500) = 2,500 → balance 0, Paid
+ *   I  checkout, COD · Allure 10ml ×2 · fee 2,500 · total 112,500
+ *      Mark paid default (COD = items − discount + fee) 112,500 — pre-fill only, never submitted
+ *      handoff default = balance 112,500; settled with 100,000 → balance 12,500, still Unpaid
+ *   J  checkout, COD · Allure 5ml ×2 · fee 2,500 · total 62,500 · handed off, never settled
+ *   Cash with couriers: I + J out = 112,500 + 62,500 = 175,000; after I settles, J's 62,500.
+ *   Balance outstanding: 485,500 + I 12,500 + J 62,500 = 560,500 over 6 orders (H is 0).
  *
  * Expenses: March — fees 3,000 (1st) · packaging 12,000 · stock_purchase 300,000 ·
  * delivery 6,000 · other 1,500 · marketing 8,500 (31st). February — other 4,000 (28th).
@@ -332,6 +350,85 @@ class GenericShopParityTest extends TestCase
         $this->assertSame(0, $pnl->stockPurchasesMmk);
     }
 
+    // ---- payments and couriers (#67/#109) ----
+
+    public function test_mark_paid_defaults_for_an_online_and_a_cod_order(): void
+    {
+        $this->seedCourierOrders();
+
+        // online prepays items − discount; COD adds the fee the courier collects
+        $this->ordersTable()
+            ->mountTableAction('markPaid', $this->orders['H'])
+            ->assertTableActionDataSet(['amount_received' => 55000]);
+        $this->ordersTable()
+            ->mountTableAction('markPaid', $this->orders['I'])
+            ->assertTableActionDataSet(['amount_received' => 112500]);
+    }
+
+    public function test_an_online_order_paid_then_its_fee_collected_by_the_courier_is_settled_in_full(): void
+    {
+        $this->seedCourierOrders();
+        $h = $this->orders['H'];
+
+        $this->ordersTable()->callTableAction('markPaid', $h); // default 55,000
+        $h->refresh();
+        $this->assertSame([55000, PaymentStatus::Paid, 2500], [$h->deposit_mmk, $h->payment_status, $h->balanceDue()]);
+
+        $this->ordersTable()->callTableAction('handedToCourier', $h); // default: the 2,500 fee
+        $this->assertSame(2500, $h->refresh()->courier_carrying_mmk);
+
+        $this->ordersTable()->callTableAction('courierSettled', $h); // default min(2,500, 2,500)
+        $h->refresh();
+        $this->assertSame([57500, PaymentStatus::Paid, 0], [$h->deposit_mmk, $h->payment_status, $h->balanceDue()]);
+    }
+
+    public function test_a_cod_order_settled_short_keeps_the_remainder_unpaid(): void
+    {
+        $this->seedCourierOrders();
+        $i = $this->orders['I'];
+
+        $this->ordersTable()->callTableAction('handedToCourier', $i); // default: the 112,500 balance
+        $this->assertSame(112500, $i->refresh()->courier_carrying_mmk);
+
+        $this->ordersTable()->callTableAction('courierSettled', $i, ['collected_mmk' => 100000]);
+        $i->refresh();
+        $this->assertSame([100000, PaymentStatus::Unpaid, 12500], [$i->deposit_mmk, $i->payment_status, $i->balanceDue()]);
+    }
+
+    public function test_cash_with_couriers_and_balance_outstanding_while_one_order_is_out(): void
+    {
+        $this->seedCourierOrders();
+        $this->travelTo(CarbonImmutable::parse('2026-01-12 09:00:00'));
+
+        $this->ordersTable()->callTableAction('markPaid', $this->orders['H']);
+        foreach (['H', 'I', 'J'] as $key) {
+            $this->ordersTable()->callTableAction('handedToCourier', $this->orders[$key]);
+        }
+        $this->ordersTable()->callTableAction('courierSettled', $this->orders['H']);
+
+        // H settled; I 112,500 + J 62,500 still out
+        $this->assertSame(['175,000 Ks', '2 order(s) out — oldest handed off 12 Jan'], $this->courierFloat());
+
+        $this->travelTo(CarbonImmutable::parse('2026-01-13 09:00:00'));
+        $this->ordersTable()->callTableAction('courierSettled', $this->orders['I'], ['collected_mmk' => 100000]);
+
+        // only J's handoff snapshot is left with a courier
+        $this->assertSame(['62,500 Ks', '1 order(s) out — oldest handed off 12 Jan'], $this->courierFloat());
+
+        $this->travelTo(CarbonImmutable::parse('2026-03-15 10:00:00'));
+        $stats = collect((fn () => $this->getStats())->call(new OrderStats))
+            ->mapWithKeys(fn (Stat $stat) => [(string) $stat->getLabel() => [(string) $stat->getValue(), (string) $stat->getDescription()]]);
+
+        // 485,500 + I 12,500 + J 62,500; H is settled to 0 and not counted
+        $this->assertSame(['560,500 Ks', '6 order(s) with a balance due'], $stats['Balance outstanding']);
+
+        // January orders move no March figure
+        $this->assertSame('403,000 Ks', $stats['Revenue this month'][0]);
+        $this->assertSame('179,999 Ks', $stats['Gross margin (liquid only)'][0]);
+        $this->assertSame('6', $stats['Orders this month'][0]);
+        $this->assertSame(395000, MonthlyPnl::for(2026, 3)->salesIncomeMmk);
+    }
+
     // ---- fixture ----
 
     private function seedCatalog(): void
@@ -407,6 +504,39 @@ class GenericShopParityTest extends TestCase
         $this->orders['F']->reject('Out of this bottle.');
     }
 
+    /** H, I and J — January checkouts, accepted and decanted, ready for the courier actions. */
+    private function seedCourierOrders(): void
+    {
+        $this->actingAs($this->studioUser());
+        $this->travelTo(CarbonImmutable::parse('2026-01-10 12:00:00'));
+
+        foreach ([
+            'H' => [PaymentMethod::Online, [[$this->allure, 10, 1]]],
+            'I' => [PaymentMethod::Cod, [[$this->allure, 10, 2]]],
+            'J' => [PaymentMethod::Cod, [[$this->allure, 5, 2]]],
+        ] as $key => [$method, $items]) {
+            $order = $this->checkout($items, $method);
+            $order->accept(CarbonImmutable::parse('2026-01-11'), CarbonImmutable::parse('2026-01-12'));
+            $order->update(['status' => OrderStatus::Decanted]);
+            $this->orders[$key] = $order;
+        }
+
+        $this->travelTo(CarbonImmutable::parse('2026-01-12 09:00:00'));
+    }
+
+    private function ordersTable()
+    {
+        return Livewire::test(ListOrders::class)->set('activeTab', 'all');
+    }
+
+    /** @return array{0: string, 1: string} the float's value and description */
+    private function courierFloat(): array
+    {
+        $stat = (fn () => $this->getStats())->call(new CourierFloat)[0];
+
+        return [(string) $stat->getValue(), (string) $stat->getDescription()];
+    }
+
     private function seedExpenses(): void
     {
         foreach ([
@@ -470,13 +600,14 @@ class GenericShopParityTest extends TestCase
     }
 
     /** @param array<array{0: Fragrance, 1: int, 2: int}> $items */
-    private function checkout(array $items): Order
+    private function checkout(array $items, PaymentMethod $method = PaymentMethod::Cod): Order
     {
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
             'phone' => '09-952345672',
             'delivery_township' => $this->sanchaung,
             'address_line' => '88 Strand Road',
+            'payment_method' => $method->value,
             'items' => $this->itemPayload($items),
         ]);
     }
