@@ -462,7 +462,7 @@ class GenericShopParityTest extends TestCase
             'promo_code' => $promo,
             // smuggled client money — the server derives every figure and must ignore these
             'total_mmk' => 1,
-            'delivery_fee_mmk' => 0,
+            'delivery_fee_mmk' => 1,
             'items' => array_map(fn (array $item) => $item + ['unit_price_mmk' => 1], $this->itemPayload($items)),
         ]))->assertCreated();
 
