@@ -76,6 +76,13 @@ test file. No migration, no API change, no app code, no dependency.
   through `POST /orders`, a township fee, fully-, partially- and un-costed orders, a
   cancelled and a rejected order, an overpaid order, last month's order, expenses in every
   category across three months, and a second shop whose sale must move nothing.
+- **Payments and couriers (#67/#109, owner review):** four more tests add January orders
+  and run the panel's own actions with their defaults. They cover the Mark-paid default
+  (online 55,000, COD 112,500), an online order marked paid and then settled with the fee
+  the courier collected (balance 0, Paid, not in "Balance outstanding"), and a COD order
+  settled short (12,500 left, still Unpaid). They also check "Cash with couriers" with two
+  orders out (175,000) and then one (62,500), and "Balance outstanding" rising to 560,500.
+  Every March and February figure above is unchanged.
 - Steps 36–42 keep it green. A step may rename a field it deliberately renames, never a
   value. It can't guard a *data* migration (the fixture is built after migrations), so the
   step plan now asks each backfilling step to test its own migration.
