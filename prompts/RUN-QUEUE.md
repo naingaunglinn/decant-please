@@ -36,7 +36,9 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 11b | Step 44b: seller sign-up in the admin panel (account + create-your-shop), phone verification (sender interface, fails closed when unconfigured), Publish button, English + Burmese | §44b (split from row 11); issue #137, don't file another | pr-open | 137-seller-signup | #139 |
 | 11c | Phone-code provider driver for sign-up (a `CodeSender` for the owner's chosen SMS / Telegram Gateway account) plus a platform-wide send cap (SMS pumping); production sign-up stays off until it exists | §44b "As built"; the provider and its account are the owner's decision | needs-owner | | |
 | 12 | Help button (admin → studio on Viber/Telegram) | roadmap: shared foundation; spec `prompts/45-help-button.md` (issue #140) | pr-open | 140-help-button | #141 |
-| 13 | Design system: section library, 3 base designs, `shop_designs`, preset picker, manual editor (no AI) | roadmap: design system | todo | | |
+| 13 | Design system: section library, 3 base designs, `shop_designs`, preset picker, manual editor (no AI) | roadmap: design system; spec `prompts/46-design-system.md` (issue #142) | in-progress | 142-design-system | |
+| 13b | Step 46b: the storefront renders the published design — design in the API + `types.ts`, theme as CSS variables on a wrapper (not `@theme`), home page from the section list, decant Clean parity with today's home, Design page joins the menu | `prompts/46-design-system.md` §Split (split from row 13); issue #142, don't file another | todo | | |
+| 13c | Step 46c: manual design editor — colours (contrast rule in words), font, section order + on/off, section text, decoration image upload to `shops/{id}/design/`; save = new row, publish = live | `prompts/46-design-system.md` §Split (split from row 13); issue #142, don't file another | todo | | |
 | 14 | AI design editor + per-shop quota | roadmap: design system. API key from env (owner step); tests mock the API | todo | | |
 | 15 | Group 1: 11 templates + presets + Burmese sample content | roadmap: group 1 | todo | | |
 | 16 | Plans (free / paid) | free-plan limits undecided | needs-owner | | |
