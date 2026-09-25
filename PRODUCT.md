@@ -8,8 +8,9 @@ Multi-tenancy design and its ADRs live in `prompts/multi-tenancy-design.md`.
 
 ## What this is
 
-A **multi-tenant SaaS** for Myanmar social sellers — in **any category** — who run a shop
-from their phone. One codebase serves many independent shops. Each shop gets a storefront
+**CornerArea** is a **multi-tenant SaaS** for Myanmar social sellers — in **any
+category** — who run a shop from their phone. Decant Please is shop #1 on it (the code and
+this repo still carry the Decant Please name until the post-go-live rename). One codebase serves many independent shops. Each shop gets a storefront
 on its own domain and an admin panel scoped to its own data; the studio operator sees
 across all of them.
 
@@ -19,8 +20,23 @@ is a *template* (attributes, variants, status labels, default modules) defined i
 (see `prompts/35-generic-shop-plan.md`). Perfume-decant vocabulary elsewhere in this file is
 the first template's flavour, not a scope limit.
 
+CornerArea ships **every planned category complete, ahead of demand** (`AGENTS.md` P5):
+23 categories in four groups, grouped by how an order flows —
+
+1. **Ship products** — decant, clothing, cosmetics, bags/shoes, electronics accessories,
+   baby & kids, home & kitchen, books, pet supplies, local produce, general store.
+2. **Pre-order** — bakery & cake, home-cooked food, florist & gifts, custom print &
+   handmade.
+3. **Food & drink** — cafe, tea shop, juice & bubble tea, restaurant & food stall.
+4. **Services & booking** — barber, beauty salon & nail, spa & massage, tutor & classes.
+
+A category is released only when its whole loop works; groups release one at a time. The
+categories, the "complete" checklist, and the build order live in
+`prompts/43-cornerarea-roadmap.md`.
+
 **The shorthand is "one backend, many storefronts"** — one Laravel instance and one
-database serving every shop, with a separate storefront deployment per shop domain.
+database serving every shop, and one storefront deployment serving every shop domain
+(ADR-0004).
 Writing it the other way round has caused confusion twice; don't.
 
 Formerly a single-decanter, perfume-only tool. Neither is true now: it is a multi-tenant
@@ -34,7 +50,7 @@ superseded by this file.
 |---|---|---|
 | **Studio operator** | you | cross-shop views, onboarding a new shop, billing |
 | **Shop owner** (the paying customer) | a social seller in Myanmar (perfume decants today; clothing, bakery, cosmetics next). Not technical. Runs the business on TikTok/Facebook/Viber today. Phone-first. | Filament admin, scoped to their shop |
-| **End customer** | buys decants from a shop. No account, mobile-first. | that shop's storefront |
+| **End customer** | buys from a shop. No account, mobile-first. | that shop's storefront |
 
 The product is sold to the **shop owner**. Their end customers are the reason it's worth
 paying for, but they are not the buyer — every product decision resolves in favour of the
@@ -122,7 +138,9 @@ orders a day. **Isolation and cost are the design drivers. Scale is not.**
 - Payment gateway or card processing **for end customers**. Payment confirmation between
   shop and customer stays manual and offline.
 - End-customer accounts or login on the storefront.
-- Chat or messaging features.
+- Chat or messaging features. A customer-initiated Viber/Telegram deep link (the customer
+  taps it and messages the shop themselves, e.g. to confirm a booking) is neither a chat
+  feature nor a platform notification — the platform sends nothing.
 - A **marketplace — product scope.** No customer-visible multi-shop anything: a storefront
   shows exactly one shop's catalog, and **no customer ever sees two shops**. No shared
   shopfront, no cross-shop search, no shared cart.
@@ -136,6 +154,11 @@ orders a day. **Isolation and cost are the design drivers. Scale is not.**
 - End-customer notifications (email/SMS/messaging). Shop-owner Telegram alerts are in
   scope and shipped; the tracking page is the customer's only channel.
 - Anything justified by scale rather than by isolation or cost.
+- Per-seller generated code or per-seller deployments (ADR-0004; design option B,
+  ADR-0005). The AI design editor edits a validated design config, never code.
+- **Parked: licensed goods** (medicine and the like). When reopened: the seller uploads a
+  licence, the studio admin approves it, the category closes automatically when the
+  licence expires, and the legal rules for selling medicine online are checked first.
 
 ## DONE
 
@@ -157,9 +180,11 @@ Per `VERIFY.md`:
    (pooled). See `docs/adr/0002-topology-reconciliation.md`, which also records the exit
    ramps for larger infrastructure later.
 2. **Plan and trial state on `shops`** — what columns, and what an expired shop serves.
-3. **Per-shop theming** — design-doc §10 proposes a `ThemeProvider`; the token set is
-   currently fixed and shared. How much can a shop change without breaking the design
-   language it's paying for?
+   Free-plan limits and paid pricing are also undecided.
+3. ~~Per-shop theming~~ — **resolved 2026-09-25**: the design system in
+   `prompts/43-cornerarea-roadmap.md` — three presets per category, then colours, fonts,
+   sections, text and images edited by form or AI chat inside one section library, stored
+   as a validated design config (`docs/adr/0005-storefront-design-config.md`).
 4. **Per-shop backup and restore.** Under pooling there is one database. A shop asking
    "what happens to my data if I leave" needs an answer before the first paying customer —
    and writing the export is how you verify no foreign key crosses a shop boundary.

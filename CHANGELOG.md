@@ -9,7 +9,38 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v36
+## 0. What changed in v37
+
+**v37** records the CornerArea scope in the repo (**#115**). Docs only — no code, no
+migration, no dependency, and no brand rename in code (that is its own PR after the
+go-live).
+
+- **`AGENTS.md` P5 replaced**: "Features follow real sellers" → "Every category ships
+  complete". CornerArea builds every planned category ahead of demand and releases a
+  category only when its whole loop works. P6 question 1 now asks which category and which
+  seller in it; §1 points to the roadmap.
+- **New `prompts/43-cornerarea-roadmap.md`**: the owner's twelve scope decisions, 23
+  categories in 4 groups (ship products, pre-order, food & drink, services & booking), the
+  "complete" checklist, shared foundation, per-group needs, status labels, default modules,
+  the design system, and the build order.
+- **New `docs/adr/0005-storefront-design-config.md`**: per-shop design is a validated
+  config the AI edits inside one section library (option B), not per-seller code or
+  deployments (option A).
+- **`PRODUCT.md`**: names the platform CornerArea (Decant Please is shop #1) and its four
+  groups; fixes the stale "separate storefront deployment per shop domain" (ADR-0004 made
+  it one); the end customer "buys from a shop"; non-goals clarify deep links, exclude
+  per-seller code/deployments, and park licensed goods; open question 3 (theming) resolved,
+  2 notes free-plan limits are undecided.
+- **`prompts/35-generic-shop-plan.md` amended** from the catalog review: step 36 —
+  nullable `order_items.size_ml`, `product_variants.is_active` + `position`,
+  `order_items.product_variant_id` restricts delete, nullable `products.brand_id` /
+  `brands.type`; step 37 — `products.template`, `shop_settings.template` (moved from 41),
+  per-shop `categories` with its isolation test; step 38 — `product_variants.image_path`.
+  The step-38 gate is now a review stop. "Brand as a concept" resolved: optional per
+  template.
+- The letterhead bug is filed as **#116** (not fixed here; queue row 2).
+
+## 0.1 What changed in v36
 
 **v36** makes the database refuse to delete a shop that holds money records (**#112**).
 Touches money-record integrity: one migration, no code path, no dependency.

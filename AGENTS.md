@@ -65,20 +65,24 @@ For the one developer who maintains all of it.
 - No new dependency without the PR stating what it replaces and what it costs on the
   Heroku/Vercel build.
 
-### P5. Features follow real sellers
+### P5. Every category ships complete
 
-- A feature needs a reason from a real shop: an issue quoting what the seller said or
-  did. "Nice to have" and "competitors have it" are not reasons.
-- Until the first real shops are live, the only work in scope is work that removes an
-  onboarding blocker — including making the product fit a new shop category.
-- Build the smallest version that answers the reason, and record what was deliberately
-  left out (the §8 pattern).
-- Unused features are candidates for hiding or removal. Less surface is less to learn,
-  break, and maintain.
+- CornerArea builds every planned category ahead of demand. We don't wait for a seller to
+  ask. The categories and their groups live in `prompts/43-cornerarea-roadmap.md`.
+- A category is released only when its whole loop works: catalog (template attributes and
+  options), ordering end to end, payment, the phone-first admin loop, status labels in
+  Burmese and English, three design presets with Burmese sample content, default modules,
+  and tests (money, stock or booking; tenant isolation; Postgres portability). Never ship
+  half a category.
+- Categories release group by group. A finished group doesn't wait for the others.
+- Build the smallest version that makes the category complete, and record what was
+  deliberately left out (the §8 pattern).
+- Unused features are candidates for hiding or removal.
 
 ### P6. Before building, answer in the PR
 
-1. Which seller needs this, and what were they doing when they hit the problem?
+1. Which category, and which seller in it, needs this? What are they doing when they hit
+   the problem?
 2. What does a shop that doesn't need it see after it ships? (The answer should be
    "nothing new.")
 3. Core or module? If core, why does every shop need it?
@@ -101,7 +105,8 @@ sees across all shops. Full brief in `PRODUCT.md`; tenancy design in
 so one platform fits perfume decants, clothing, bakery pre-orders, cosmetics, and more —
 each category is a *template* (attributes, variants, status labels, default modules)
 defined in code. The generic-shop refactor is planned in `prompts/35-generic-shop-plan.md`
-(steps 35–42); **multi-tenancy is already built** (steps 23–25 in #58, plus 32–34) and the
+(steps 35–42), and the categories, groups and build order beyond it live in
+`prompts/43-cornerarea-roadmap.md`; **multi-tenancy is already built** (steps 23–25 in #58, plus 32–34) and the
 refactor builds on that seam.
 
 Older docs describe this as a single-decanter perfume tool. They are superseded.
