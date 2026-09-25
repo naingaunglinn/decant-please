@@ -371,13 +371,13 @@ Ref: fragrances.brand_id > brands.id [delete: cascade]
 Ref: decant_prices.shop_id > shops.id [delete: cascade]
 Ref: decant_prices.fragrance_id > fragrances.id [delete: cascade]
 Ref: promo_codes.shop_id > shops.id [delete: cascade]
-Ref: orders.shop_id > shops.id [delete: cascade]
+Ref: orders.shop_id > shops.id [delete: restrict]
 Ref: orders.delivery_township_id > delivery_townships.id [delete: set null]
-Ref: order_items.shop_id > shops.id [delete: cascade]
+Ref: order_items.shop_id > shops.id [delete: restrict]
 Ref: order_items.order_id > orders.id [delete: cascade]
 Ref: order_items.fragrance_id > fragrances.id [delete: restrict]
 Ref: shop_settings.shop_id > shops.id [delete: cascade]
-Ref: expenses.shop_id > shops.id [delete: cascade]
+Ref: expenses.shop_id > shops.id [delete: restrict]
 Ref: delivery_townships.shop_id > shops.id [delete: cascade]
 Ref: delivery_township_couriers.shop_id > shops.id [delete: cascade]
 Ref: delivery_township_couriers.delivery_township_id > delivery_townships.id [delete: cascade]
@@ -388,10 +388,11 @@ Ref: model_has_roles.role_id > roles.id [delete: cascade]
 Ref: role_has_permissions.permission_id > permissions.id [delete: cascade]
 Ref: role_has_permissions.role_id > roles.id [delete: cascade]
 
-// NOTE — orders.shop_id / order_items.shop_id / expenses.shop_id are CASCADE today:
-// deleting a shop would delete its money records. This is safe only because shops are
-// never hard-deleted (archived is the soft delete). Follow-up issue #112 changes these
-// to RESTRICT so the database, not policy, guarantees money records can't be lost.
+// NOTE — orders.shop_id / order_items.shop_id / expenses.shop_id are RESTRICT (#112):
+// a shop that holds money records cannot be deleted — the database, not policy,
+// guarantees orders and expenses outlive it (archived is the soft delete). Catalog and
+// config tables stay CASCADE: they are regenerable, so a shop with no money history
+// still deletes cleanly.
 
 
 // ---------- Layout groups ----------

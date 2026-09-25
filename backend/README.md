@@ -126,7 +126,9 @@ answers *"which shop, and which records."* Platform-admin access is the `studio_
 role alone, read through `User::isStudioAdmin()` (issue #110 dropped the transitional
 `is_studio` column). **Shop lifecycle** is the `status` enum
 (`onboarding → live → suspended → archived`); only `live` is served (others 404), and
-`is_active` is a derived read-only accessor for `status === live`.
+`is_active` is a derived read-only accessor for `status === live`. `archived` is the only
+way to retire a shop that has orders or expenses: their `shop_id` FKs are `RESTRICT`
+(issue #112), so the database refuses to hard-delete it.
 
 **Utility**
 

@@ -9,7 +9,33 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
-## 0. What changed in v35
+## 0. What changed in v36
+
+**v36** makes the database refuse to delete a shop that holds money records (**#112**).
+Touches money-record integrity: one migration, no code path, no dependency.
+
+- **`orders.shop_id`, `order_items.shop_id` and `expenses.shop_id` are now `RESTRICT`**
+  (were `CASCADE`). Before, deleting a `shops` row would have silently destroyed that
+  shop's orders, order lines and expenses. That was safe only because nothing
+  hard-deletes shops (archived is the soft delete). Now the database guarantees it: a
+  shop with financial history can only be archived.
+- **Catalog and config stay `CASCADE`** (brands, fragrances, decant_prices, promo_codes,
+  shop_settings, delivery_*). They are regenerable configuration, not financial records,
+  so a shop with no money history still deletes cleanly. `shop_user`/`shop_domains` stay
+  cascade and `studio_audit_events` stays `SET NULL`.
+- **Migration is a symmetric swap.** It uses the same constraint names in both
+  directions, and `down()` reverts to cascade without deleting anything. Verified
+  up→down→up on Postgres 17. `ShopDeleteProtectionTest` asserts the FK rule on all
+  three tables, that a shop with an order or an expense is refused, and that a shop
+  without either still deletes and cascades its catalog.
+- **`backend/docs/schema.dbml`**: the three `Ref` lines are now `restrict`, and the
+  "#112 follow-up" note now describes the guarantee. Every `Ref` was checked against the
+  migrated Postgres.
+- **Tooling (separate commit):** the unattended queue runner (`prompts/run-step.md`,
+  `prompts/RUN-QUEUE.md`, `scripts/run-queue.sh`, the `pr-reviewer` agent and the
+  project `.claude/settings.json` permission allowlist). No app code.
+
+## 0.1 What changed in v35
 
 **v35** drops the transitional `users.is_studio` column (**#110**): the `studio_admin`
 role is the only source of truth for platform access. Touches personal-data access
