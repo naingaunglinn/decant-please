@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 
 /** @mixin Product */
-class FragranceResource extends JsonResource
+class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
@@ -33,7 +33,9 @@ class FragranceResource extends JsonResource
             'is_featured' => $this->is_featured,
             'min_price_mmk' => $minPrice,
             'min_price_formatted' => $minPrice !== null ? Money::kyat($minPrice) : null,
-            'prices' => DecantPriceResource::collection($this->whenLoaded('activeVariants')),
+            // Still keyed `prices` (step 36b): the pre-36b storefront reads this key
+            // through the /fragrances alias, so the shape stays additive until go-live.
+            'prices' => ProductVariantResource::collection($this->whenLoaded('activeVariants')),
         ];
     }
 }

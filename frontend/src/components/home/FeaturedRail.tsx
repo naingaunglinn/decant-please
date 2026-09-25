@@ -1,8 +1,8 @@
 import { FragranceCard } from "@/components/catalog/FragranceCard";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
 /** Horizontal scroll on mobile, calm grid on desktop. */
-export function FeaturedRail({ fragrances }: { fragrances: Fragrance[] }) {
+export function FeaturedRail({ fragrances }: { fragrances: Product[] }) {
   if (fragrances.length === 0) return null;
 
   return (

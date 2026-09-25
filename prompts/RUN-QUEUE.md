@@ -21,7 +21,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 2 | Invoice and print letterheads use the shop's name, not "Decant Please!" | roadmap: shared foundation (letterhead bug); issue #116 already filed, don't file another | pr-open | 116-shop-name-letterheads | #118 |
 | 3 | Step 35: baseline parity test | `35-generic-shop-plan.md` §35 (stack from here, not from the #67 branch; #67 is merged) | pr-open | 104-parity-baseline | #119 |
 | 4 | Step 36a: product + variant schema, models, admin (API contract unchanged) | §36, as amended by item 1 | pr-open | 105-product-variant-model | #120 |
-| 4b | Step 36b: `/products` API, checkout by `variant_id`, storefront `/product/[slug]` + redirect, `types.ts`, `api.md` | §36 "As built" (split from row 4); issue #105, don't file another | todo | | |
+| 4b | Step 36b: `/products` API, checkout by `variant_id`, storefront `/product/[slug]` + redirect, `types.ts`, `api.md` | §36 "As built" (split from row 4); issue #105, don't file another | pr-open | 105-products-api | #121 |
 | 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | todo | | |
 | 6 | Step 38: clothing template, variant photos | §38, as amended | todo | | |
 | 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | todo | | |
@@ -49,6 +49,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 29 | Group 4d: per-provider day calendar | roadmap: group 4 | todo | | |
 | 30 | Group 4e: group 4 templates + presets | roadmap: group 4 | todo | | |
 | 31 | CornerArea brand rename in code | roadmap: build order 1 | after-go-live | | |
+| 32 | Remove the step-36b deploy aliases: `/fragrances` routes, the legacy `fragrance_id` + `size_ml` checkout line, and the admin "View on site" `/fragrance/` link (→ `/product/`) | §36 "As built" (36b) | after-go-live | | |
 
 ## Log
 
@@ -60,3 +61,4 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 2026-09-25 · 4 · step 36 split: 36a built (products/product_variants schema + backfill, models, admin, archived variants, Shield permission rename; API byte-identical); Postgres up/down/up money hash identical; 376 tests; row 4b added for the API/storefront half; found pre-existing EditOrder township TypeError (noted in PR) · #120
 2026-09-25 · fix #118 · owner review (parity fixture) applied on #119's branch: courier + payment-method money paths (Mark-paid defaults, online fee settle → 0 Paid, COD short settle → 12,500 Unpaid, courier float, balance outstanding 560,500), existing figures unchanged; merged up into #120; 380 tests · #119
 2026-09-25 · fix #114, #117 · #114: settings.json deny list tightened (+refspec, refs/heads/main|develop pushes, docker compose down); #117: plan says a brand with products can't be deleted (archive it) and step 37 rebuilds search_text on brand rename; code on #120: products.brand_id NO ACTION (not RESTRICT — SQLite checks it mid shop-cascade), admin delete/bulk delete refuse with a notice, 4 new tests; merged up the stack; 383 tests green on SQLite and on Postgres · #120
+2026-09-25 · 4b · step 36b: /products API + aliases, checkout by variant_id (legacy pair kept to go-live), storefront /product/[slug] + 308 redirect, cart v2; reviewer blocker (deploy order) fixed → API first under maintenance; row 32 added (remove aliases after go-live); 386 tests · #121

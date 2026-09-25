@@ -5,10 +5,10 @@ import type {
   CheckoutPayload,
   CheckoutResponse,
   DeliveryZones,
-  Fragrance,
-  FragranceFilters,
   OrderStatusResponse,
   Paginated,
+  Product,
+  ProductFilters,
   PromoPreview,
 } from "./types";
 
@@ -55,20 +55,20 @@ async function apiFetch<T>(shop: string, path: string, init?: RequestInit): Prom
   return response.json();
 }
 
-export async function getFragrances(
+export async function getProducts(
   shop: string,
-  filters: FragranceFilters = {},
-): Promise<Paginated<Fragrance>> {
+  filters: ProductFilters = {},
+): Promise<Paginated<Product>> {
   const params = new URLSearchParams(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== ""),
   );
   const qs = params.size > 0 ? `?${params}` : "";
 
-  return apiFetch(shop, `/fragrances${qs}`, { next: { revalidate: 60 } });
+  return apiFetch(shop, `/products${qs}`, { next: { revalidate: 60 } });
 }
 
-export async function getFragrance(shop: string, slug: string): Promise<Fragrance | null> {
-  const response = await fetch(`${base(shop)}/fragrances/${encodeURIComponent(slug)}`, {
+export async function getProduct(shop: string, slug: string): Promise<Product | null> {
+  const response = await fetch(`${base(shop)}/products/${encodeURIComponent(slug)}`, {
     headers: { Accept: "application/json" },
     next: { revalidate: 60 },
   });
@@ -121,8 +121,7 @@ export async function createOrder(
   if (payload.payment_method) form.append("payment_method", payload.payment_method);
   if (payload.website) form.append("website", payload.website);
   payload.items.forEach((item, i) => {
-    form.append(`items[${i}][fragrance_id]`, String(item.fragrance_id));
-    form.append(`items[${i}][size_ml]`, String(item.size_ml));
+    form.append(`items[${i}][variant_id]`, String(item.variant_id));
     form.append(`items[${i}][quantity]`, String(item.quantity));
   });
   form.append("proof", proof);

@@ -18,15 +18,18 @@ class ValidatePromoController extends Controller
         $data = $request->validate([
             'code' => ['required', 'string', 'max:64'],
             'items' => ['required', 'array', 'min:1', 'max:20'],
-            'items.*.fragrance_id' => ['required', 'integer'],
-            'items.*.size_ml' => ['required', 'integer', 'min:1'],
+            // A line names its variant (step 36b). The legacy fragrance_id + size_ml
+            // pair is still accepted from a pre-36b storefront until go-live.
+            'items.*.variant_id' => ['required_without:items.*.fragrance_id', 'integer'],
+            'items.*.fragrance_id' => ['required_without:items.*.variant_id', 'integer'],
+            'items.*.size_ml' => ['required_with:items.*.fragrance_id', 'integer', 'min:1'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:50'],
         ]);
 
         // re-derive the subtotal from the current catalog — never trust a client sum
         $subtotal = 0;
         foreach ($data['items'] as $i => $item) {
-            $price = Order::currentPriceFor((int) $item['fragrance_id'], (int) $item['size_ml']);
+            $price = Order::currentVariantFor($item);
 
             if (! $price) {
                 throw ValidationException::withMessages([

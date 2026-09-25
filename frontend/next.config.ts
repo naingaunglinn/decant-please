@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
   experimental: {
     viewTransition: true,
   },
+  // Step 36b: the detail page moved from /fragrance/{slug} to /product/{slug}.
+  // Shared links and search results keep working. Redirects run before the proxy,
+  // so this matches the public path and the host stays as it was.
+  async redirects() {
+    return [{ source: "/fragrance/:slug", destination: "/product/:slug", permanent: true }];
+  },
   images: {
     // Next 16's optimizer refuses upstreams that resolve to loopback/private IPs
     // even when remotePatterns allows them. Local dev's API *is* localhost, so

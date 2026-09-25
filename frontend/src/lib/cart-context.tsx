@@ -12,10 +12,13 @@ import {
 } from "react";
 import type { CartLine } from "./types";
 
-const STORAGE_KEY = "decant-please.cart.v1";
+// v2 (step 36b): a line is keyed by its variant. A v1 cart (fragrance + size,
+// no variant id) is not carried over: it can't name a variant without a refetch.
+const STORAGE_KEY = "decant-please.cart.v2";
+const LEGACY_STORAGE_KEY = "decant-please.cart.v1";
 
-export function cartLineKey(line: Pick<CartLine, "fragranceId" | "sizeMl">): string {
-  return `${line.fragranceId}:${line.sizeMl}`;
+export function cartLineKey(line: Pick<CartLine, "variantId">): string {
+  return String(line.variantId);
 }
 
 interface CartContextValue {
@@ -42,6 +45,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored) setLines(JSON.parse(stored));
     } catch {

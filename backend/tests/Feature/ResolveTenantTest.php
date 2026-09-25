@@ -24,7 +24,7 @@ class ResolveTenantTest extends TestCase
     public function test_an_unknown_shop_slug_404s(): void
     {
         $this->getJson('/api/v1/no-such-shop/meta')->assertNotFound();
-        $this->getJson('/api/v1/no-such-shop/fragrances')->assertNotFound();
+        $this->getJson('/api/v1/no-such-shop/products')->assertNotFound();
     }
 
     public function test_an_inactive_shop_404s(): void

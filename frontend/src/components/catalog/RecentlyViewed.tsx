@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { FragranceCard } from "./FragranceCard";
-import { getFragrance } from "@/lib/api";
+import { getProduct } from "@/lib/api";
 import { useTenant } from "@/lib/tenant-context";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
 const KEY = "decant-please.recently-viewed.v1";
 const LIMIT = 6;
@@ -39,16 +39,16 @@ export function RecordRecentlyViewed({ slug }: { slug: string }) {
 /** The home-page rail. Renders nothing until there's something to show. */
 export function RecentlyViewedRail({ exclude = [] }: { exclude?: string[] }) {
   const { slug: shop } = useTenant();
-  const [fragrances, setFragrances] = useState<Fragrance[]>([]);
+  const [fragrances, setFragrances] = useState<Product[]>([]);
 
   useEffect(() => {
     const slugs = readSlugs();
     if (slugs.length === 0) return;
 
     let stale = false;
-    Promise.all(slugs.map((slug) => getFragrance(shop, slug).catch(() => null))).then((results) => {
+    Promise.all(slugs.map((slug) => getProduct(shop, slug).catch(() => null))).then((results) => {
       if (stale) return;
-      const alive = results.filter((f): f is Fragrance => f !== null);
+      const alive = results.filter((f): f is Product => f !== null);
       setFragrances(alive);
       // prune anything deactivated since it was viewed
       if (alive.length !== slugs.length) writeSlugs(alive.map((f) => f.slug));

@@ -9,6 +9,40 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v41
+
+**v41** is the second half of step 36 (**#105**): the public contract catches up with the
+products + variants schema. A decant shop and its customers see nothing new; the one
+visible change is the address bar, which now says `/product/…`.
+
+- **API.** `GET /products` and `/products/{slug}` (`ProductController`, `ProductResource`,
+  `ProductVariantResource`). Each `prices[]` entry gains `id` (the variant id) and `label`
+  (`"10ml"`). The key stays `prices`, so the change is additive and a pre-36b
+  storefront keeps working against the new API.
+- **Checkout by variant.** `POST /orders` and `/orders/validate-promo` take
+  `items[].{variant_id, quantity}`. `Order::currentVariantFor()` is the one lookup: the
+  variant must be this shop's, active and in stock, with an active product and brand.
+  The price is still re-derived on the server.
+- **Deploy window (until go-live).** The old `/fragrances` routes still answer (same
+  controller), and the legacy `fragrance_id` + `size_ml` line still resolves to the same
+  variant (`variant_id` wins if both are sent). A queue row removes both after go-live.
+  This covers an old storefront on the new API only. The new storefront needs the new
+  API, so **the API deploys first**. Vercel deploys on push and Heroku only after CI, so
+  keep Heroku maintenance mode on from before the `main` promotion until the release is
+  out and `/products` answers.
+- **Storefront.** `types.ts`: `Fragrance → Product`, `DecantPrice → ProductVariant`,
+  `CheckoutItem {variant_id, quantity}`. The detail route is `app/[host]/product/[slug]`,
+  and `/fragrance/{slug}` 308-redirects to it (`next.config.ts` `redirects`, which run
+  before the proxy, so the host is kept). Cart lines are keyed by variant. The cart
+  storage key is now `v2`, so a cart saved before the deploy is not carried over.
+- **Docs.** `api.md` (the new paths and payload, plus the two stale spots: the `/meta`
+  `payment` block and the tracking receipt's payment fields), the READMEs, `AGENTS.md`
+  rule 2 and the `decant-money` skill now name `variant_id`.
+- **Tests.** The suite now checks out by `variant_id`. New tests cover the legacy pair,
+  the `/fragrances` aliases, and another shop's variant id being refused at checkout and
+  promo preview (`TenantIsolationTest`). Parity changed names only, plus the new `id` and
+  `label` on each price row; every value is the same.
+
 ## 0. What changed in v40
 
 **v40** is the first half of step 36 (**#105**): the catalog becomes products + variants

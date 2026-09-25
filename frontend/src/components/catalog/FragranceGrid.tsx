@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { FragranceCard } from "./FragranceCard";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
-export function FragranceGrid({ fragrances }: { fragrances: Fragrance[] }) {
+export function FragranceGrid({ fragrances }: { fragrances: Product[] }) {
   const reduced = useReducedMotion();
 
   if (fragrances.length === 0) {

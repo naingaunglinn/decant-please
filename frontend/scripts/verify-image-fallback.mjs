@@ -38,7 +38,7 @@ async function pickSubjects() {
   let missing = null;
 
   for (let page = 1, lastPage = 1; page <= lastPage; page++) {
-    const response = await fetch(`${API}/v1/${SHOP}/fragrances?per_page=50&page=${page}`);
+    const response = await fetch(`${API}/v1/${SHOP}/products?per_page=50&page=${page}`);
     if (!response.ok) throw new Error(`catalog fetch failed: HTTP ${response.status}`);
     const body = await response.json();
     lastPage = body.meta?.last_page ?? 1;
@@ -62,7 +62,7 @@ const page = await browser.newPage();
 
 // The failing case — the whole point of the issue.
 if (missing) {
-  await page.goto(`${BASE}/fragrance/${missing}`);
+  await page.goto(`${BASE}/product/${missing}`);
   const plate = page.getByRole("main").locator("article").first().locator("div.aspect-square").first();
   await plate.waitFor();
 
@@ -84,7 +84,7 @@ if (missing) {
 
 // The working case — proves the fallback didn't just swallow every image.
 if (loads) {
-  await page.goto(`${BASE}/fragrance/${loads}`);
+  await page.goto(`${BASE}/product/${loads}`);
   const image = page.getByRole("main").locator("article").first().locator("img").first();
   await image.waitFor();
   await check(

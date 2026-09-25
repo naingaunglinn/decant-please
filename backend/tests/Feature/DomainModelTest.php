@@ -109,8 +109,7 @@ class DomainModelTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [[
-                'fragrance_id' => $price->product_id,
-                'size_ml' => 10,
+                'variant_id' => $price->id,
                 'quantity' => 2,
                 'unit_price_mmk' => 1, // client-supplied price must be ignored
             ]],
@@ -142,8 +141,8 @@ class DomainModelTest extends TestCase
         // out-of-stock size
         try {
             Order::newFromCheckout($base + ['items' => [
-                ['fragrance_id' => $good->product_id, 'size_ml' => 10, 'quantity' => 1],
-                ['fragrance_id' => $outOfStock->product_id, 'size_ml' => 30, 'quantity' => 1],
+                ['variant_id' => $good->id, 'quantity' => 1],
+                ['variant_id' => $outOfStock->id, 'quantity' => 1],
             ]]);
             $this->fail('Expected ValidationException for out-of-stock item.');
         } catch (ValidationException $e) {
@@ -158,7 +157,7 @@ class DomainModelTest extends TestCase
         $good->product->update(['is_active' => false]);
         $this->expectException(ValidationException::class);
         Order::newFromCheckout($base + ['items' => [
-            ['fragrance_id' => $good->product_id, 'size_ml' => 10, 'quantity' => 1],
+            ['variant_id' => $good->id, 'quantity' => 1],
         ]]);
     }
 

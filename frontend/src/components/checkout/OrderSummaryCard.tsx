@@ -36,8 +36,7 @@ export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderS
 
   const cartItems = (): CheckoutItem[] =>
     lines.map((line) => ({
-      fragrance_id: line.fragranceId,
-      size_ml: line.sizeMl,
+      variant_id: line.variantId,
       quantity: line.quantity,
     }));
 

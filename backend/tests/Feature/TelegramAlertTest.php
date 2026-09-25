@@ -360,8 +360,7 @@ class TelegramAlertTest extends TestCase
             'address_line' => 'Sanchaung, Yangon',
             'website' => $honeypot ? 'https://spam.example' : '',
             'items' => [[
-                'fragrance_id' => $price->product_id,
-                'size_ml' => $price->size_ml,
+                'variant_id' => $price->id,
                 'quantity' => $quantity,
             ]],
         ];

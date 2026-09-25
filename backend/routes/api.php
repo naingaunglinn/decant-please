@@ -3,10 +3,10 @@
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CancelOrderController;
 use App\Http\Controllers\Api\DeliveryZoneController;
-use App\Http\Controllers\Api\FragranceController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentProofController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StorefrontHostController;
 use App\Http\Controllers\Api\TrackOrderController;
 use App\Http\Controllers\Api\ValidatePromoController;
@@ -26,8 +26,13 @@ Route::get('v1/_storefront/host/{host}', StorefrontHostController::class)
 Route::prefix('v1/{shop}')->middleware(ResolveTenant::class)->group(function () {
     Route::middleware('throttle:catalog')->group(function () {
         Route::get('/brands', BrandController::class);
-        Route::get('/fragrances', [FragranceController::class, 'index']);
-        Route::get('/fragrances/{slug}', [FragranceController::class, 'show']);
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::get('/products/{slug}', [ProductController::class, 'show']);
+        // Pre-36b names, kept so a pre-36b storefront keeps working once this API
+        // is live. The API deploys first (the 36b storefront needs /products).
+        // Removed after go-live (RUN-QUEUE).
+        Route::get('/fragrances', [ProductController::class, 'index']);
+        Route::get('/fragrances/{slug}', [ProductController::class, 'show']);
         Route::get('/meta', MetaController::class);
         Route::get('/delivery-zones', DeliveryZoneController::class);
     });

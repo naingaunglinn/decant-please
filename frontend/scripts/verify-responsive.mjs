@@ -58,7 +58,7 @@ const heightOf = async (loc) => (await loc.boundingBox())?.height ?? 0;
 // the image checks actually run (cards without one render the vial placeholder);
 // walk the shop pages to find one, falling back to the very first card
 await page.goto(`${BASE}/shop`);
-const cards = page.locator('main a[href^="/fragrance/"]');
+const cards = page.locator('main a[href^="/product/"]');
 await cards.first().waitFor();
 let pdpPath = await cards.first().getAttribute("href");
 for (let p = 1; p <= 5; p++) {

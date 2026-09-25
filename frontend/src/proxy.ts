@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * ADR-0004: the deterministic host → internal-path rewrite, and nothing else.
- * `client-a.com/fragrance/x` renders `app/[host]/…` as `/client-a.com/fragrance/x`;
+ * `client-a.com/product/x` renders `app/[host]/…` as `/client-a.com/product/x`;
  * the browser URL never changes, and the internal segment gives every rendered
  * page a cache key that carries the tenant by construction — the step-32 unkeyed-
  * cache lesson, applied to the route cache.

@@ -83,15 +83,15 @@ class ProductVariantTest extends TestCase
     {
         $this->tenMl->update(['is_active' => false]);
 
-        $this->getJson('/api/v1/decant-please/fragrances/'.$this->allure->slug)
+        $this->getJson('/api/v1/decant-please/products/'.$this->allure->slug)
             ->assertOk()
             ->assertJsonCount(1, 'data.prices')
             ->assertJsonPath('data.prices.0.size_ml', 5);
 
         // min price, the size filter and /meta all ignore it too
         $this->tenMl->update(['price_mmk' => 1000]);
-        $this->getJson('/api/v1/decant-please/fragrances')->assertJsonPath('data.0.min_price_mmk', 30000);
-        $this->getJson('/api/v1/decant-please/fragrances?size=10')->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/decant-please/products')->assertJsonPath('data.0.min_price_mmk', 30000);
+        $this->getJson('/api/v1/decant-please/products?size=10')->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/decant-please/meta')
             ->assertJsonPath('sizes', [5])
             ->assertJsonPath('price.min', 30000);
@@ -107,7 +107,7 @@ class ProductVariantTest extends TestCase
         $this->assertSame(0, Order::count());
 
         $this->postJson('/api/v1/decant-please/orders/validate-promo', [
-            'code' => 'ANY', 'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+            'code' => 'ANY', 'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1]],
         ])->assertUnprocessable()->assertJsonValidationErrors('items.0');
     }
 
@@ -166,7 +166,7 @@ class ProductVariantTest extends TestCase
         $this->allure->variants()->create(['size_ml' => 30, 'price_mmk' => 150000]);
         $this->allure->variants()->create(['size_ml' => 3, 'price_mmk' => 20000]);
         $this->assertSame([3, 5, 10, 30], $this->allure->variants()->pluck('size_ml')->all());
-        $this->getJson('/api/v1/decant-please/fragrances/'.$this->allure->slug)
+        $this->getJson('/api/v1/decant-please/products/'.$this->allure->slug)
             ->assertJsonPath('data.prices.*.size_ml', [3, 5, 10, 30]);
 
         $this->fiveMl->update(['position' => 2]);
@@ -188,7 +188,7 @@ class ProductVariantTest extends TestCase
             'phone' => '09-771234561',
             'delivery_township_id' => $this->serviceableTownship()->id,
             'address_line' => 'No. 12, Inya Road',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => $sizeMl, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($this->allure, $sizeMl), 'quantity' => 1]],
         ];
     }
 }

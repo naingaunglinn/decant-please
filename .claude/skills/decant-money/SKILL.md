@@ -29,7 +29,8 @@ two-decimal currency and instructs you to store minor units. Do not apply that r
 
 ## 2. Prices come from the server, always
 
-Checkout accepts only `fragrance_id`, `size_ml`, and `quantity`. The server re-derives every
+Checkout accepts only `variant_id` and `quantity` (step 36b; the legacy `fragrance_id` +
+`size_ml` pair resolves to the same variant until go-live). The server re-derives every
 price from the current catalog and writes immutable snapshots onto the order items.
 
 Both halves of that need preserving:

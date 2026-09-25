@@ -93,12 +93,19 @@ abstract class TestCase extends BaseTestCase
         return $township;
     }
 
+    /** The id checkout names a line by (step 36b): the product's variant of that size. */
+    protected function variantId(Product $product, int $sizeMl): int
+    {
+        return $product->variants()->where('size_ml', $sizeMl)->valueOrFail('id');
+    }
+
     /**
      * A shared catalog fragrance for order-item fixtures. Since #67, balanceDue() and
      * the "Balance outstanding" stat read line snapshots, so an order needs a real item —
      * callers add one with unit_price_mmk = the intended line total. firstOrCreate keeps
      * it to one per shop, idempotent across repeated helper calls in a test.
      */
+
     protected function itemFragrance(): Product
     {
         $brand = Brand::firstOrCreate(['name' => 'Fixture Brand'], ['type' => 'designer']);

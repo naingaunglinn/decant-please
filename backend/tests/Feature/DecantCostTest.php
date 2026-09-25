@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Widgets\OrderStats;
 use App\Http\Controllers\Api\TrackOrderController;
-use App\Http\Resources\FragranceResource;
+use App\Http\Resources\ProductResource;
 use App\Models\Brand;
 use App\Models\Order;
 use App\Models\Product;
@@ -146,8 +146,8 @@ class DecantCostTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [
-                ['fragrance_id' => $costed->id, 'size_ml' => 10, 'quantity' => 1],
-                ['fragrance_id' => $uncosted->id, 'size_ml' => 10, 'quantity' => 1],
+                ['variant_id' => $this->variantId($costed, 10), 'quantity' => 1],
+                ['variant_id' => $this->variantId($uncosted, 10), 'quantity' => 1],
             ],
         ]);
 
@@ -185,7 +185,7 @@ class DecantCostTest extends TestCase
         $receipt = json_encode(TrackOrderController::receipt($order->fresh()->load('items.product.brand')));
         $this->assertStringNotContainsString('cost', strtolower($receipt));
 
-        $resource = json_encode(FragranceResource::make($fragrance->load('brand', 'activeVariants'))->resolve());
+        $resource = json_encode(ProductResource::make($fragrance->load('brand', 'activeVariants'))->resolve());
         $this->assertStringNotContainsString('cost', strtolower($resource));
         $this->assertStringNotContainsString('bottle', strtolower($resource));
 
@@ -225,8 +225,7 @@ class DecantCostTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [[
-                'fragrance_id' => $fragrance->id,
-                'size_ml' => $sizeMl,
+                'variant_id' => $this->variantId($fragrance, $sizeMl),
                 'quantity' => $quantity,
             ]],
         ]);

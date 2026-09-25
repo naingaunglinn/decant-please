@@ -74,8 +74,7 @@ export function CheckoutClient() {
           website: honeypot,
           promo_code: promoCode ?? undefined,
           items: lines.map((line) => ({
-            fragrance_id: line.fragranceId,
-            size_ml: line.sizeMl,
+            variant_id: line.variantId,
             quantity: line.quantity,
           })),
         },

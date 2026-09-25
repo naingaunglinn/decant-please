@@ -163,7 +163,7 @@ These are invariants, not preferences. Breaking one is a bug even if tests pass.
      one is a design decision — say so and wait, do not just add it.
    - A new tenant-owned table ships with its isolation test in the same PR. No exceptions.
 1. **Money is integer Myanmar Kyat.** Never floats, never decimals. Display `50,000 Ks`.
-2. **The server derives every price.** The client sends only `fragrance_id`, `size_ml`,
+2. **The server derives every price.** The client sends only `variant_id`,
    `quantity`, `delivery_township_id`. A client-sent price, total, or delivery fee is
    ignored — never trusted, never persisted.
 3. **Snapshots are frozen at write.** `fragrance_name_snapshot`, `unit_price_mmk`,
