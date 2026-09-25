@@ -9,6 +9,31 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v51
+
+**v51** fixes the four pre-existing defects step 42 found (**#134**, RUN-QUEUE row 10b).
+No migration.
+
+- **The receipt names an item as it sold.** `TrackOrderController::receipt()` reads the
+  line's `fragrance_name_snapshot` (`Brand Name`, frozen at checkout) instead of composing
+  `Brand — Name (Concentration)` from the live product. Renaming a product or its brand no
+  longer rewrites an old receipt (AGENTS.md §4 rule 3). The receipt string loses the
+  em dash and the concentration suffix; it now matches the admin and the Telegram alert.
+  The `fragrance_name` key is unchanged.
+- **`decant:fresh-start` deletes variant photos** (`product_variants.image_path`, step 38)
+  from the media disk by stored path, like product images. Scoped to the reset shop; the
+  two-shop fresh-start isolation test now covers the photos too.
+- **The payment-proof upload checks the order.** `Order::acceptsPaymentProof()` refuses a
+  paid, cancelled or rejected order with a `409`, before anything is stored. A replacement
+  would delete the slip the seller confirmed against. Delivered-but-unpaid still accepts
+  a slip. The wrong-credentials 404 is unchanged and comes first. The storefront shows the
+  409's message instead of "check your connection" (`uploadPaymentProof` throws
+  `ApiConflictError`).
+- **Generic wording**: `That item is no longer available.` and `Product not found.`
+  replace the two "fragrance" strings a clothing shop's customers could see.
+- `backend/docs/api.md` updated: the snapshot rule for `fragrance_name`, the payment-proof
+  `409`, and the two strings.
+
 ## 0. What changed in v50
 
 **v50** is step 42 (**#133**), the last step of the generic-shop refactor. It is docs only:

@@ -214,6 +214,76 @@ class PaymentTest extends TestCase
         Storage::disk($disk)->assertExists($second);
     }
 
+    public function test_payment_proof_is_refused_once_the_order_is_paid_and_the_confirmed_slip_survives(): void
+    {
+        // A replacement deletes the previous object (the updated hook), so an upload
+        // after "mark paid" would destroy the slip the seller confirmed against (#134).
+        $disk = $this->fakeProofsDisk();
+        $order = $this->order();
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
+            'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
+            'proof' => UploadedFile::fake()->image('confirmed.jpg'),
+        ])->assertOk();
+        $confirmed = $order->fresh()->payment_proof_path;
+        $order->fresh()->markPaid();
+        $before = Storage::disk($disk)->allFiles();
+
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
+            'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
+            'proof' => UploadedFile::fake()->image('late.jpg'),
+        ])->assertStatus(409)->assertJsonStructure(['message']);
+
+        $this->assertSame($confirmed, $order->fresh()->payment_proof_path);
+        Storage::disk($disk)->assertExists($confirmed);
+        // refused before store(): no orphaned object on the private disk
+        $this->assertSame($before, Storage::disk($disk)->allFiles());
+    }
+
+    public function test_payment_proof_is_refused_on_cancelled_and_rejected_orders(): void
+    {
+        $disk = $this->fakeProofsDisk();
+
+        foreach ([OrderStatus::Cancelled, OrderStatus::Rejected] as $status) {
+            $order = $this->order(status: $status);
+
+            $this->postJson('/api/v1/decant-please/orders/payment-proof', [
+                'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
+                'proof' => UploadedFile::fake()->image('transfer.jpg'),
+            ])->assertStatus(409);
+
+            $this->assertNull($order->fresh()->payment_proof_path);
+        }
+
+        $this->assertSame([], Storage::disk($disk)->allFiles());
+    }
+
+    public function test_payment_proof_is_still_accepted_on_a_delivered_unpaid_order(): void
+    {
+        // Delivered is terminal, but an online order can go out before the transfer
+        // lands — the storefront still shows the upload, so the API takes it.
+        $this->fakeProofsDisk();
+        $order = $this->order(status: OrderStatus::Delivered);
+
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
+            'tracking_code' => $order->tracking_code, 'phone' => $order->phone,
+            'proof' => UploadedFile::fake()->image('transfer.jpg'),
+        ])->assertOk()->assertJsonPath('has_payment_proof', true);
+    }
+
+    public function test_payment_proof_on_a_paid_order_with_the_wrong_phone_is_the_generic_404(): void
+    {
+        // The status check runs after the lookup: a guess never learns an order
+        // exists by getting a 409 instead of the not-found every miss returns.
+        $this->fakeProofsDisk();
+        $order = $this->order();
+        $order->markPaid();
+
+        $this->postJson('/api/v1/decant-please/orders/payment-proof', [
+            'tracking_code' => $order->tracking_code, 'phone' => '09-000000000',
+            'proof' => UploadedFile::fake()->image('transfer.jpg'),
+        ])->assertNotFound()->assertJsonPath('message', "We couldn't find an order with that code and phone number.");
+    }
+
     public function test_tracking_receipt_reports_payment_status_and_balance_due(): void
     {
         $order = $this->order(total: 55000, deposit: 5000);

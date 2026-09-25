@@ -12,7 +12,8 @@ use Illuminate\Http\Request;
 /**
  * The customer uploads a screenshot of their offline transfer. Gated by the same
  * exact tracking_code + phone pair as tracking/cancel — no guessing oracle — and,
- * like cancel, only meaningful while the order isn't already settled. Uploading
+ * like cancel, refused with a 409 once the order is settled (paid, cancelled or
+ * rejected — Order::acceptsPaymentProof). Uploading
  * proof does NOT mark the order paid: the decanter still eyeballs the screenshot
  * and confirms in the admin. This just moves the screenshot out of DMs and onto
  * the order.
@@ -32,6 +33,13 @@ class PaymentProofController extends Controller
 
         if (! $order) {
             return TrackOrderController::notFoundResponse();
+        }
+
+        // After the generic 404 (the oracle rule), before anything is stored.
+        if (! $order->acceptsPaymentProof()) {
+            return response()->json([
+                'message' => "This order doesn't need a payment slip any more — call us if something's wrong.",
+            ], 409);
         }
 
         $hadProof = $order->payment_proof_path !== null;

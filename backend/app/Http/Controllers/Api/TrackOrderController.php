@@ -62,8 +62,9 @@ class TrackOrderController extends Controller
             'phone' => $order->phone,
             'address' => $order->address,
             'items' => $order->items->map(fn (OrderItem $item): array => [
-                'fragrance_name' => ($item->product->brand ? "{$item->product->brand->name} — " : '').$item->product->name
-                    .(($concentration = $item->product->attrDisplay('concentration')) !== null ? " ({$concentration})" : ''),
+                // The name as it sold, frozen at checkout (§4 rule 3) — renaming the
+                // product or its brand never rewrites an old receipt (#134).
+                'fragrance_name' => $item->fragrance_name_snapshot,
                 'size_ml' => $item->size_ml,
                 // How the line's variant read when it sold: "10ml", "M / Blue" (step 38).
                 'variant_label' => $item->variantLabel(),

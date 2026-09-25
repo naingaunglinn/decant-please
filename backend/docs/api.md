@@ -49,7 +49,7 @@ wrong. Don't build UI that tries to distinguish; it can't.
 ```
 
 Item-level problems are keyed `items.N` (e.g. `items.0`) with one of:
-- `That fragrance is no longer available.` — unknown id (or another shop's), or product/brand deactivated
+- `That item is no longer available.` — unknown id (or another shop's), or product/brand deactivated
 - `{label} of {name} just sold out — pick another size.` — the variant exists but is out of stock or archived (`{label}` is e.g. `10ml`)
 
 **Rate limits are per-endpoint buckets, keyed by shop + client IP** (step 32).
@@ -173,7 +173,7 @@ The key is still `prices` (not `variants`) so the shape stayed additive across s
 
 ## `GET /products/{slug}`
 
-`{ "data": { …product object… } }`, or `404` `{ "message": "Fragrance not found." }` —
+`{ "data": { …product object… } }`, or `404` `{ "message": "Product not found." }` —
 inactive products and products of inactive brands 404 exactly like unknown slugs.
 
 ## `GET /meta`
@@ -373,8 +373,8 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
   "customer_name": "Ma Thiri",
   "phone": "09-123456789",
   "address": "…",
-  "items": [                         // fragrance_name: the product as it reads now (below)
-    { "fragrance_name": "Creed — Aventus (EDP)", "size_ml": 10, "variant_label": "10ml",
+  "items": [                         // fragrance_name: the name as it sold (below)
+    { "fragrance_name": "Creed Aventus", "size_ml": 10, "variant_label": "10ml",
       "quantity": 2, "unit_price_mmk": 38000, "line_total_mmk": 76000 }
   ],
   "subtotal_mmk": 76000,
@@ -388,11 +388,10 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
 }
 ```
 
-**Known defect (#134):** an item's `fragrance_name` is composed from the **current**
-product row (brand — name, plus the concentration where the template has one), not from
-the order line's frozen name snapshot, so renaming a product renames it on old receipts.
-That breaks the snapshot rule and is queued to be fixed; clients should not rely on it.
-Its prices, `size_ml` and `variant_label` are the line's own and never move.
+An item's `fragrance_name` is the line's frozen name snapshot — `Brand Name`, or just the
+name for a product without a brand — written once at checkout. Renaming the product or
+its brand never changes an old receipt (#134). The key keeps its name for every
+category. Its prices, `size_ml` and `variant_label` are the line's own too and never move.
 
 `balance_due_mmk` is the one money field that can be **negative** (#67): it is
 `Σ line_total − discount + delivery_fee − deposit`, derived from the line snapshots so a
@@ -442,7 +441,14 @@ credentials and the same generic 404 as tracking), and `proof` (jpeg/png/webp im
 replaces the order's earlier slip, and the old object is deleted.
 
 Uploading a slip does **not** mark the order paid — the seller checks it and marks it
-paid in the admin. The server doesn't check the order's status here.
+paid in the admin.
+
+Once the order is **paid**, **cancelled** or **rejected**, the upload is refused with
+`409` `{ "message": "This order doesn't need a payment slip any more — call us if
+something's wrong." }` and nothing is stored: a replacement would delete the slip the
+seller confirmed against (#134). A delivered order that is still unpaid accepts a slip.
+The check runs after the credential lookup, so a wrong code or phone is still the
+generic 404, never a 409.
 
 ## `POST /orders/validate-promo` — preview only
 

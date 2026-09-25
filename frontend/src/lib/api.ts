@@ -180,8 +180,9 @@ export async function trackOrder(
 
 /** Uploads the customer's transfer screenshot. Multipart, so Content-Type is left
  *  to the browser (it sets the boundary). Same generic-404 contract as trackOrder;
- *  a 422 (wrong file type/size) throws ApiValidationError. Does NOT mark the order
- *  paid — the decanter confirms that separately. */
+ *  a 422 (wrong file type/size) throws ApiValidationError, a 409 (order already
+ *  paid, cancelled or rejected — a stale page) throws ApiConflictError. Does NOT
+ *  mark the order paid — the decanter confirms that separately. */
 export async function uploadPaymentProof(
   shop: string,
   trackingCode: string,
@@ -205,12 +206,19 @@ export async function uploadPaymentProof(
     const body = await response.json();
     throw new ApiValidationError(body.message ?? "Validation failed.", body.errors ?? {});
   }
+  if (response.status === 409) {
+    const body = await response.json().catch(() => null);
+    throw new ApiConflictError(
+      body?.message ?? "This order doesn't need a payment slip any more — call us if something's wrong.",
+    );
+  }
   if (!response.ok) throw new Error(`API request failed: ${response.status}`);
 
   return response.json();
 }
 
-/** Thrown when a cancel arrives too late — the order is already being prepared. */
+/** Thrown when a cancel arrives too late (the order is already being prepared), or a
+ *  payment slip arrives for an order that no longer takes one. */
 export class ApiConflictError extends Error {
   constructor(message: string) {
     super(message);

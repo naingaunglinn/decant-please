@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
-import { getMeta, uploadPaymentProof, ApiValidationError } from "@/lib/api";
+import { getMeta, uploadPaymentProof, ApiConflictError, ApiValidationError } from "@/lib/api";
 import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { OrderStatusResponse, PaymentInfo } from "@/lib/types";
@@ -73,7 +73,9 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
       setError(
         e instanceof ApiValidationError
           ? (Object.values(e.errors)[0]?.[0] ?? e.message)
-          : "Upload didn't go through — check your connection and try again.",
+          : e instanceof ApiConflictError
+            ? e.message
+            : "Upload didn't go through — check your connection and try again.",
       );
     } finally {
       setUploading(false);
