@@ -9,6 +9,27 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v39
+
+**v39** records the generic-shop refactor's parity baseline (**#104**, step 35). One new
+test file. No migration, no API change, no app code, no dependency.
+
+- **`tests/Feature/GenericShopParityTest.php`** freezes a decant shop at 2026-03-15 and
+  asserts, as hand-worked literal Kyat: the `/fragrances` list and detail objects with
+  `min_price_mmk` and every price, `/meta`'s filter options, sizes and price bounds, each
+  order's server-derived money (items, discount, fee, total, deposit, liquid cost, signed
+  balance), the dashboard's revenue, gross margin ("on 3 of 4"), order count and balance
+  outstanding, and `MonthlyPnl` for March and February, every field.
+- The fixture covers each money rule: the ceiling cost division, a capped percent promo
+  through `POST /orders`, a township fee, fully-, partially- and un-costed orders, a
+  cancelled and a rejected order, an overpaid order, last month's order, expenses in every
+  category across three months, and a second shop whose sale must move nothing.
+- Steps 36–42 keep it green. A step may rename a field it deliberately renames, never a
+  value. It can't guard a *data* migration (the fixture is built after migrations), so the
+  step plan now asks each backfilling step to test its own migration.
+- Checked by mutation: switching the cost rounding from ceiling to floor fails 4 of its 7
+  tests.
+
 ## 0. What changed in v38
 
 **v38** fixes the letterhead bug (**#116**): the admin's printed documents named the

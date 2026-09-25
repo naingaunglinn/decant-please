@@ -17,8 +17,8 @@ Principles P1–P6) throughout.
 
 ## Progress (source of truth for resuming)
 
-- [ ] **Pre-35 — #67 first** (correct money before the baseline) — *see Sequencing below*
-- [ ] **35** — Baseline parity test
+- [x] **Pre-35 — #67 first** (correct money before the baseline) — merged before the baseline was recorded
+- [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
 - [ ] **36** — Product + Variant model
 - [ ] **37** — Templates + attributes
 - [ ] **38** — Clothing template
@@ -108,8 +108,19 @@ filter options + `price`/`sizes`, `OrderStats` revenue + gross margin, and
 `MonthlyPnl::for($y,$m)` (sales income, COGS, gross margin, delivery result, net operating).
 Reuse the patterns in `PublicApiTest`, `DecantCostTest`, `ExpensePnlTest`.
 
+**As built (#104).** The fixture is written inside the test, not taken from the demo seeders:
+the seeders are sample content later steps rewrite, and they read `today()` and random
+tracking codes. The clock is frozen at 2026-03-15 10:00 (`travelTo`); ids are compared to the
+fixture's own models, never literals (Postgres sequences don't roll back). `/meta`'s
+`social`/`payment` blocks are left out (they resolve through env). Beyond the spec, it also
+pins each order's derived money (items, discount, fee, total, deposit, cost, signed balance)
+and the "Balance outstanding" stat, since #67 had landed.
+
 **Risks.** Determinism (freeze seed data + dates). Must assert money as values so a later
-rename can't silently move a figure.
+rename can't silently move a figure. **The fixture is created after migrations run**, so
+parity cannot catch a bad *data* migration — a step that backfills or moves stored values
+(36's `product_variant_id` backfill, 37's attribute move, 39's status rename, 40's
+`stock_ml` move) tests that migration on its own seeded rows.
 
 **Deliberately not built.** No storefront pixel snapshots (that's `frontend/scripts/verify-*.mjs`);
 no exhaustive per-widget coverage beyond revenue/margin/P&L.
