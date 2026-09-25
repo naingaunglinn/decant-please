@@ -25,7 +25,7 @@ Principles P1–P6) throughout.
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [x] **39** — Status labels (template-driven; `decanted→prepared`) — **built** (v46, #126)
 - [x] **40** — Stock modes (`per_variant` / `pooled`) — split in two (#128): **40a built** (v47: both modes, draw-down under lock, per-variant cost, low stock), **40b built** (v48: Myanmar weight units — `stock_unit`, frozen line `measure`, the unit guard)
-- [ ] **41** — Module toggles
+- [x] **41** — Module toggles — **built** (v49, #131)
 - [ ] **42** — Design-spec sync (docs)
 
 Issues: 35–38 created with this plan (#103's PR); 39–42 issues are opened as each step starts
@@ -613,6 +613,42 @@ order path is never broken by a disabled module (P2).
 
 **Deliberately not built.** No per-user module permissions (Shield handles auth); modules are
 per-shop.
+
+**As built (v49, #131).**
+
+- **Keys** live in `App\Support\Modules` (constants, not an enum under `app/Enums`):
+  `stock`, `cost_margin`, `production_schedule`, `promo_codes`, `expenses`. Stored keys,
+  never renamed. `DecantTemplate`'s unread `cost` became `cost_margin`.
+- **`shop_settings.modules` jsonb, null = the shop template's defaults.** No backfill:
+  every existing shop keeps exactly today's screens. The Features page (Settings) saves
+  the full enabled set; a saved set doesn't pick up a module a template later turns on
+  by default. Unknown keys are dropped on read and write.
+- **One resolver**, `Modules::on()` / `enabled()`, memoised per shop id with `once()`;
+  `ShopSetting`'s saved hook flushes it (and the status-label memo) with the `/meta`
+  cache. No tenant (console): every module.
+- **Defaults** follow the roadmap's group-1 column: decant all five; clothing drops the
+  production schedule but keeps stock and cost (per-variant, step 40 — the pre-40
+  comment that left them out was stale).
+- **Off hides screens, never writes.** Pages and resources refuse their URL
+  (`canAccess`, Shield still applies), widgets drop (`canView`), and form fields and
+  columns are left out. Draw-down still runs on any counted product, and each order line
+  still freezes its cost (the admin line's cost field is hidden but still saved), so
+  turning a module back on shows true numbers.
+- **Surfaces**: production schedule → both schedule pages, "Upcoming decants";
+  stock → low-stock panel, product stock sections and column, the Accept shortfall
+  warning; cost & margin → product cost section, variant cost, Cost/ml column, the
+  order line's cost field, the order and dashboard margin; promo codes → the resource,
+  the discount widget, and `PromoCode::evaluate()` (one place — preview and checkout
+  both answer "not found", the order goes through at full price); expenses → the
+  resource and Profit & loss.
+- **API**: `/meta` gains `modules` (additive; `types.ts` optional). The storefront
+  checkout hides the promo box without `promo_codes`, and shows it when the list is
+  missing.
+- Not built: delivery zones as a module (checkout needs a township — off would break
+  the order path; groups 3/4 add the no-delivery path); hiding `prep_date` (Accept and
+  the order form need it; only the calendar is the module); the orders CSV keeps its
+  cost/margin columns (a fixed export shape); Burmese labels on the Features page (the
+  admin is English-only today).
 
 ## Step 42 — Design-spec sync (docs)  *(after 39–41)*
 

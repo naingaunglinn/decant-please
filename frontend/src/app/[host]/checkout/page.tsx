@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CheckoutClient } from "@/components/checkout/CheckoutClient";
+import { getMeta } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
 
 export const metadata: Metadata = {
@@ -15,7 +16,11 @@ export function generateStaticParams(): Array<{ host: string }> {
 
 export default async function CheckoutPage({ params }: { params: Promise<{ host: string }> }) {
   const { host } = await params;
-  await tenantPage(host, "/checkout"); // 404 unknown hosts, 308 secondaries
+  const tenant = await tenantPage(host, "/checkout"); // 404 unknown hosts, 308 secondaries
+  // Promo codes off (step 41) → no code box. A failed /meta or one from before
+  // the field existed shows the box; the server refuses a code either way.
+  const meta = await getMeta(tenant.slug).catch(() => null);
+  const promoCodes = meta?.modules?.includes("promo_codes") ?? true;
 
   return (
     <div className="mx-auto max-w-[880px] px-4 py-12 sm:px-6 md:py-16">
@@ -27,7 +32,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ host:
       </p>
 
       <div className="mt-10">
-        <CheckoutClient />
+        <CheckoutClient promoCodes={promoCodes} />
       </div>
     </div>
   );

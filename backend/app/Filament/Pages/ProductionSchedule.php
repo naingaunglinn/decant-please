@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\Modules;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
@@ -21,6 +22,12 @@ class ProductionSchedule extends Page
     protected static string|UnitEnum|null $navigationGroup = 'Sales';
 
     protected static ?int $navigationSort = 2;
+
+    /** Hidden, and its URL refused, while the shop has the module off (step 41). */
+    public static function canAccess(): bool
+    {
+        return Modules::on(Modules::PRODUCTION_SCHEDULE) && parent::canAccess();
+    }
 
     /**
      * FullCalendar's event feed: one all-day entry per day with work, titled

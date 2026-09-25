@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Enums\OrderStatus;
 use App\Filament\Pages\ProductionSchedule;
 use App\Models\Order;
+use App\Support\Modules;
 use App\Support\Money;
 use App\Templates\Templates;
 use Filament\Actions\Action;
@@ -18,6 +19,12 @@ class UpcomingDecants extends TableWidget
     protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';
+
+    /** Off the dashboard while the shop has the module off (step 41). */
+    public static function canView(): bool
+    {
+        return Modules::on(Modules::PRODUCTION_SCHEDULE) && parent::canView();
+    }
 
     public function table(Table $table): Table
     {

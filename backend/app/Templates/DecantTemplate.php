@@ -4,6 +4,7 @@ namespace App\Templates;
 
 use App\Enums\Concentration;
 use App\Enums\Gender;
+use App\Support\Modules;
 
 /**
  * Perfume decants — the first template (roadmap group 1). Its attributes are the
@@ -92,7 +93,7 @@ class DecantTemplate extends Template
 
     public function defaultModules(): array
     {
-        return ['delivery_zones', 'stock', 'cost', 'production_schedule', 'promo_codes', 'expenses'];
+        return [Modules::STOCK, Modules::COST_MARGIN, Modules::PRODUCTION_SCHEDULE, Modules::PROMO_CODES, Modules::EXPENSES];
     }
 
     /**

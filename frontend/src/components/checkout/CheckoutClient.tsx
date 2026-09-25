@@ -18,7 +18,7 @@ export interface CheckoutErrors {
 
 const NO_ERRORS: CheckoutErrors = { fields: {}, lines: {}, general: null };
 
-export function CheckoutClient() {
+export function CheckoutClient({ promoCodes }: { promoCodes: boolean }) {
   const { slug: shop } = useTenant();
   const { lines, subtotal, hydrated, clear } = useCart();
   const router = useRouter();
@@ -154,6 +154,7 @@ export function CheckoutClient() {
         <OrderSummaryCard
           lineErrors={errors.lines}
           township={township}
+          promoCodes={promoCodes}
           onPromoChange={(code, discountMmk) => {
             setPromoCode(code);
             setPromoDiscount(discountMmk);

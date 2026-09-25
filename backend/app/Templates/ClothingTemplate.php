@@ -2,6 +2,8 @@
 
 namespace App\Templates;
 
+use App\Support\Modules;
+
 /**
  * Clothing — the second template (step 38; roadmap group 1), the one that proves
  * the generic catalog. A variant is a Size + Color pair ({"Size":"M","Color":"Blue"})
@@ -95,7 +97,8 @@ class ClothingTemplate extends Template
 
     public function defaultModules(): array
     {
-        // Read by step 41. No ml stock, cost or decant schedule.
-        return ['delivery_zones', 'promo_codes', 'expenses'];
+        // Per-variant stock and cost (step 40); no production schedule — a
+        // clothing seller packs what's on the shelf (roadmap: decant only).
+        return [Modules::STOCK, Modules::COST_MARGIN, Modules::PROMO_CODES, Modules::EXPENSES];
     }
 }

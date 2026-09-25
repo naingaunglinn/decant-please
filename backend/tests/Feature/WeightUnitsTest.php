@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Shop;
 use App\Models\ShopSetting;
+use App\Support\Modules;
 use App\Support\StockUnit;
 use App\Support\TenantContext;
 use App\Templates\Attribute;
@@ -414,6 +415,7 @@ class TestWeighedTemplate extends Template
 
     public function defaultModules(): array
     {
-        return [];
+        // Group 1's defaults (roadmap), like the produce template it stands in for.
+        return [Modules::STOCK, Modules::COST_MARGIN, Modules::PROMO_CODES, Modules::EXPENSES];
     }
 }

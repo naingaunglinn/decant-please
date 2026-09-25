@@ -9,6 +9,38 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v49
+
+**v49** is step 41 (**#131**). Each shop turns optional features on and off. A shop that
+never touches it sees exactly what it saw before.
+
+- **Five modules**, keys in `App\Support\Modules`: `stock`, `cost_margin`,
+  `production_schedule`, `promo_codes`, `expenses`. Delivery zones stay core (checkout
+  needs a township).
+- **Migration** `2026_10_02_000000_add_modules_to_shop_settings` adds
+  `shop_settings.modules` (jsonb, null). Null means the shop template's defaults
+  (`Template::defaultModules()`), so no backfill. Up → down → up on Postgres 17.
+- **Defaults**: decant, all five. Clothing, all but the production schedule.
+- **Features page** (admin → Settings) with plain-word descriptions. Saving stores the full
+  enabled set and reloads, so the menu changes at once.
+- **Off hides, never writes.** Pages and resources refuse their URL, widgets drop off the
+  dashboard, and stock and cost fields leave the product and order forms. Stock still
+  draws down and each order line still freezes its cost, so turning a module back on shows
+  true numbers.
+- **Promo codes off is enforced on the server**: `PromoCode::evaluate()` answers every
+  code as not found. Checkout still places the order, at full price. `/meta` gains
+  `modules`, and the storefront checkout hides the promo box without `promo_codes`.
+- Tests: `ModuleTogglesTest` (10). It covers defaults, two shops in one request, the
+  Features page, the exact admin menu before and after, typed URLs refused, fields
+  hidden but numbers kept, `/meta`, promo refusal with a full-price checkout, and the
+  core order loop with every module off. The weighed test template gets group 1's
+  defaults.
+
+**Deploy:** migration first (additive, nullable). The API change is additive, and the
+storefront treats a missing `modules` as all on, so either half can go first. Rollback:
+the migration's `down()` drops the column; existing shops were on template defaults
+anyway.
+
 ## 0. What changed in v48
 
 **v48** is step 40b (**#128**). Pooled stock can be counted by weight, in the Myanmar units

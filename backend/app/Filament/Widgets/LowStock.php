@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Support\Modules;
 use App\Templates\Templates;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -23,6 +24,12 @@ class LowStock extends TableWidget
     protected static ?int $sort = 5;
 
     protected int|string|array $columnSpan = 'full';
+
+    /** Off the dashboard while the shop has the module off (step 41). */
+    public static function canView(): bool
+    {
+        return Modules::on(Modules::STOCK) && parent::canView();
+    }
 
     public function table(Table $table): Table
     {

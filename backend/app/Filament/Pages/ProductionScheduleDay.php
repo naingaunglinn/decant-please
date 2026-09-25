@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Order;
+use App\Support\Modules;
 use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
@@ -21,6 +22,12 @@ class ProductionScheduleDay extends Page
     protected static ?string $slug = 'production-schedule/{date}';
 
     public string $date = '';
+
+    /** Hidden, and its URL refused, while the shop has the module off (step 41). */
+    public static function canAccess(): bool
+    {
+        return Modules::on(Modules::PRODUCTION_SCHEDULE) && parent::canAccess();
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
