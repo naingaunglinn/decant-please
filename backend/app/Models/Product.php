@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToShop;
 use App\Models\Concerns\HasSlug;
+use App\Support\StockUnit;
 use App\Templates\Template;
 use App\Templates\Templates;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
-#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_amount', 'low_stock_threshold', 'bottle_cost_mmk', 'bottle_volume_ml'])]
+#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_amount', 'stock_unit', 'low_stock_threshold', 'reference_cost_mmk', 'reference_amount'])]
 /**
  * A catalog product (step 36; was `Fragrance`). Its sellable options are
  * ProductVariant rows. What it carries beyond the core columns is its template's
@@ -45,6 +46,8 @@ class Product extends Model
                 && ! Category::query()->whereKey($product->category_id)->exists()) {
                 throw new InvalidArgumentException('That category does not exist in this shop.');
             }
+
+            $product->stampStockUnit();
 
             if ($product->search_text === null || $product->isDirty(['name', 'brand_id', 'attributes', 'template'])) {
                 $product->refreshSearchText();
@@ -100,9 +103,9 @@ class Product extends Model
      */
     public function variants(): HasMany
     {
-        // size_ml breaks position ties, so a variant created without a position
-        // (all of them today) still lists smallest-first, as decant sizes always have.
-        return $this->hasMany(ProductVariant::class)->orderBy('position')->orderBy('size_ml')->orderBy('id');
+        // measure breaks position ties (it mirrors size_ml for decant; step 40b
+        // weighs by it), so a variant created without a position lists smallest-first.
+        return $this->hasMany(ProductVariant::class)->orderBy('position')->orderBy('measure')->orderBy('id');
     }
 
     /** What a customer can see and buy: archived variants never leave the admin. */
@@ -150,6 +153,58 @@ class Product extends Model
     public function pooledStock(): bool
     {
         return $this->catalogTemplate()->pooledStock();
+    }
+
+    /**
+     * A pooled product's numbers are in its template's unit (step 40b): a new one
+     * takes it; a switch to a template in another unit is refused while anything
+     * is counted in the old one — the stock, the reference purchase, a variant's
+     * size, or an order line's frozen amount. Otherwise 500 ml would read as 500
+     * kyatthar, and a "10ml" variant or an accepted order's 10ml would draw 10
+     * kyatthar. A per-variant template keeps the unit, so switching back to the
+     * same one loses nothing.
+     */
+    protected function stampStockUnit(): void
+    {
+        $template = $this->catalogTemplate();
+        $unit = $template->pooledStock() ? $template->measure() : null;
+
+        if ($unit === null || $unit === $this->stock_unit) {
+            return;
+        }
+
+        if ($this->exists && ($this->stock_amount !== null || $this->reference_cost_mmk !== null
+            || $this->reference_amount !== null || $this->hasMeasuredRows())) {
+            throw new InvalidArgumentException(
+                'This product is counted in '.($this->stock_unit ?? 'another unit').'. Clear its stock and cost first — or, once it has sold, add it again as a new product.'
+            );
+        }
+
+        $this->stock_unit = $unit;
+    }
+
+    private function hasMeasuredRows(): bool
+    {
+        return ProductVariant::query()
+            ->where('product_variants.product_id', $this->id)
+            ->whereNotNull('product_variants.measure')
+            ->exists()
+            || OrderItem::query()
+                ->where('order_items.product_id', $this->id)
+                ->whereNotNull('order_items.measure')
+                ->exists();
+    }
+
+    /** The unit its pooled figures are in: stored, else its template's. */
+    public function stockUnit(): string
+    {
+        return (string) ($this->stock_unit ?? $this->catalogTemplate()->measure());
+    }
+
+    /** An amount of this product's pooled stock in words: "30ml", "1 viss 50 kyatthar". */
+    public function formatAmount(int $amount): string
+    {
+        return StockUnit::format($amount, $this->stockUnit());
     }
 
     /**
@@ -203,12 +258,12 @@ class Product extends Model
     }
 
     /**
-     * Topping up the shelf: adding a bottle is just more millilitres on the
-     * running total. Starts tracking a previously-untracked fragrance.
+     * Topping up the shelf: a bottle or a sack is just more on the running total,
+     * in the product's unit. Starts tracking a previously-untracked product.
      */
-    public function addBottle(int $ml): void
+    public function addStock(int $amount): void
     {
-        $this->stock_amount = ($this->stock_amount ?? 0) + max(0, $ml);
+        $this->stock_amount = ($this->stock_amount ?? 0) + max(0, $amount);
         $this->save();
     }
 
@@ -231,9 +286,10 @@ class Product extends Model
     }
 
     /**
-     * What $sizeMl of juice costs from the reference bottle — LIQUID ONLY: vial,
-     * label, and spillage are deliberately not in this number, and every label
-     * that shows it must say so. Null unless the reference pair is set.
+     * What $amount (in stock_unit) costs from the reference purchase — the bottle
+     * or the sack only: vial, bag, label and spillage are deliberately not in this
+     * number, and every label that shows it must say so. Null unless the reference
+     * pair is set.
      *
      * Pure-integer CEILING division — deliberately the project's second rounding
      * rule, beside PromoCode's floor, because the directions of safety differ:
@@ -241,14 +297,14 @@ class Product extends Model
      * would understate cost and flatter every margin figure. Ceiling overstates
      * cost by at most 1 Ks per vial — margin errs conservative.
      */
-    public function liquidCostMmk(int $sizeMl): ?int
+    public function pooledCostMmk(int $amount): ?int
     {
-        if ($this->bottle_cost_mmk === null || $this->bottle_volume_ml === null
-            || $this->bottle_volume_ml < 1 || $sizeMl < 1) {
+        if ($this->reference_cost_mmk === null || $this->reference_amount === null
+            || $this->reference_amount < 1 || $amount < 1) {
             return null;
         }
 
-        return intdiv($this->bottle_cost_mmk * $sizeMl + $this->bottle_volume_ml - 1, $this->bottle_volume_ml);
+        return intdiv($this->reference_cost_mmk * $amount + $this->reference_amount - 1, $this->reference_amount);
     }
 
     /**
@@ -274,8 +330,8 @@ class Product extends Model
             'is_featured' => 'boolean',
             'stock_amount' => 'integer',
             'low_stock_threshold' => 'integer',
-            'bottle_cost_mmk' => 'integer',
-            'bottle_volume_ml' => 'integer',
+            'reference_cost_mmk' => 'integer',
+            'reference_amount' => 'integer',
         ];
     }
 }

@@ -83,14 +83,14 @@ class ProductsTable
                         ->where('is_active', true)
                         ->map(fn ($variant) => $variant->label())
                         ->implode(' · ')),
-                // Pooled: the running ml; per variant (step 40): the pieces across
+                // Pooled: the running amount in its unit; per variant (step 40): the pieces across
                 // counted options, red when any is at its reorder line.
                 TextColumn::make('stock_amount')
                     ->label('Stock')
                     ->badge()
                     ->state(fn (Product $record): string => match (true) {
                         ! $record->isStockTracked() => '—',
-                        $record->pooledStock() => "{$record->stock_amount}ml",
+                        $record->pooledStock() => $record->formatAmount((int) $record->stock_amount),
                         default => $record->variants->where('is_active', true)->sum('stock_qty').' pcs',
                     })
                     ->color(fn (Product $record): string => match (true) {
@@ -100,15 +100,15 @@ class ProductsTable
                     })
                     ->tooltip(fn (Product $record): ?string => match (true) {
                         ! $record->isLowStock() => null,
-                        $record->pooledStock() => "Low — reorder at {$record->low_stock_threshold}ml",
+                        $record->pooledStock() => 'Low — reorder at '.$record->formatAmount($record->low_stock_threshold),
                         default => 'Low: '.$record->lowVariants()->map(fn ($variant): string => "{$variant->label()} ({$variant->stock_qty})")->implode(', '),
                     })
                     ->sortable($measured),
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
                     ->visible($measured)
-                    ->state(fn (Product $record): string => $record->liquidCostMmk(1) !== null
-                        ? Money::kyat((int) $record->liquidCostMmk(1))
+                    ->state(fn (Product $record): string => $record->pooledCostMmk(1) !== null
+                        ? Money::kyat((int) $record->pooledCostMmk(1))
                         : '—')
                     ->tooltip('Liquid only — ceiling-rounded per ml')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -152,12 +152,13 @@ class ProductsTable
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 ReplicateAction::make()
-                    ->excludeAttributes(['slug'])
+                    // min_in_stock_price is the list query's withMin() alias, not a column
+                    ->excludeAttributes(['slug', 'min_in_stock_price'])
                     ->after(function (Product $record, Product $replica): void {
                         // slug was excluded, so the HasSlug hook generated a fresh one; copy the price
                         // rows with their cost — not their count: the copy starts uncounted
                         $record->variants->each(fn ($variant) => $replica->variants()->create(
-                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
+                            $variant->only(['size_ml', 'measure', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
                         ));
                     }),
                 ProductResource::safeDeleteAction(),

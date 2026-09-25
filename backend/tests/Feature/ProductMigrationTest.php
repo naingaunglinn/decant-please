@@ -80,7 +80,7 @@ class ProductMigrationTest extends TestCase
 
         $product = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
             'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
-            'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
+            'reference_cost_mmk' => 100000, 'reference_amount' => 30,
         ]);
         $product->variants()->create(['size_ml' => 30, 'price_mmk' => 150000]);
         $five = $product->variants()->create(['size_ml' => 5, 'price_mmk' => 30000]);

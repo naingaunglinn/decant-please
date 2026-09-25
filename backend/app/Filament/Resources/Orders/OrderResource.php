@@ -13,6 +13,7 @@ use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\StockUnit;
 use App\Templates\Templates;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -115,7 +116,8 @@ class OrderResource extends Resource
         $parts = [];
 
         foreach ($record->stockShortfalls() as $short) {
-            $parts[] = "⚠ {$short['name']}: needs {$short['needed']}{$short['unit']} but only {$short['available']}{$short['unit']} in stock.";
+            $parts[] = '⚠ '.$short['name'].': needs '.StockUnit::format($short['needed'], $short['unit'])
+                .' but only '.StockUnit::format($short['available'], $short['unit']).' in stock.';
         }
 
         if ($record->payment_method === PaymentMethod::Online && $record->payment_status === PaymentStatus::Unpaid) {

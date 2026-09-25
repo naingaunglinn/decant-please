@@ -9,6 +9,67 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v48
+
+**v48** is step 40b (**#128**). Pooled stock can be counted by weight, in the Myanmar units
+a produce seller uses: kyatthar, and viss (1 viss = 100 kyatthar). A decant shop sees
+nothing new. The produce template itself is RUN-QUEUE row 15; this step is tested with a
+test-only weighed template.
+
+- **One base unit per product, whole numbers.** `products.stock_unit` is `ml` or
+  `kyatthar`. A viss is display only, so a 25-kyatthar pack and a 1-viss pack draw from the
+  same running total with no conversion. `App\Support\StockUnit::format()` is the one
+  place an amount becomes words: "30ml", "25 kyatthar", "1 viss 50 kyatthar".
+- **Migrations.** `2026_10_01_000000_rename_reference_cost_pair` renames only:
+  `bottle_cost_mmk` → `reference_cost_mmk`, `bottle_volume_ml` → `reference_amount`
+  (`Product::liquidCostMmk()` → `pooledCostMmk()`, `addBottle()` → `addStock()`).
+  `2026_10_01_000001_add_weight_units` adds `products.stock_unit` (backfilled `ml` for
+  decant and for any product with an ml figure) and `order_items.measure` (backfilled
+  from `size_ml`). `down()` refuses while anything is weighed. Up → down → up on Postgres
+  17: the order-line, order and product money hashes are identical in all three states.
+- **A frozen per-line amount.** `order_items.measure` is how much of the pooled stock one
+  unit of the line draws, stamped once in `OrderItem`'s creating hook from `size_ml` or the
+  variant's `measure`. Draw-down, the Accept shortfall and the cost snapshot read it, so
+  re-weighing a pack later never moves a placed order.
+- **Weighed variants** use the existing `product_variants.measure` (whole kyatthar,
+  `size_ml` null) and label themselves: measure 150 → `{"Weight": "1 viss 50 kyatthar"}`.
+  Cost is the same ceiling rule over the reference pair (100,000 Ks for 300 kyatthar →
+  8,334 Ks for 25).
+- **The unit guard** (`Product` saving hook). A pooled product takes its template's unit.
+  A switch to a template in another unit is refused while anything is counted in the old
+  one: the stock, the reference cost, a variant's size, or any order line with a frozen
+  amount. Otherwise 500 ml would read as 500 kyatthar, and a "10ml" variant or an accepted
+  order's 10ml would draw 10 kyatthar. A per-variant template keeps the unit.
+- **Admin.** For a weighed template the product form asks for stock, "Reorder at" and the
+  purchase (cost + amount) in kyatthar, with a "100 kyatthar = 1 viss" hint, and one
+  weight per variant. The decant form keeps its bottle words. The product list, low-stock
+  panel and Accept warning print amounts through `StockUnit`, so decant still reads
+  "30ml".
+- **API.** No shape change. A weighed template's variants are served as options
+  (`/meta` `variant_options`: `Weight`; `?option[Weight]=1 viss`), so the 38b option
+  picker handles them with no storefront change. `types.ts` is unchanged.
+- **Admin order edits re-freeze the amount.** Changing a line's size or pack in the admin
+  (10ml → 30ml) stamps its new `measure` with its new label, so the draw-down takes 30.
+  **Duplicate** copies a variant's `measure`, and no longer fails on the product list's
+  `min_in_stock_price` alias (it was copied into the insert; Duplicate failed for every
+  product before this).
+- **Tests.** `WeightUnitsTest` (12): viss formatting, the unit and variant labels, draw-down
+  by the frozen weight, ceiling cost, shortfall and low stock in viss, the guard (stock, ml
+  sizes, and an untracked product already on an order), an admin line edit (ml and
+  weight), Duplicate, the API and checkout, the admin form, and the migration round trip
+  and refusal. 456 tests pass on SQLite (+1 Postgres-only skip) and 457 on Postgres 17.
+  The parity test is unchanged and green.
+- **Deploy (maintenance on, like 37a, 39 and 40a).** The first migration renames two
+  columns the running code reads and writes. In the window before the new dynos serve, an
+  old checkout would snapshot a null cost onto a real order, and the admin's product save
+  would fail. So turn Heroku maintenance on before the `main` promotion, and off once the
+  release is out. The API is unchanged, so the storefront has no deploy order.
+  - **Rollback:** with maintenance on again (the serving code reads the new columns),
+    run `php artisan migrate:rollback --step=2` **before** rolling back the code.
+    `down()` refuses once a product is counted by weight or a weighed line exists.
+    Those can't be expressed in the old schema, so there is no rollback past them short of
+    removing those products.
+
 ## 0. What changed in v47
 
 **v47** is step 40a (**#128**). Stock is counted the way the product's category counts it.

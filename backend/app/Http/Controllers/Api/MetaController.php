@@ -51,8 +51,8 @@ class MetaController extends Controller
                 // Variant option filters (step 38) for a template whose variants
                 // aren't ml sizes: each option name with the values in stock now,
                 // in variant display order — ?option[{name}]= on /products. Empty
-                // for decant, which keeps `sizes`.
-                'variant_options' => $template->measure() === null
+                // for decant, which keeps `sizes`; weights (step 40b) are options.
+                'variant_options' => $template->measure() !== 'ml'
                     ? self::variantOptions($template->variantOptions(), $available->clone())
                     : [],
                 // The pre-37 storefront's hardcoded lists — same values as before.

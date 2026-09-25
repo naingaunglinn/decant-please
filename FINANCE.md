@@ -26,7 +26,7 @@ treat §8 itself as the source.
 | Revenue this month, revenue chart | `OrderStats.php:17`, `RevenueChart` |
 | Top fragrances (by vials, not money) | `TopFragrances` |
 | Stock (pooled ml, or pieces per variant), low-stock alert | `stock_amount`, `low_stock_threshold` (v8; renamed step 40), `product_variants.stock_qty` (step 40) |
-| Bottle cost + liquid-only gross margin | `liquidCostMmk` (ceiling), `unit_cost_mmk`/`line_cost_mmk` snapshots, dashboard stat, CSV columns (step 28) |
+| Bottle cost + liquid-only gross margin | `pooledCostMmk` (ceiling), `unit_cost_mmk`/`line_cost_mmk` snapshots, dashboard stat, CSV columns (step 28) |
 | Township rate table + fee derived at checkout | `delivery_townships` (+ per-courier coverage/reference-cost rows), `/delivery-zones`, order snapshots (step 30) |
 | Order CSV export incl. balance due | `OrdersTable.php:126` |
 | A5 invoice with balance due | invoice generator |
@@ -179,8 +179,8 @@ periods, or require a reason recorded in the audit trail.
 **Resolved 2026-08-04 — locked for prompt 28, do not re-open:**
 
 1. **Cost excludes consumables: liquid only.** The derivation prices juice alone
-   (`bottle_cost_mmk × size_ml / bottle_volume_ml`, ceiling division), and the naming
-   carries the limit: `liquidCostMmk`, stat labelled "Gross margin (liquid only)" with the
+   (`reference_cost_mmk × size_ml / reference_amount`, ceiling division), and the naming
+   carries the limit: `pooledCostMmk`, stat labelled "Gross margin (liquid only)" with the
    exclusions named in its description. The distortion stands as the reason the label
    matters — omitting vial, label, and spillage understates small-size cost far harder than
    large (roughly 11% on a 5ml versus under 3% on a 30ml), which skews precisely the size

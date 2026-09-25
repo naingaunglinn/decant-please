@@ -101,7 +101,7 @@ costs onto order items. The figure is deliberately partial, and four rules keep 
   of M orders"), and an order's margin exists only when **every** line has a cost — a
   partial cost sum understates cost silently, so never `SUM(line_cost_mmk)` across
   orders that might be partially costed.
-- **The cost rounding rule is CEILING** (`Fragrance::liquidCostMmk()`), deliberately
+- **The cost rounding rule is CEILING** (`Product::pooledCostMmk()`), deliberately
   opposite in direction to the promo floor: flooring a discount can only make the shop
   keep more, while flooring a cost would understate cost and flatter every margin
   figure. Ceiling errs by at most 1 Ks per vial, conservative. Two rules now exist —

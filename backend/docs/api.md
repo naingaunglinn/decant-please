@@ -203,7 +203,9 @@ values as before.
 `variant_options` (step 38) is empty for decant. For a template whose variants aren't ml
 sizes it lists each option name with the values in stock now, in variant display order —
 `[{ "name": "Size", "values": ["S", "M", "L"] }, { "name": "Color", "values": ["Blue", "Red"] }]`
-— each a `/products` `option[{name}]` filter.
+— each a `/products` `option[{name}]` filter. A template weighed by the kyatthar (step 40b)
+is one of these: its variants are `{"Weight": "25 kyatthar"}`, `{"Weight": "1 viss"}`, so
+`option[Weight]=1 viss` filters and the option picker sells them.
 
 `sizes` and `price` reflect **in-stock** decants only; `price.min/max` are `null` on
 an empty catalog. `social` URLs are `null` when unconfigured. `payment` is the shop's

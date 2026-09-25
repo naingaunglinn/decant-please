@@ -281,8 +281,9 @@ class Order extends Model
 
     /**
      * Take this order off the shelf, in each product's stock mode (step 40): a
-     * pooled product once per product (a 5ml + a 10ml of the same juice draws
-     * 15ml in one write), a per-variant one once per variant, by quantity.
+     * pooled product once per product, by each line's frozen measure (a 5ml + a
+     * 10ml of the same juice draws 15ml in one write; step 40b), a per-variant
+     * one once per variant, by quantity.
      * Untracked counts are skipped. Called from the → Prepared transition.
      *
      * One transaction, and every affected row is locked (products, then variants,
@@ -305,8 +306,8 @@ class Order extends Model
             }
 
             if ($item->product->pooledStock()) {
-                if ($item->size_ml !== null) {
-                    $byProduct[$item->product_id] = ($byProduct[$item->product_id] ?? 0) + $item->size_ml * $item->quantity;
+                if ($item->measure !== null) {
+                    $byProduct[$item->product_id] = ($byProduct[$item->product_id] ?? 0) + $item->measure * $item->quantity;
                 }
             } elseif ($item->product_variant_id !== null) {
                 $byVariant[$item->product_variant_id] = ($byVariant[$item->product_variant_id] ?? 0) + $item->quantity;
@@ -506,7 +507,8 @@ class Order extends Model
      * What this order can't be fully made up from, given current stock, in each
      * product's mode — surfaced at Accept so a shortfall is caught before
      * committing, not at the bench. Untracked (null) counts are ignored. `unit`
-     * is the pooled measure ("ml"), or "" for pieces.
+     * is the pooled stock_unit ("ml", "kyatthar"), or "" for pieces — read the
+     * figures through StockUnit::format().
      *
      * @return array<array{name: string, needed: int, available: int, unit: string}>
      */
@@ -521,15 +523,15 @@ class Order extends Model
             }
 
             if ($item->product->pooledStock()) {
-                if ($item->size_ml === null) {
+                if ($item->measure === null) {
                     continue;
                 }
 
                 $row = &$needed["p{$item->product_id}"];
                 $row['name'] ??= $item->product->name;
-                $row['amount'] = ($row['amount'] ?? 0) + $item->size_ml * $item->quantity;
+                $row['amount'] = ($row['amount'] ?? 0) + $item->measure * $item->quantity;
                 $row['stock'] = $item->product->stock_amount;
-                $row['unit'] = (string) $item->product->catalogTemplate()->measure();
+                $row['unit'] = $item->product->stockUnit();
             } elseif ($item->variant !== null) {
                 $row = &$needed["v{$item->product_variant_id}"];
                 $row['name'] ??= "{$item->product->name} {$item->variantLabel()}";
