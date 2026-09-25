@@ -6,6 +6,7 @@ use App\Enums\BrandType;
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Support\CatalogImport;
+use App\Support\Modules;
 use App\Support\Money;
 use App\Support\TenantContext;
 use App\Templates\Attribute;
@@ -87,6 +88,7 @@ class ProductsTable
                 // counted options, red when any is at its reorder line.
                 TextColumn::make('stock_amount')
                     ->label('Stock')
+                    ->visible(fn (): bool => Modules::on(Modules::STOCK))
                     ->badge()
                     ->state(fn (Product $record): string => match (true) {
                         ! $record->isStockTracked() => '—',
@@ -106,7 +108,7 @@ class ProductsTable
                     ->sortable($measured),
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
-                    ->visible($measured)
+                    ->visible(fn (): bool => $measured && Modules::on(Modules::COST_MARGIN))
                     ->state(fn (Product $record): string => $record->pooledCostMmk(1) !== null
                         ? Money::kyat((int) $record->pooledCostMmk(1))
                         : '—')

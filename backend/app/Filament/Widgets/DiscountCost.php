@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\Modules;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Collection;
 
@@ -12,6 +13,12 @@ class DiscountCost extends Widget
     protected static ?int $sort = 6;
 
     protected string $view = 'filament.widgets.discount-cost';
+
+    /** Off the dashboard while the shop has the module off (step 41). */
+    public static function canView(): bool
+    {
+        return Modules::on(Modules::PROMO_CODES) && parent::canView();
+    }
 
     /**
      * This month's discounts grouped by code — read from the ORDER snapshots

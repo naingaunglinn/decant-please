@@ -8,6 +8,7 @@ use App\Filament\Resources\PromoCodes\Pages\ListPromoCodes;
 use App\Filament\Resources\PromoCodes\Schemas\PromoCodeForm;
 use App\Filament\Resources\PromoCodes\Tables\PromoCodesTable;
 use App\Models\PromoCode;
+use App\Support\Modules;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -24,6 +25,12 @@ class PromoCodeResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Finance';
 
     protected static ?string $recordTitleAttribute = 'code';
+
+    /** Hidden, and every URL refused, while the shop has the module off (step 41); Shield still applies. */
+    public static function canAccess(): bool
+    {
+        return Modules::on(Modules::PROMO_CODES) && parent::canAccess();
+    }
 
     public static function form(Schema $schema): Schema
     {

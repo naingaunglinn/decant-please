@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\Modules;
 use App\Support\Money;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -58,8 +59,10 @@ class OrderStats extends StatsOverviewWidget
         return [
             Stat::make('Revenue this month', Money::kyat($revenue))
                 ->description('Excludes cancelled & rejected'),
-            Stat::make('Gross margin (liquid only)', Money::kyat((int) $orderMargins->sum()))
-                ->description("Excludes vial, label, spillage & delivery — on {$orderMargins->count()} of {$monthOrders->count()} orders"),
+            ...(Modules::on(Modules::COST_MARGIN) ? [
+                Stat::make('Gross margin (liquid only)', Money::kyat((int) $orderMargins->sum()))
+                    ->description("Excludes vial, label, spillage & delivery — on {$orderMargins->count()} of {$monthOrders->count()} orders"),
+            ] : []),
             Stat::make('Orders this month', Order::where('created_at', '>=', now()->startOfMonth())->count()),
             Stat::make('Balance outstanding', Money::kyat((int) $outstandingBalances->sum()))
                 ->description($outstandingBalances->count().' order(s) with a balance due')

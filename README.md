@@ -82,6 +82,10 @@ the panel offers:
   downloadable template
 - Telegram alert to the decanter's phone the moment a website order lands (off until a
   bot token + chat id are configured; a Telegram outage never delays checkout)
+- Features page (step 41) — each shop turns stock, cost & margin, the production
+  schedule, promo codes and expenses / P&L on or off; defaults come from the shop's
+  category, and a feature that's off disappears from the menu, dashboard and forms
+  (nothing is deleted)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Delivery zones (Settings) — a township rate table seeded from Royal Express's coverage
   chart, with per-courier coverage/reference costs (admin-eyes only), bulk fee/cost

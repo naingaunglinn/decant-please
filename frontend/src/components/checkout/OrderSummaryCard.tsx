@@ -24,9 +24,11 @@ interface OrderSummaryCardProps {
   /** Reports the applied code and its previewed discount up — the code rides the
    *  order; the discount nets the online "amount to pay" (#67). */
   onPromoChange: (code: string | null, discountMmk: number) => void;
+  /** False when the shop has promo codes off (step 41) — no code box at all. */
+  promoCodes: boolean;
 }
 
-export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderSummaryCardProps) {
+export function OrderSummaryCard({ lineErrors, township, onPromoChange, promoCodes }: OrderSummaryCardProps) {
   const { slug: shop } = useTenant();
   const { lines, subtotal } = useCart();
   const [input, setInput] = useState("");
@@ -134,7 +136,7 @@ export function OrderSummaryCard({ lineErrors, township, onPromoChange }: OrderS
       </div>
 
       {/* promo code — preview only; the server re-validates at submission */}
-      {applied ? (
+      {!promoCodes ? null : applied ? (
         <div className="mt-3 flex items-baseline justify-between gap-3 rounded-xl bg-pine-soft px-4 py-3">
           <span className="flex items-center gap-2 text-xs">
             <Pill tone="pine" className="font-mono">{applied.code}</Pill>

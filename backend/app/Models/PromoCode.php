@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PromoType;
 use App\Models\Concerns\BelongsToShop;
+use App\Support\Modules;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,11 +37,19 @@ class PromoCode extends Model
      * The one evaluation both the preview endpoint and checkout go through, so
      * they can never disagree. Checkout passes $lock = true inside its
      * transaction so a limited-use code can't be double-spent in a race.
+     * Also where a shop with promo codes off refuses every code.
      *
      * @return array{valid: bool, discount_mmk: int, message: ?string, promo: ?self}
      */
     public static function evaluate(string $code, int $subtotalMmk, bool $lock = false): array
     {
+        // Promo codes off (step 41): no code applies, even one still active in the
+        // table — the same answer as an unknown code, so checkout places the order
+        // at full price (Order::applyPromo) and never fails because of it.
+        if (! Modules::on(Modules::PROMO_CODES)) {
+            return ['valid' => false, 'discount_mmk' => 0, 'message' => "We couldn't find that code.", 'promo' => null];
+        }
+
         $promo = self::query()
             ->active()
             ->where('code', Str::upper(trim($code)))

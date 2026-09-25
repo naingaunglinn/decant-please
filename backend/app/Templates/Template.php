@@ -147,7 +147,7 @@ abstract class Template
         return 'The day you get this order ready.';
     }
 
-    /** @return list<string> modules on by default (read by step 41) */
+    /** @return list<string> App\Support\Modules keys on until the shop's own Features page is saved (step 41) */
     abstract public function defaultModules(): array;
 
     public function attribute(string $key): ?Attribute

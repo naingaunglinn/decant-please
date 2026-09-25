@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Products\Schemas;
 use App\Enums\BrandType;
 use App\Models\Brand;
 use App\Models\Product;
+use App\Support\Modules;
 use App\Support\StockUnit;
 use App\Support\TenantContext;
 use App\Templates\Attribute;
@@ -14,6 +15,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -39,6 +41,9 @@ class ProductForm
         $pooled = $template->pooledStock();
         $unit = (string) $template->measure();
         $bottle = $unit === StockUnit::ML;
+        // A shop with the module off sees no stock or cost field (step 41). Left
+        // out, not hidden, like the other mode's section: the stored figures stay.
+        $stock = Modules::on(Modules::STOCK);
 
         return $schema
             ->columns(2)
@@ -91,7 +96,7 @@ class ProductForm
                     ]),
                 // One stock section per mode: both bind low_stock_threshold, so the
                 // other mode's is left out, not hidden (a hidden field still fills).
-                ...($pooled ? [
+                ...($stock && $pooled ? [
                     Section::make('Stock')
                         ->description($bottle
                             ? 'Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.'
@@ -134,7 +139,7 @@ class ProductForm
                                 ->helperText('Flag it on the dashboard once the remaining '.($bottle ? 'volume' : 'amount').' falls to this.'),
                         ]),
                 ] : []),
-                ...(! $pooled ? [
+                ...($stock && ! $pooled ? [
                     Section::make('Stock')
                         ->description('Count each option in its row below ("In stock"). Leave a count blank to not track it: the in-stock toggles still apply.')
                         ->columnSpanFull()
@@ -149,8 +154,12 @@ class ProductForm
                                 ->helperText('Flag an option on the dashboard once its count falls to this.'),
                         ]),
                 ] : []),
+                // Stock off: the reorder line still gets its mode's default on
+                // create (the column's 30 would flag every size once counting starts),
+                // and an edit writes the stored value back unchanged.
+                ...(! $stock ? [Hidden::make('low_stock_threshold')->default($pooled ? 30 : 2)] : []),
                 Section::make('Cost')
-                    ->visible($pooled)
+                    ->visible($pooled && Modules::on(Modules::COST_MARGIN))
                     ->description($bottle
                         ? 'What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.'
                         : 'What you pay for the goods — one purchase\'s price and how much it was. Goods only: bags, labels and waste aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
@@ -251,7 +260,7 @@ class ProductForm
                 ->minValue(0)
                 ->suffix('pcs')
                 ->helperText('Blank = not counted. Drops on its own when an order is '.mb_strtolower($template->preparedLabel()).'.')
-                ->visible(! $template->pooledStock()),
+                ->visible(! $template->pooledStock() && Modules::on(Modules::STOCK)),
             TextInput::make('unit_cost_mmk')
                 ->label('Cost')
                 ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
@@ -260,7 +269,7 @@ class ProductForm
                 ->minValue(0)
                 ->suffix('Ks')
                 ->helperText('What one costs you. Blank = unknown; margin shows only when every line has a cost.')
-                ->visible(! $template->pooledStock()),
+                ->visible(! $template->pooledStock() && Modules::on(Modules::COST_MARGIN)),
         ];
 
         if ($template->measure() !== null) {

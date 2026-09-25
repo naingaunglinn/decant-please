@@ -8,6 +8,7 @@ use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Models\ProductVariant;
 use App\Models\ShopSetting;
+use App\Support\Modules;
 use App\Support\ShopConfig;
 use App\Support\TenantContext;
 use App\Templates\Attribute;
@@ -75,6 +76,10 @@ class MetaController extends Controller
                     'facebook_url' => ShopConfig::get('social.facebook'),
                 ],
                 'payment' => self::payment(),
+                // The shop's enabled optional features (step 41, App\Support\Modules).
+                // The storefront hides the promo-code box without `promo_codes`; the
+                // server refuses a code either way (PromoCode::evaluate).
+                'modules' => Modules::enabled(),
             ];
         }));
     }

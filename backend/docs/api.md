@@ -188,7 +188,8 @@ Everything a client needs to build filter UI without hardcoding:
   "sorts": ["newest", "price_asc", "price_desc", "name"],
   "social": { "tiktok_url": "https://…", "facebook_url": null },
   "payment": { "kbzpay_name": "…", "kbzpay_number": "…", "wave_name": "…",
-               "wave_number": "…", "qr_url": "https://…", "instructions": "…" }
+               "wave_number": "…", "qr_url": "https://…", "instructions": "…" },
+  "modules": ["stock", "cost_margin", "production_schedule", "promo_codes", "expenses"]
 }
 ```
 
@@ -211,6 +212,13 @@ is one of these: its variants are `{"Weight": "25 kyatthar"}`, `{"Weight": "1 vi
 an empty catalog. `social` URLs are `null` when unconfigured. `payment` is the shop's
 offline transfer details (not a gateway): only the configured fields are present, and
 the whole block is `null` when none are set.
+
+`modules` (step 41) is the shop's enabled optional features, from `stock`,
+`cost_margin`, `production_schedule`, `promo_codes`, `expenses`. A shop that never
+saved its Features page gets its template's defaults. Without `promo_codes`, a
+storefront shows no promo-code box, and the server refuses any code anyway (below).
+Additive: a client reading a `/meta` from before step 41 treats a missing list as
+all on.
 
 ## `GET /delivery-zones`
 
@@ -405,6 +413,10 @@ on mismatch. Rules:
   call, not an API call.
 
 ## `POST /orders/validate-promo` — preview only
+
+A shop with promo codes off (step 41, `/meta` `modules`) answers every code as
+unknown (`valid: false`, "We couldn't find that code."), and checkout places the
+order at full price with `promo_note` set, exactly as for a lapsed code.
 
 Body: `{ "code": "WELCOME10", "items": [ …same line shape as checkout… ] }`.
 Nothing is persisted or incremented; the subtotal is re-derived server-side

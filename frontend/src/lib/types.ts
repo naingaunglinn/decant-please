@@ -113,6 +113,10 @@ export interface CatalogMeta {
   sorts: string[];
   social: { tiktok_url: string | null; facebook_url: string | null };
   payment: PaymentInfo | null;
+  /** The shop's enabled optional features (step 41), e.g. `promo_codes`, `stock`.
+   *  Optional: a /meta cached before step 41 lacks it — read a missing list as
+   *  "all on" (the server refuses a disabled feature regardless). */
+  modules?: string[];
 }
 
 export interface ProductFilters {

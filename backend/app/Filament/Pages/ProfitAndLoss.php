@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Modules;
 use App\Support\MonthlyPnl;
 use BackedEnum;
 use Carbon\CarbonImmutable;
@@ -30,6 +31,12 @@ class ProfitAndLoss extends Page
     public int $year;
 
     public int $month;
+
+    /** Hidden, and its URL refused, while the shop has the module off (step 41). */
+    public static function canAccess(): bool
+    {
+        return Modules::on(Modules::EXPENSES) && parent::canAccess();
+    }
 
     public function mount(): void
     {
