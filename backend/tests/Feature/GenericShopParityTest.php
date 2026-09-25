@@ -489,7 +489,7 @@ class GenericShopParityTest extends TestCase
 
         $this->orders['A'] = $this->postCheckout([[$this->allure, 10, 2], [$this->aventus, 5, 1]], promo: 'PARITY10');
         $this->orders['A']->accept(CarbonImmutable::parse('2026-03-16'), CarbonImmutable::parse('2026-03-18'));
-        $this->orders['A']->update(['status' => OrderStatus::Decanted]);
+        $this->orders['A']->update(['status' => OrderStatus::Prepared]);
 
         $this->orders['B'] = $this->postCheckout([[$this->loveInWhite, 5, 1], [$this->allure, 5, 1]]);
 
@@ -519,7 +519,7 @@ class GenericShopParityTest extends TestCase
         ] as $key => [$method, $items]) {
             $order = $this->checkout($items, $method);
             $order->accept(CarbonImmutable::parse('2026-01-11'), CarbonImmutable::parse('2026-01-12'));
-            $order->update(['status' => OrderStatus::Decanted]);
+            $order->update(['status' => OrderStatus::Prepared]);
             $this->orders[$key] = $order;
         }
 
@@ -621,7 +621,7 @@ class GenericShopParityTest extends TestCase
             'customer_name' => 'Ei Phyu', 'phone' => '09-773216549',
             'address' => '5 Kabar Aye Pagoda Road, Yankin, Yangon',
             'order_from' => $source, 'status' => $status,
-            'decant_date' => '2026-03-14', 'delivery_date' => '2026-03-16',
+            'prep_date' => '2026-03-14', 'delivery_date' => '2026-03-16',
             'delivery_fee_mmk' => $fee, 'discount_mmk' => $discount, 'deposit_mmk' => $deposit,
         ]);
 

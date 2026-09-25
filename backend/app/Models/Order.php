@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use RuntimeException;
 
-#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'decant_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at', 'delivery_township_id', 'region_snapshot', 'township_snapshot', 'address_line', 'address_extra', 'delivery_courier'])]
+#[Fillable(['customer_name', 'phone', 'address', 'order_from', 'tracking_code', 'prep_date', 'delivery_date', 'status', 'rejection_reason', 'deposit_mmk', 'delivery_fee_mmk', 'discount_mmk', 'promo_code', 'total_mmk', 'notes', 'payment_status', 'payment_method', 'paid_at', 'payment_proof_path', 'handed_to_courier_at', 'courier_carrying_mmk', 'courier_settled_at', 'delivery_township_id', 'region_snapshot', 'township_snapshot', 'address_line', 'address_extra', 'delivery_courier'])]
 class Order extends Model
 {
     use BelongsToShop;
@@ -61,14 +61,14 @@ class Order extends Model
         });
 
         // Stock is drawn down when the vials are physically filled — i.e. the
-        // moment the order becomes Decanted, not when it's accepted. Warn-only:
+        // moment the order becomes Prepared (decanted), not when it's accepted. Warn-only:
         // this never blocks the transition (a shortfall just clamps to 0 and
         // shows on the low-stock panel), and it leaves the manual in_stock
         // toggle alone. wasChanged() means it fires once, on the actual
-        // transition into Decanted — a plain re-save of an already-decanted
+        // transition into Prepared — a plain re-save of an already-prepared
         // order won't pour twice.
         static::updated(function (self $order) {
-            if ($order->wasChanged('status') && $order->status === OrderStatus::Decanted) {
+            if ($order->wasChanged('status') && $order->status === OrderStatus::Prepared) {
                 $order->drawDownDecantStock();
             }
         });
@@ -242,13 +242,13 @@ class Order extends Model
             ->first();
     }
 
-    public function accept(CarbonInterface $decantDate, ?CarbonInterface $deliveryDate = null): void
+    public function accept(CarbonInterface $prepDate, ?CarbonInterface $deliveryDate = null): void
     {
         if ($this->status !== OrderStatus::AwaitingConfirmation) {
             throw new LogicException('Only orders awaiting confirmation can be accepted.');
         }
 
-        $this->decant_date = $decantDate;
+        $this->prep_date = $prepDate;
         $this->delivery_date = $deliveryDate;
         $this->status = OrderStatus::Pending;
         $this->save();
@@ -283,7 +283,7 @@ class Order extends Model
      * Pour every item's volume off its product's running stock total, once
      * per product (a 5ml + a 10ml of the same juice draws 15ml in one write).
      * Untracked products are skipped inside Product::drawDownStock. Called
-     * from the → Decanted transition in booted().
+     * from the → Prepared transition in booted().
      */
     protected function drawDownDecantStock(): void
     {
@@ -541,13 +541,13 @@ class Order extends Model
 
         $items = OrderItem::query()
             ->whereHas('order', fn ($query) => $query
-                ->whereDate('decant_date', '>=', $from->toDateString())
-                ->whereDate('decant_date', '<=', $to->toDateString())
+                ->whereDate('prep_date', '>=', $from->toDateString())
+                ->whereDate('prep_date', '<=', $to->toDateString())
                 ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
             ->with(['order', 'product.brand', 'variant'])
             ->get();
 
-        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
+        $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->prep_date->toDateString());
 
         $days = [];
 
@@ -651,7 +651,7 @@ class Order extends Model
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
             'delivery_courier' => Courier::class,
-            'decant_date' => 'date',
+            'prep_date' => 'date',
             'delivery_date' => 'date',
             'handed_to_courier_at' => 'date',
             'courier_settled_at' => 'date',

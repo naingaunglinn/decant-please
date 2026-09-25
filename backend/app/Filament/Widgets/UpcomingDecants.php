@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Filament\Pages\ProductionSchedule;
 use App\Models\Order;
 use App\Support\Money;
+use App\Templates\Templates;
 use Filament\Actions\Action;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -25,9 +26,9 @@ class UpcomingDecants extends TableWidget
             ->query(
                 Order::query()
                     ->with('items')
-                    ->whereBetween('decant_date', [today(), today()->addDays(7)])
+                    ->whereBetween('prep_date', [today(), today()->addDays(7)])
                     ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected])
-                    ->orderBy('decant_date')
+                    ->orderBy('prep_date')
             )
             ->headerActions([
                 Action::make('open_schedule')
@@ -36,7 +37,8 @@ class UpcomingDecants extends TableWidget
                     ->url(ProductionSchedule::getUrl()),
             ])
             ->columns([
-                TextColumn::make('decant_date')
+                TextColumn::make('prep_date')
+                    ->label(fn (): string => Templates::forShop()->prepDateLabel())
                     ->date(),
                 TextColumn::make('customer_name')
                     ->label('Customer'),

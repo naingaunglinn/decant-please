@@ -62,7 +62,7 @@ class ProductionSchedule extends Page
 
     /**
      * A day is overdue when it's behind us and any of its vials are still
-     * unpoured — an order not yet decanted or delivered. Fully-poured past
+     * unpoured — an order not yet prepared (decanted) or delivered. Fully-poured past
      * days render as plain history.
      *
      * @param  array{date: CarbonImmutable, groups: Collection}  $day
@@ -75,7 +75,7 @@ class ProductionSchedule extends Page
 
         return $day['groups']->contains(
             fn (array $group): bool => $group['orders']->contains(
-                fn (Order $order): bool => ! in_array($order->status, [OrderStatus::Decanted, OrderStatus::Delivered], true),
+                fn (Order $order): bool => ! in_array($order->status, [OrderStatus::Prepared, OrderStatus::Delivered], true),
             ),
         );
     }

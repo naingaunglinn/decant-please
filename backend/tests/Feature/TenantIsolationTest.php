@@ -942,11 +942,11 @@ class TenantIsolationTest extends TestCase
 
         $this->forShop($this->shopA);
         $this->makeOrder(OrderStatus::Pending, customer: 'Alice From Shop A')
-            ->update(['decant_date' => today()->addDay()]);
+            ->update(['prep_date' => today()->addDay()]);
 
         $this->forShop($this->shopB);
         $this->makeOrder(OrderStatus::Pending, customer: 'Bobby From Shop B')
-            ->update(['decant_date' => today()->addDay()]);
+            ->update(['prep_date' => today()->addDay()]);
 
         $this->forShop($this->shopA);
         Livewire::test(UpcomingDecants::class)
@@ -995,7 +995,7 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopA);
         $aFragrance = $this->makeNamedFragrance('Chanel', 'Allure Homme Sport');
         $aOrder = $this->makeOrder(OrderStatus::Pending);
-        $aOrder->update(['decant_date' => $date]);
+        $aOrder->update(['prep_date' => $date]);
         $aOrder->items()->create([
             'product_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 2,
@@ -1004,7 +1004,7 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopB);
         $bFragrance = $this->makeNamedFragrance('Dior', 'Sauvage');
         $bOrder = $this->makeOrder(OrderStatus::Pending);
-        $bOrder->update(['decant_date' => $date]);
+        $bOrder->update(['prep_date' => $date]);
         $bOrder->items()->create([
             'product_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 5,

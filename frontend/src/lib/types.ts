@@ -194,6 +194,8 @@ export interface PromoPreview {
 export type OrderStatus =
   | "awaiting_confirmation"
   | "pending"
+  | "prepared"
+  /** An API from before step 39 still sends it — the deploy window only (RUN-QUEUE row 32). */
   | "decanted"
   | "delivered"
   | "cancelled"
@@ -208,8 +210,13 @@ export interface OrderStatusResponse {
   order_number: string;
   status: OrderStatus;
   status_label: string;
+  /** Every state's label in the shop's words ("prepared": Decanted, Packed). Absent from a pre-step-39 API. */
+  status_labels?: Partial<Record<OrderStatus, string>>;
   placed_at: string;
-  decant_date: string | null;
+  /** The day the order is made ready (step 39). Absent from a pre-step-39 API, which sends decant_date. */
+  prep_date?: string | null;
+  /** Deploy alias of prep_date; removed after go-live (RUN-QUEUE row 32). */
+  decant_date?: string | null;
   delivery_date: string | null;
   rejection_reason: string | null;
   customer_name: string;

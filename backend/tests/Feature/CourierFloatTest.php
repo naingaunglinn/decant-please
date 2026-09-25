@@ -91,7 +91,7 @@ class CourierFloatTest extends TestCase
             ->assertSee('Nothing outstanding');
     }
 
-    private function order(int $total, int $deposit = 0, OrderStatus $status = OrderStatus::Decanted): Order
+    private function order(int $total, int $deposit = 0, OrderStatus $status = OrderStatus::Prepared): Order
     {
         $order = Order::create([
             'customer_name' => 'Aung Kyaw',

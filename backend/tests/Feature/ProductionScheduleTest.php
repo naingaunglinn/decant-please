@@ -379,7 +379,7 @@ class ProductionScheduleTest extends TestCase
     }
 
     /** @param  array<array{0: Product, 1: int, 2: int}>  $lines  [fragrance, size_ml, quantity] */
-    private function orderOn(?string $decantDate, array $lines, OrderStatus $status = OrderStatus::Pending): Order
+    private function orderOn(?string $prepDate, array $lines, OrderStatus $status = OrderStatus::Pending): Order
     {
         $order = Order::create([
             'customer_name' => 'Aung Kyaw',
@@ -387,7 +387,7 @@ class ProductionScheduleTest extends TestCase
             'address' => 'Sanchaung, Yangon',
             'order_from' => 'website',
             'status' => $status,
-            'decant_date' => $decantDate,
+            'prep_date' => $prepDate,
         ]);
 
         foreach ($lines as [$fragrance, $sizeMl, $quantity]) {

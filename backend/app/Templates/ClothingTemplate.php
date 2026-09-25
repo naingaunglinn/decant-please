@@ -2,8 +2,6 @@
 
 namespace App\Templates;
 
-use App\Enums\OrderStatus;
-
 /**
  * Clothing — the second template (step 38; roadmap group 1), the one that proves
  * the generic catalog. A variant is a Size + Color pair ({"Size":"M","Color":"Blue"})
@@ -79,17 +77,15 @@ class ClothingTemplate extends Template
         return ['item', 'items'];
     }
 
-    public function statusLabels(): array
+    public function preparedLabel(): string
     {
-        // Read by step 39. "Decanted" means nothing to a clothes seller; the
-        // order is packed and ready instead.
-        $labels = array_combine(
-            array_map(fn (OrderStatus $status): string => $status->value, OrderStatus::cases()),
-            array_map(fn (OrderStatus $status): string => $status->label(), OrderStatus::cases()),
-        );
-        $labels[OrderStatus::Decanted->value] = 'Packed';
+        // "Decanted" means nothing to a clothes seller; the order is packed.
+        return 'Packed';
+    }
 
-        return $labels;
+    public function prepDateLabel(): string
+    {
+        return 'Packing date';
     }
 
     public function defaultModules(): array

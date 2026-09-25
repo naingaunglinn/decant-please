@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
 use App\Support\Money;
+use App\Templates\Templates;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -58,7 +59,8 @@ class OrdersTable
                     ->copyable()
                     ->searchable()
                     ->toggleable(),
-                TextColumn::make('decant_date')
+                TextColumn::make('prep_date')
+                    ->label(fn (): string => Templates::forShop()->prepDateLabel())
                     ->date()
                     ->sortable(),
                 TextColumn::make('delivery_date')
@@ -125,7 +127,7 @@ class OrdersTable
 
                         return response()->streamDownload(function () use ($orders): void {
                             $out = fopen('php://output', 'w');
-                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', 'Decant date', 'Delivery date', 'Status', 'Payment', 'Total (Ks)', 'Balance due (Ks)', 'Cost (liquid only, Ks)', 'Gross margin (liquid only, Ks)']);
+                            fputcsv($out, ['Date', 'Customer', 'Phone', 'Source', 'Items', Templates::forShop()->prepDateLabel(), 'Delivery date', 'Status', 'Payment', 'Total (Ks)', 'Balance due (Ks)', 'Cost (liquid only, Ks)', 'Gross margin (liquid only, Ks)']);
 
                             foreach ($orders as $order) {
                                 // Fully-costed orders only, for cost and margin alike —
@@ -140,7 +142,7 @@ class OrdersTable
                                     $order->items
                                         ->map(fn ($item) => "{$item->fragrance_name_snapshot} {$item->variantLabel()} × {$item->quantity}")
                                         ->implode('; '),
-                                    $order->decant_date?->format('Y-m-d'),
+                                    $order->prep_date?->format('Y-m-d'),
                                     $order->delivery_date?->format('Y-m-d'),
                                     $order->status->label(),
                                     $order->payment_status->label(),
@@ -172,7 +174,7 @@ class OrdersTable
                             Notification::make()
                                 ->warning()
                                 ->title('Nothing to invoice in this view')
-                                ->body('Invoices exist for pending, decanted and delivered orders only.')
+                                ->body('Invoices exist for '.mb_strtolower(OrderStatus::Pending->label()).', '.mb_strtolower(OrderStatus::Prepared->label()).' and '.mb_strtolower(OrderStatus::Delivered->label()).' orders only.')
                                 ->send();
 
                             return null;

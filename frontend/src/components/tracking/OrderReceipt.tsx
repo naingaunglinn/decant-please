@@ -216,7 +216,8 @@ export function OrderReceipt({ order: initial, context, onSearchAgain }: OrderRe
           <StatusTimeline
             status={order.status}
             placedAt={order.placed_at}
-            decantDate={order.decant_date}
+            prepDate={order.prep_date ?? order.decant_date}
+            preparedLabel={order.status_labels?.prepared}
             deliveryDate={order.delivery_date}
             rejectionReason={order.rejection_reason}
           />

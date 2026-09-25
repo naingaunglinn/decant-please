@@ -145,7 +145,7 @@ class PublicApiTest extends TestCase
         $order = Order::where('tracking_code', $response->json('tracking_code'))->firstOrFail();
         $this->assertSame(OrderStatus::AwaitingConfirmation, $order->status);
         $this->assertSame(OrderSource::Website, $order->order_from);
-        $this->assertNull($order->decant_date);
+        $this->assertNull($order->prep_date);
         $this->assertSame(55000, $order->items()->first()->unit_price_mmk);
     }
 
@@ -256,7 +256,7 @@ class PublicApiTest extends TestCase
             ->assertJsonPath('order_number', "#{$order->id}")
             ->assertJsonPath('status', 'awaiting_confirmation')
             ->assertJsonPath('status_label', 'Awaiting Confirmation')
-            ->assertJsonPath('decant_date', null)
+            ->assertJsonPath('prep_date', null)
             ->assertJsonPath('rejection_reason', null)
             ->assertJsonPath('customer_name', 'Su Su')
             ->assertJsonPath('phone', '09-771234561')

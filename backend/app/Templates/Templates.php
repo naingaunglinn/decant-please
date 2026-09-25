@@ -2,6 +2,7 @@
 
 namespace App\Templates;
 
+use App\Enums\OrderStatus;
 use App\Models\Shop;
 use App\Models\ShopSetting;
 use App\Support\TenantContext;
@@ -48,6 +49,52 @@ final class Templates
     {
         // currentOrNull, never current(): a read must not create the settings row.
         return ShopSetting::currentOrNull()?->template ?? self::DEFAULT;
+    }
+
+    /**
+     * The one status-label resolver (step 39): the current shop's template's word
+     * for $status. OrderStatus::label() — and so every badge, select, CSV row,
+     * invoice and tracking receipt — reads this.
+     *
+     * With no tenant set (a console command) there is no shop to ask, so it falls
+     * back to the category-free word: a label is not shop data, so this can't leak.
+     * Memoised per shop id for the request — an orders list would otherwise read
+     * shop_settings once per badge. Keyed by id, never the Shop object: an object
+     * hash is reused after GC and could hand one shop another's labels.
+     */
+    public static function statusLabel(OrderStatus $status): string
+    {
+        return self::statusLabels()[$status->value] ?? $status->defaultLabel();
+    }
+
+    /** @return array<string, string> every state's label, in the same words statusLabel() gives */
+    public static function statusLabels(): array
+    {
+        $shop = app(TenantContext::class)->get();
+
+        if ($shop === null) {
+            $labels = [];
+
+            foreach (OrderStatus::cases() as $status) {
+                $labels[$status->value] = $status->defaultLabel();
+            }
+
+            return $labels;
+        }
+
+        return self::statusLabelsFor($shop->id);
+    }
+
+    /** @return array<string, string> */
+    private static function statusLabelsFor(int $shopId): array
+    {
+        // once() keys on the closure's captured variables, not on this method's
+        // arguments: capturing $shopId is what gives each shop its own entry.
+        return once(function () use ($shopId): array {
+            unset($shopId); // captured for the key only; forShop() reads the context
+
+            return self::forShop()->statusLabels();
+        });
     }
 
     /**
