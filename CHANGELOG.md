@@ -24,12 +24,12 @@ and record what each one costs.
   `product_variants.stock_qty` and `unit_cost_mmk` (nullable: untracked, unknown). A
   per-variant product's reorder line goes from the ml default 30 to 2 pieces; no variant
   was counted before, so no flag changes. `down()` refuses while a variant carries a count
-  or a cost. Up → down → up on Postgres 17: products, variants and order-line money hashes
+  or a cost, and puts those reorder lines back to 30. Up → down → up on Postgres 17: products, variants and order-line money hashes
   identical except that reorder line.
 - **Draw-down** (`Order::drawDownStock()`, on → Prepared): pooled by size × quantity per
   product, per variant by quantity. One transaction; every affected row is locked
   (`lockForUpdate`, products then variants, id order) before any is written, so two orders
-  prepared at once can't lose an update. Still warn-only: clamps at zero, never blocks.
+  prepared at once can't lose an update to each other. Still warn-only: clamps at zero, never blocks.
 - **Cost snapshot** (`OrderItem::currentUnitCost()`, the one rule the line snapshot and the
   admin order form share): pooled costs its share of the reference bottle (the ceiling
   rule, unchanged: 100,000 Ks / 30ml at 5ml is still 16,667); per variant reads the
@@ -37,18 +37,35 @@ and record what each one costs.
 - **Admin**: a clothing product's form counts ("In stock", pcs) and costs each option in
   its row, with one "Reorder at" (pcs, default 2). The decant form is unchanged. The
   product list shows pieces for per-variant products (red, with the low options in the
-  tooltip). The low-stock panel lists both modes ("M / Blue: 1"). The Accept warning names
+  tooltip). The low-stock panel lists both modes ("M / Blue: 1"), each product in its own
+  mode, in the shop's word for a product ("Fragrance", as before). The Accept warning names
   the variant and drops the "ml" for pieces.
 - **API**: unchanged. `stock_qty` and `unit_cost_mmk` stay admin-only.
-- **Tests**: `StockModesTest` (10): per-variant draw-down, clamp, a mixed decant + clothing
-  order, the per-variant cost snapshot (frozen, null when unknown), the pooled cost
+- **Tests**: `StockModesTest` (11): per-variant draw-down, clamp, a mixed decant + clothing
+  order, the per-variant cost snapshot (frozen, null when unknown; through the storefront
+  checkout too), the pooled cost
   ignoring a stray variant cost, shortfalls, the low-stock panel in two shops, the admin
   form, the migration round trip on seeded rows in two shops, and (Postgres only) the
-  `FOR UPDATE` locks. Parity: names only, no values. 444 tests pass on SQLite and on
-  Postgres 17.
+  `FOR UPDATE` locks. Parity: names only, no values. 445 tests pass on Postgres 17; on SQLite
+  444 pass and the Postgres-only lock test skips.
+- **Deploy (maintenance on, like 37a and 39).** The migration renames two columns the
+  running code reads (`stock_ml`, `low_stock_threshold_ml`), and Heroku's release phase
+  migrates while the old dynos still serve. In that window old code 500s on the products
+  list and the low-stock panel. Worse, an order moved to Decanted there commits its status
+  and then fails the draw-down, so its stock is never taken off. So turn Heroku
+  maintenance on before the `main` promotion, and off once the release is out. The API is
+  unchanged, so the storefront has no deploy order.
+  - **Rollback:** run `php artisan migrate:rollback --step=1` **before** rolling back the
+    code. `down()` refuses once a seller has counted or costed a variant. To roll back
+    anyway, clear those first (`UPDATE product_variants SET stock_qty = NULL,
+    unit_cost_mmk = NULL;`), which loses those counts and costs: order lines keep their
+    cost snapshots.
+  - **Recovery**, if an order was moved to Decanted mid-release: take its ml off the
+    fragrance's Remaining by hand in the product form.
 - **Not built**: Myanmar weight units (RUN-QUEUE row 8b); a per-variant count reaching
   zero doesn't hide the variant (the `in_stock` toggle stays manual, as for decant);
-  "liquid only" margin wording for clothing.
+  "liquid only" margin wording for clothing; a lock on the order row itself (the same
+  order saved to Prepared twice at once can still draw twice, as before step 40).
 
 ## 0. What changed in v46
 

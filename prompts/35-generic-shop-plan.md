@@ -556,7 +556,9 @@ pieces; **40b** (RUN-QUEUE row 8b) adds Myanmar weight units.
 - **One reorder line per product** (`low_stock_threshold`): ml for pooled, pieces for
   each variant of a per-variant product. The migration sets existing per-variant products
   to 2 (the ml default 30 in pieces would flag every size at once); none was counted yet.
-- `LowStock` orders NULL pooled amounts last explicitly (SQLite and Postgres sort NULLs
+- `Product::scopeLowStock()` checks each product's mode (`Templates::pooledKeys()`), as
+  `isLowStock()` does, so a count left from the other mode after a template switch
+  doesn't flag. `LowStock` orders NULL pooled amounts last explicitly (SQLite and Postgres sort NULLs
   differently) and qualifies both sides of the variant comparison inside `whereHas`.
 - Not built: a count reaching zero doesn't flip `in_stock` (manual, as for decant);
   checkout doesn't reserve or refuse by count; "liquid only" margin wording stays on the

@@ -153,8 +153,10 @@ class Product extends Model
     }
 
     /**
-     * Products at or below their reorder line, in either stock mode: the pooled
-     * amount, or any selling variant's pieces. Untracked (null) counts never match.
+     * Products at or below their reorder line, each in its own stock mode (the
+     * same rule as isLowStock()): the pooled amount, or any selling variant's
+     * pieces. Untracked (null) counts never match, nor does a count left over
+     * from the other mode after a template switch.
      * Both sides of each comparison are qualified — the variant one runs inside a
      * correlated subquery, where a bare column is ambiguous on Postgres.
      */
@@ -162,11 +164,14 @@ class Product extends Model
     {
         return $query->where(fn (Builder $query) => $query
             ->where(fn (Builder $pooled) => $pooled
+                ->whereIn('products.template', Templates::pooledKeys())
                 ->whereNotNull('products.stock_amount')
                 ->whereColumn('products.stock_amount', '<=', 'products.low_stock_threshold'))
-            ->orWhereHas('activeVariants', fn (Builder $variant) => $variant
-                ->whereNotNull('product_variants.stock_qty')
-                ->whereColumn('product_variants.stock_qty', '<=', 'products.low_stock_threshold')));
+            ->orWhere(fn (Builder $perVariant) => $perVariant
+                ->whereNotIn('products.template', Templates::pooledKeys())
+                ->whereHas('activeVariants', fn (Builder $variant) => $variant
+                    ->whereNotNull('product_variants.stock_qty')
+                    ->whereColumn('product_variants.stock_qty', '<=', 'products.low_stock_threshold'))));
     }
 
     /** Tracking is opt-in: a null count (the product's, or every selling variant's) is not tracked. */

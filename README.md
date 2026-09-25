@@ -302,7 +302,7 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 444 tests — parity baseline, domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, storefront hosts, full API
+docker compose exec backend php artisan test   # 445 tests — parity baseline, domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, storefront hosts, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 

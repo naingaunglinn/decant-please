@@ -34,6 +34,12 @@ final class Templates
         return array_map(fn (string $class): string => (new $class)->name(), self::$registry);
     }
 
+    /** @return list<string> the keys whose templates pool their stock (step 40) */
+    public static function pooledKeys(): array
+    {
+        return array_keys(array_filter(self::$registry, fn (string $class): bool => (new $class)->pooledStock()));
+    }
+
     public static function has(string $key): bool
     {
         return isset(self::$registry[$key]);

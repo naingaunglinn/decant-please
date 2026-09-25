@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Templates\Templates;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -25,6 +26,9 @@ class LowStock extends TableWidget
 
     public function table(Table $table): Table
     {
+        // The shop's own word ("fragrance"), so a decant shop reads what it always did.
+        $noun = Templates::forShop()->productNouns()[0];
+
         return $table
             ->heading('Low stock — reorder soon')
             ->query(
@@ -39,13 +43,13 @@ class LowStock extends TableWidget
                     ->orderBy('products.name')
             )
             ->emptyStateHeading('Nothing running low')
-            ->emptyStateDescription('Everything you count is above its reorder line.')
+            ->emptyStateDescription("Every tracked {$noun} is above its reorder threshold.")
             ->emptyStateIcon(Heroicon::OutlinedCheckCircle)
             ->columns([
                 TextColumn::make('brand.name')
                     ->label('Brand'),
                 TextColumn::make('name')
-                    ->label('Product')
+                    ->label(ucfirst($noun))
                     ->url(fn (Product $record): string => ProductResource::getUrl('edit', ['record' => $record])),
                 TextColumn::make('stock_amount')
                     ->label('Remaining')

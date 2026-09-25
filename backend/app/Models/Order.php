@@ -287,7 +287,9 @@ class Order extends Model
      *
      * One transaction, and every affected row is locked (products, then variants,
      * each in id order, so two orders never lock in opposite orders) before any is
-     * written: two orders prepared at once can't both read 50ml and both write 40.
+     * written: two different orders prepared at once can't both read 50ml and both
+     * write 40. (The same order saved to Prepared twice at once is not guarded
+     * here — the order row isn't locked; that was true before step 40 too.)
      * Still warn-only — a shortfall clamps at zero rather than blocking an order
      * whose vials are already filled; Accept is where it is flagged.
      */
@@ -316,8 +318,8 @@ class Order extends Model
         }
 
         DB::transaction(function () use ($byProduct, $byVariant): void {
-            $products = Product::query()->whereKey(array_keys($byProduct))->orderBy('id')->lockForUpdate()->get();
-            $variants = ProductVariant::query()->whereKey(array_keys($byVariant))->orderBy('id')->lockForUpdate()->get();
+            $products = $byProduct === [] ? collect() : Product::query()->whereKey(array_keys($byProduct))->orderBy('id')->lockForUpdate()->get();
+            $variants = $byVariant === [] ? collect() : ProductVariant::query()->whereKey(array_keys($byVariant))->orderBy('id')->lockForUpdate()->get();
 
             $products->each(fn (Product $product) => $product->drawDownStock($byProduct[$product->id]));
             $variants->each(fn (ProductVariant $variant) => $variant->drawDownStock($byVariant[$variant->id]));

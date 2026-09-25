@@ -154,9 +154,10 @@ class ProductsTable
                 ReplicateAction::make()
                     ->excludeAttributes(['slug'])
                     ->after(function (Product $record, Product $replica): void {
-                        // slug was excluded, so the HasSlug hook generated a fresh one; copy the price rows
+                        // slug was excluded, so the HasSlug hook generated a fresh one; copy the price
+                        // rows with their cost — not their count: the copy starts uncounted
                         $record->variants->each(fn ($variant) => $replica->variants()->create(
-                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position'])
+                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
                         ));
                     }),
                 ProductResource::safeDeleteAction(),

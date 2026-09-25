@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Schema;
  * not a recorded figure.
  *
  * down() refuses while any variant carries stock or a cost, rather than drop what
- * the seller entered.
+ * the seller entered, and puts those reorder lines back to 30.
  */
 return new class extends Migration
 {
@@ -55,5 +55,7 @@ return new class extends Migration
             $table->renameColumn('stock_amount', 'stock_ml');
             $table->renameColumn('low_stock_threshold', 'low_stock_threshold_ml');
         });
+
+        DB::table('products')->where('template', '!=', 'decant')->update(['low_stock_threshold_ml' => 30]);
     }
 };

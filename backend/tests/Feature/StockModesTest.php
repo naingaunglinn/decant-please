@@ -184,6 +184,23 @@ class StockModesTest extends TestCase
         $this->assertNull($uncosted->fresh()->liquidGrossMarginMmk());
     }
 
+    public function test_a_storefront_checkout_snapshots_the_variants_cost(): void
+    {
+        $shirt = $this->shirt([['M / Blue', 5, 9000]]);
+
+        $response = $this->postJson('/api/v1/decant-please/orders', [
+            'customer_name' => 'Su Su',
+            'phone' => '09-771234561',
+            'delivery_township_id' => $this->serviceableTownship(fee: 3000)->id,
+            'address_line' => 'No. 12, Baho Road',
+            'items' => [['variant_id' => $this->variant($shirt, 'M / Blue')->id, 'quantity' => 2, 'unit_cost_mmk' => 1]],
+        ])->assertCreated();
+
+        $line = Order::where('tracking_code', $response->json('tracking_code'))->firstOrFail()->items()->first();
+        $this->assertSame(9000, $line->unit_cost_mmk); // a client-sent cost is ignored
+        $this->assertSame(18000, $line->line_cost_mmk);
+    }
+
     public function test_a_pooled_line_still_costs_its_share_of_the_bottle_not_a_variant_cost(): void
     {
         $aventus = $this->decant();
@@ -226,6 +243,10 @@ class StockModesTest extends TestCase
         ShopSetting::current()->update(['template' => 'clothing']);
         $theirs = $this->shirt([['M / Blue', 0]], name: 'Their Shirt');
         app(TenantContext::class)->set($first);
+
+        // A count left from the other mode (a template switch) doesn't flag.
+        $switched = $this->shirt([['M / Blue', 9]], name: 'Switched Shirt');
+        $switched->update(['stock_amount' => 1]);
 
         $this->assertSame(['Aventus', 'Low Shirt'], Product::query()->lowStock()->orderBy('products.name')->pluck('name')->all());
         $this->assertSame(['M / Blue'], $low->fresh()->lowVariants()->map->label()->all());
@@ -294,6 +315,7 @@ class StockModesTest extends TestCase
         $this->assertFalse(Schema::hasColumn('product_variants', 'stock_qty'));
         $down = DB::table('products')->orderBy('id')->get(['id', 'stock_ml', 'bottle_cost_mmk'])->map(fn (object $row) => (array) $row)->all();
         $this->assertSame(array_map(fn (array $row) => ['id' => $row['id'], 'stock_ml' => $row['stock_amount'], 'bottle_cost_mmk' => $row['bottle_cost_mmk']], $before), $down);
+        $this->assertSame([30, 30, 30], DB::table('products')->orderBy('id')->pluck('low_stock_threshold_ml')->map(fn ($v) => (int) $v)->all());
 
         $migration->up();
 
