@@ -148,22 +148,22 @@ class ProductForm
                     ->columnSpanFull()
                     ->columns(2)
                     ->schema([
-                        TextInput::make('bottle_cost_mmk')
+                        TextInput::make('reference_cost_mmk')
                             ->label('Bottle cost')
                             ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
                             ->stripCharacters(',')
                             ->numeric()
                             ->minValue(0)
                             ->suffix('Ks')
-                            ->requiredWith('bottle_volume_ml')
+                            ->requiredWith('reference_amount')
                             ->helperText('Update by hand when you rebuy at a new price — past orders keep the cost they were created with.'),
-                        TextInput::make('bottle_volume_ml')
+                        TextInput::make('reference_amount')
                             ->label('Bottle size')
                             ->numeric()
                             ->minValue(1)
                             ->suffix('ml')
                             ->datalist([30, 50, 75, 100, 125, 200])
-                            ->requiredWith('bottle_cost_mmk'),
+                            ->requiredWith('reference_cost_mmk'),
                     ]),
                 Section::make($template->variantsHeading())
                     ->columnSpanFull()

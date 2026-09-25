@@ -74,7 +74,7 @@ class ClothingTemplateTest extends TestCase
 
         Livewire::test(CreateProduct::class)
             ->assertFormFieldDoesNotExist('stock_amount')
-            ->assertFormFieldHidden('bottle_cost_mmk')
+            ->assertFormFieldHidden('reference_cost_mmk')
             ->fillForm([
                 'brand_id' => $brand->id,
                 'name' => 'Linen Shirt',

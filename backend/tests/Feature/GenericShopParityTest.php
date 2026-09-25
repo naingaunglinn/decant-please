@@ -41,7 +41,7 @@ use Tests\TestCase;
  * compared to the fixture's own models, never to literals — Postgres sequences
  * don't roll back between tests, so a literal id is not deterministic.
  *
- * Catalog (bottle cost ÷ bottle volume, CEILING — Product::liquidCostMmk):
+ * Catalog (bottle cost ÷ bottle volume, CEILING — Product::pooledCostMmk):
  *   Chanel (designer) Allure Homme Sport  5ml 30,000 · 10ml 55,000 · 30ml 150,000 (out of stock)
  *                                         cost 300,000 / 100ml → 5ml 15,000 · 10ml 30,000
  *   Creed (niche)     Aventus             5ml 65,000 · 10ml 120,000
@@ -443,7 +443,7 @@ class GenericShopParityTest extends TestCase
                 'vibes' => 'Fresh, Sporty', 'performance' => 'Around 4-6 Hours',
             ],
             'description' => 'A crisp citrus-marine cologne.',
-            'is_featured' => true, 'bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100,
+            'is_featured' => true, 'reference_cost_mmk' => 300000, 'reference_amount' => 100,
             'stock_amount' => 100,
         ]);
         $this->allure->variants()->createMany([
@@ -454,7 +454,7 @@ class GenericShopParityTest extends TestCase
 
         $this->aventus = $this->creed->products()->create([
             'name' => 'Aventus', 'attributes' => ['concentration' => 'edp', 'gender' => 'male', 'notes' => 'Pineapple, Birch'],
-            'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
+            'reference_cost_mmk' => 100000, 'reference_amount' => 30,
             'stock_amount' => 12,
         ]);
         $this->aventus->variants()->createMany([
@@ -567,7 +567,7 @@ class GenericShopParityTest extends TestCase
 
             $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
                 'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
-                'bottle_cost_mmk' => 50000, 'bottle_volume_ml' => 100,
+                'reference_cost_mmk' => 50000, 'reference_amount' => 100,
             ]);
             $fragrance->variants()->create(['size_ml' => 5, 'price_mmk' => 7000]);
 

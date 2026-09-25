@@ -62,7 +62,7 @@ class StockModesTest extends TestCase
         $product = $brand->products()->create([
             'name' => 'Aventus', 'template' => 'decant', 'stock_amount' => $stockMl,
             'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
-            'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
+            'reference_cost_mmk' => 100000, 'reference_amount' => 30,
         ]);
         // A stray variant cost on a pooled product must never become its COGS.
         $product->variants()->create(['size_ml' => 5, 'price_mmk' => 30000, 'unit_cost_mmk' => 1]);
@@ -301,7 +301,7 @@ class StockModesTest extends TestCase
         $this->decant(7);
         app(TenantContext::class)->set($first);
 
-        $columns = ['id', 'shop_id', 'template', 'stock_amount', 'low_stock_threshold', 'bottle_cost_mmk', 'bottle_volume_ml'];
+        $columns = ['id', 'shop_id', 'template', 'stock_amount', 'low_stock_threshold', 'reference_cost_mmk', 'reference_amount'];
         $before = DB::table('products')->orderBy('id')->get($columns)->map(fn (object $row) => (array) $row)->all();
 
         $migration = require database_path('migrations/2026_09_30_000000_add_stock_modes.php');
@@ -313,8 +313,8 @@ class StockModesTest extends TestCase
         $migration->down();
         $this->assertTrue(Schema::hasColumn('products', 'stock_ml'));
         $this->assertFalse(Schema::hasColumn('product_variants', 'stock_qty'));
-        $down = DB::table('products')->orderBy('id')->get(['id', 'stock_ml', 'bottle_cost_mmk'])->map(fn (object $row) => (array) $row)->all();
-        $this->assertSame(array_map(fn (array $row) => ['id' => $row['id'], 'stock_ml' => $row['stock_amount'], 'bottle_cost_mmk' => $row['bottle_cost_mmk']], $before), $down);
+        $down = DB::table('products')->orderBy('id')->get(['id', 'stock_ml', 'reference_cost_mmk'])->map(fn (object $row) => (array) $row)->all();
+        $this->assertSame(array_map(fn (array $row) => ['id' => $row['id'], 'stock_ml' => $row['stock_amount'], 'reference_cost_mmk' => $row['reference_cost_mmk']], $before), $down);
         $this->assertSame([30, 30, 30], DB::table('products')->orderBy('id')->pluck('low_stock_threshold_ml')->map(fn ($v) => (int) $v)->all());
 
         $migration->up();

@@ -107,8 +107,8 @@ class ProductsTable
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
                     ->visible($measured)
-                    ->state(fn (Product $record): string => $record->liquidCostMmk(1) !== null
-                        ? Money::kyat((int) $record->liquidCostMmk(1))
+                    ->state(fn (Product $record): string => $record->pooledCostMmk(1) !== null
+                        ? Money::kyat((int) $record->pooledCostMmk(1))
                         : '—')
                     ->tooltip('Liquid only — ceiling-rounded per ml')
                     ->toggleable(isToggledHiddenByDefault: true),

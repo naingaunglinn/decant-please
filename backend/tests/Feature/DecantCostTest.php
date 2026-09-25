@@ -29,21 +29,21 @@ class DecantCostTest extends TestCase
     public function test_liquid_cost_divides_exactly_and_ceils_the_remainder(): void
     {
         $exact = $this->fragrance(cost: 300000, volume: 100);
-        $this->assertSame(30000, $exact->liquidCostMmk(10)); // exact division
+        $this->assertSame(30000, $exact->pooledCostMmk(10)); // exact division
 
         // 100,000 × 5 / 30 = 16,666.67 — CEILING, never floor: a floored cost flatters margin
         $remainder = $this->fragrance(cost: 100000, volume: 30, name: 'Layton');
-        $this->assertSame(16667, $remainder->liquidCostMmk(5));
+        $this->assertSame(16667, $remainder->pooledCostMmk(5));
 
         $perMl = $this->fragrance(cost: 2500, volume: 1, name: 'PerMl');
-        $this->assertSame(25000, $perMl->liquidCostMmk(10)); // volume = 1
+        $this->assertSame(25000, $perMl->pooledCostMmk(10)); // volume = 1
     }
 
     public function test_liquid_cost_is_null_unless_both_reference_fields_are_set(): void
     {
-        $this->assertNull($this->fragrance(cost: null, volume: null)->liquidCostMmk(10));
-        $this->assertNull($this->fragrance(cost: 300000, volume: null, name: 'CostOnly')->liquidCostMmk(10));
-        $this->assertNull($this->fragrance(cost: null, volume: 100, name: 'VolumeOnly')->liquidCostMmk(10));
+        $this->assertNull($this->fragrance(cost: null, volume: null)->pooledCostMmk(10));
+        $this->assertNull($this->fragrance(cost: 300000, volume: null, name: 'CostOnly')->pooledCostMmk(10));
+        $this->assertNull($this->fragrance(cost: null, volume: 100, name: 'VolumeOnly')->pooledCostMmk(10));
     }
 
     public function test_cost_pair_is_both_or_neither_on_the_fragrance_form(): void
@@ -51,9 +51,9 @@ class DecantCostTest extends TestCase
         $fragrance = $this->fragrance(cost: null, volume: null);
 
         Livewire::test(EditProduct::class, ['record' => $fragrance->getRouteKey()])
-            ->fillForm(['bottle_cost_mmk' => 300000])
+            ->fillForm(['reference_cost_mmk' => 300000])
             ->call('save')
-            ->assertHasFormErrors(['bottle_volume_ml']);
+            ->assertHasFormErrors(['reference_amount']);
     }
 
     // ---- the snapshot ----
@@ -91,7 +91,7 @@ class DecantCostTest extends TestCase
         $order = $this->checkout($fragrance, sizeMl: 10, quantity: 1);
         $item = $order->items->first();
 
-        $fragrance->update(['bottle_cost_mmk' => 999000]); // rebuy at a new price
+        $fragrance->update(['reference_cost_mmk' => 999000]); // rebuy at a new price
 
         $item->update(['quantity' => 3]);
         $item->refresh();
@@ -110,7 +110,7 @@ class DecantCostTest extends TestCase
         $this->assertNull($item->line_cost_mmk);
 
         // Costing the fragrance later must not retro-fill the old item.
-        $fragrance->update(['bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100]);
+        $fragrance->update(['reference_cost_mmk' => 300000, 'reference_amount' => 100]);
         $item->update(['quantity' => 2]);
         $item->refresh();
 
@@ -206,8 +206,8 @@ class DecantCostTest extends TestCase
         $fragrance = $brandModel->products()->create([
             'name' => $name,
             'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
-            'bottle_cost_mmk' => $cost,
-            'bottle_volume_ml' => $volume,
+            'reference_cost_mmk' => $cost,
+            'reference_amount' => $volume,
         ]);
 
         $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);

@@ -74,7 +74,7 @@ class OrderItem extends Model
         }
 
         if ($product->pooledStock()) {
-            return $product->liquidCostMmk((int) $sizeMl);
+            return $product->pooledCostMmk((int) $sizeMl);
         }
 
         $cost = $variantId === null

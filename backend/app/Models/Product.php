@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
-#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_amount', 'low_stock_threshold', 'bottle_cost_mmk', 'bottle_volume_ml'])]
+#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_amount', 'low_stock_threshold', 'reference_cost_mmk', 'reference_amount'])]
 /**
  * A catalog product (step 36; was `Fragrance`). Its sellable options are
  * ProductVariant rows. What it carries beyond the core columns is its template's
@@ -241,14 +241,14 @@ class Product extends Model
      * would understate cost and flatter every margin figure. Ceiling overstates
      * cost by at most 1 Ks per vial — margin errs conservative.
      */
-    public function liquidCostMmk(int $sizeMl): ?int
+    public function pooledCostMmk(int $sizeMl): ?int
     {
-        if ($this->bottle_cost_mmk === null || $this->bottle_volume_ml === null
-            || $this->bottle_volume_ml < 1 || $sizeMl < 1) {
+        if ($this->reference_cost_mmk === null || $this->reference_amount === null
+            || $this->reference_amount < 1 || $sizeMl < 1) {
             return null;
         }
 
-        return intdiv($this->bottle_cost_mmk * $sizeMl + $this->bottle_volume_ml - 1, $this->bottle_volume_ml);
+        return intdiv($this->reference_cost_mmk * $sizeMl + $this->reference_amount - 1, $this->reference_amount);
     }
 
     /**
@@ -274,8 +274,8 @@ class Product extends Model
             'is_featured' => 'boolean',
             'stock_amount' => 'integer',
             'low_stock_threshold' => 'integer',
-            'bottle_cost_mmk' => 'integer',
-            'bottle_volume_ml' => 'integer',
+            'reference_cost_mmk' => 'integer',
+            'reference_amount' => 'integer',
         ];
     }
 }
