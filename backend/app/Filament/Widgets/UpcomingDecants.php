@@ -43,7 +43,7 @@ class UpcomingDecants extends TableWidget
                 TextColumn::make('items_summary')
                     ->label('Items')
                     ->state(fn (Order $record): string => $record->items
-                        ->map(fn ($item) => "{$item->size_ml}ml × {$item->quantity}")
+                        ->map(fn ($item) => "{$item->variantLabel()} × {$item->quantity}")
                         ->implode(', ')),
                 TextColumn::make('status')
                     ->badge(),

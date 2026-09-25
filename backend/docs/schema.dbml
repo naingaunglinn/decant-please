@@ -153,15 +153,16 @@ Table product_variants {
   id bigint [pk, increment]
   shop_id bigint [not null]
   product_id bigint [not null]
-  size_ml smallint [not null]
+  size_ml smallint [null, note: 'null when the template has no measure (clothing, step 38)']
   price_mmk int [not null]
   in_stock boolean [not null, default: true]
   created_at timestamp [null]
   updated_at timestamp [null]
-  options jsonb [null, note: 'option values, e.g. {"Size":"10ml"}']
+  options jsonb [null, note: 'option values, e.g. {"Size":"10ml"} or {"Size":"M","Color":"Blue"}']
   measure int [null, note: 'numeric amount (10 for 10ml)']
   is_active boolean [not null, default: true, note: 'archived, never deleted, once on an order']
   position int [not null, default: 0, note: 'display order; ties sort by size_ml']
+  image_path varchar [null, note: 'a photo per variant (colour), under shops/{id}/variants/']
   indexes {
     (product_id, size_ml) [unique]
   }

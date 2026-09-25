@@ -546,7 +546,7 @@ class Order extends Model
                 ->whereDate('decant_date', '>=', $from->toDateString())
                 ->whereDate('decant_date', '<=', $to->toDateString())
                 ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
-            ->with(['order', 'product.brand'])
+            ->with(['order', 'product.brand', 'variant'])
             ->get();
 
         $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
@@ -555,7 +555,9 @@ class Order extends Model
 
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
             $groups = ($byDay->get($day->toDateString()) ?? collect())
-                ->groupBy(fn (OrderItem $item) => "{$item->product_id}:{$item->size_ml}")
+                // The variant's frozen label splits M / Blue from L / Red, which
+                // share a null size_ml; a decant line's label is its size.
+                ->groupBy(fn (OrderItem $item) => "{$item->product_id}:{$item->size_ml}:{$item->variantLabel()}")
                 ->map(function (Collection $group): array {
                     $first = $group->first();
 
@@ -564,11 +566,14 @@ class Order extends Model
                             ? "{$first->product->brand->name} — {$first->product->name}"
                             : $first->product->name,
                         'size_ml' => $first->size_ml,
+                        'variant_label' => $first->variantLabel(),
+                        // the seller's own variant order (S, M, L, XL), not alphabetical
+                        'variant_position' => $first->variant?->position ?? 0,
                         'quantity' => $group->sum('quantity'),
                         'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
                     ];
                 })
-                ->sortBy([['label', 'asc'], ['size_ml', 'asc']])
+                ->sortBy([['label', 'asc'], ['size_ml', 'asc'], ['variant_position', 'asc'], ['variant_label', 'asc']])
                 ->values();
 
             $days[] = ['date' => $day, 'groups' => $groups];

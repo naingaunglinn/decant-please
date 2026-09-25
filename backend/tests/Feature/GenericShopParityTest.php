@@ -648,16 +648,27 @@ class GenericShopParityTest extends TestCase
         ], $items);
     }
 
-    /** The expected keys, read off the actual object in the expected order. */
+    /**
+     * The expected keys, read off the actual object in the expected order. A key
+     * a later step adds is ignored, in nested objects and in each element of a
+     * list of objects (step 38's variant `options`); a list keeps its length.
+     */
     private function pick(array $actual, array $expected): array
     {
         $picked = [];
 
         foreach ($expected as $key => $value) {
             $this->assertArrayHasKey($key, $actual);
-            $picked[$key] = is_array($value) && is_array($actual[$key]) && ! array_is_list($value)
-                ? $this->pick($actual[$key], $value)
-                : $actual[$key];
+            $picked[$key] = match (true) {
+                ! is_array($value) || ! is_array($actual[$key]) => $actual[$key],
+                ! array_is_list($value) => $this->pick($actual[$key], $value),
+                $value !== [] && is_array($value[0]) && count($value) === count($actual[$key]) => array_map(
+                    fn (array $actualItem, array $expectedItem): array => $this->pick($actualItem, $expectedItem),
+                    $actual[$key],
+                    $value,
+                ),
+                default => $actual[$key],
+            };
         }
 
         return $picked;

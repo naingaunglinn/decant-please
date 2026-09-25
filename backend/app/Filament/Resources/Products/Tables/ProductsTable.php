@@ -44,10 +44,13 @@ class ProductsTable
 
         // The shop template's select attributes (step 37) — a badge column and a
         // filter each: concentration and gender for decant.
+        $template = Templates::forShop();
         $selects = array_values(array_filter(
-            Templates::forShop()->attributes(),
+            $template->attributes(),
             fn (Attribute $attribute): bool => $attribute->type === Attribute::SELECT,
         ));
+        // The ml stock, cost, size filter and CSV import are decant's (step 38).
+        $measured = $template->measure() === 'ml';
 
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
@@ -75,12 +78,14 @@ class ProductsTable
                         ? 'From '.Money::kyat((int) $record->min_in_stock_price)
                         : 'Out of stock'),
                 TextColumn::make('sizes')
+                    ->label($measured ? 'Sizes' : 'Options')
                     ->state(fn (Product $record): string => $record->variants
                         ->where('is_active', true)
                         ->map(fn ($variant) => $variant->label())
                         ->implode(' · ')),
                 TextColumn::make('stock_ml')
                     ->label('Stock')
+                    ->visible($measured)
                     ->badge()
                     ->state(fn (Product $record): string => $record->isStockTracked()
                         ? "{$record->stock_ml}ml"
@@ -96,6 +101,7 @@ class ProductsTable
                     ->sortable(),
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
+                    ->visible($measured)
                     ->state(fn (Product $record): string => $record->liquidCostMmk(1) !== null
                         ? Money::kyat((int) $record->liquidCostMmk(1))
                         : '—')
@@ -127,6 +133,7 @@ class ProductsTable
                 TernaryFilter::make('is_featured'),
                 SelectFilter::make('has_size')
                     ->label('Has size')
+                    ->visible($measured)
                     ->options([5 => '5ml', 10 => '10ml', 30 => '30ml'])
                     ->query(fn (Builder $query, array $data) => $query->when($data['value'] ?? null,
                         fn (Builder $q, string $size) => $q->whereHas('variants', fn (Builder $p) => $p->where('size_ml', $size)))),
@@ -143,7 +150,7 @@ class ProductsTable
                     ->after(function (Product $record, Product $replica): void {
                         // slug was excluded, so the HasSlug hook generated a fresh one; copy the price rows
                         $record->variants->each(fn ($variant) => $replica->variants()->create(
-                            $variant->only(['size_ml', 'price_mmk', 'in_stock', 'is_active', 'position'])
+                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position'])
                         ));
                     }),
                 ProductResource::safeDeleteAction(),
@@ -151,6 +158,7 @@ class ProductsTable
             ->toolbarActions([
                 Action::make('importCsv')
                     ->label('Import CSV')
+                    ->visible($measured)
                     ->icon(Heroicon::OutlinedArrowUpTray)
                     ->modalHeading('Import fragrances from CSV')
                     ->modalDescription('One row per fragrance; price_5ml / price_10ml / price_30ml columns for the sizes (blank = not offered). Rows that already exist are skipped, so re-uploading is always safe. Images are added per fragrance afterwards.')
@@ -211,6 +219,7 @@ class ProductsTable
                     }),
                 Action::make('downloadCsvTemplate')
                     ->label('CSV template')
+                    ->visible($measured)
                     ->icon(Heroicon::OutlinedArrowDownTray)
                     ->action(fn () => response()->streamDownload(
                         function (): void {

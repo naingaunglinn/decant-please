@@ -146,7 +146,7 @@
                 @foreach ($order->items as $item)
                     <tr>
                         <td>{{ $item->fragrance_name_snapshot }}</td>
-                        <td class="num">{{ $item->size_ml }}ml</td>
+                        <td class="num">{{ $item->variantLabel() }}</td>
                         <td class="num">× {{ $item->quantity }}</td>
                         <td class="num">{{ Money::kyat($item->unit_price_mmk) }}</td>
                         <td class="num">{{ Money::kyat($item->line_total_mmk) }}</td>

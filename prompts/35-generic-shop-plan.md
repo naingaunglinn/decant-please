@@ -21,7 +21,7 @@ Principles P1–P6) throughout.
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
 - [x] **36** — Product + Variant model — split in two (#105): **36a built** (v40: schema, models, admin; API unchanged), **36b built** (v41: API contract + storefront)
 - [x] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), **37b built** (v43: storefront renders from `attributes` / `filters`)
-- [ ] **38** — Clothing template
+- [ ] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), 38b (storefront) next
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [ ] **39** — Status labels (template-driven; `decanted→prepared`)
 - [ ] **40** — Stock modes (`per_variant` / `pooled`)
@@ -363,6 +363,47 @@ shop's `shops/{id}/…` prefix.
 and fix it upstream.
 
 **Deliberately not built.** Only two templates (decant, clothing); bakery/cosmetics later.
+
+**As built — split in two (#107).** Like 36 and 37, the step is over one reviewable PR.
+The seam is the customer: 38a lets a clothing shop exist and sell through the API; 38b
+shows it on the storefront.
+
+- **38a (v44): backend, admin, studio — the API is additive.**
+  - `ClothingTemplate` (material and "For" selects, both filterable; Size + Color).
+  - `Template::measure()`: `'ml'` for decant, null otherwise. Every ml-only piece hangs
+    off it — the ml size field, the Stock and Cost sections, the ml columns and size
+    filter, the CSV import — so a decant shop sees nothing new (P3). Also
+    `variantPhotos()`, `variantsHeading()` and `name()`.
+  - **Gap fixed upstream (36):** `product_variants.size_ml` was still NOT NULL; the
+    migration makes it nullable and adds `image_path`. `down()` refuses while a
+    sizeless variant exists rather than invent a size.
+  - Admin: one text field per option, distinct Size + Color per product (case- and
+    space-insensitive), drag-to-reorder into `position`, a photo per variant under
+    `shops/{id}/variants/`. `ProductVariant` trims options and keeps the template's
+    order, so a label always reads "M / Blue". Duplicating a product copies options and
+    photos.
+  - **Admin order lines:** a clothing line picks a variant ("Option") instead of
+    typing ml. Without this, saving any clothing order in the admin failed on the
+    required ml size.
+  - Every "{size_ml}ml" an admin reads (invoice, day sheet, order list and CSV,
+    upcoming decants, Telegram) now prints `OrderItem::variantLabel()` — the frozen
+    label, identical for decant. The production schedule groups by it too, so M / Blue
+    and L / Red stay two lines.
+  - API, additive: `prices[].options` and `image_url`; `/products`
+    `option[{name}]=` (one in-stock variant must match every picked option);
+    `/meta` `variant_options` (empty for decant); tracking `items[].variant_label`, and
+    the receipt shows it.
+  - Studio "Register a shop" picks the category (`Templates::assignToShop`, written
+    under the new shop's context — no `withoutTenancy()`).
+  - Decisions: no per-product template picker yet (it would show on the decant form;
+    a mixing shop arrives with row 15); brand stays required in the clothing form
+    until 38b makes it optional in the API contract (the storefront still hides
+    brandless products); `statusLabels()` and `defaultModules()` for clothing are data
+    until steps 39 and 41 read them.
+- **38b (RUN-QUEUE row 6b): the storefront.** Option picker (Size then Color) with the
+  variant photo, option filter UI from `variant_options`, optional brand in the API
+  contract (`brand: null`), a size guide, and a demo clothing shop seeder for the
+  browser checks.
 
 > **⏸ Review stop (amended).** The owner reviews 35–38 here; then 39–41 continue. It no longer
 > waits for a real-seller trial (`AGENTS.md` P5 as replaced by #115).

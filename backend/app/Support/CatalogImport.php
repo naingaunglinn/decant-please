@@ -59,7 +59,15 @@ class CatalogImport
      */
     public static function run(string $csv, bool $updateExisting = false): self
     {
-        $import = new self($updateExisting, Templates::forShop());
+        $template = Templates::forShop();
+
+        // The CSV's columns are ml price columns (price_5ml…): a shop whose
+        // variants aren't ml sizes (clothing, step 38) adds products by hand.
+        if ($template->measure() !== 'ml') {
+            throw new InvalidArgumentException('CSV import is for perfume decants only — add these products one at a time.');
+        }
+
+        $import = new self($updateExisting, $template);
         $rows = self::parseCsv($csv);
 
         if ($rows === []) {

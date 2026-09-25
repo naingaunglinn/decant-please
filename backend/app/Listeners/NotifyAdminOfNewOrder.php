@@ -28,7 +28,7 @@ class NotifyAdminOfNewOrder
         }
 
         $items = $order->items
-            ->map(fn ($item) => "{$item->size_ml}ml × {$item->quantity} {$item->fragrance_name_snapshot}")
+            ->map(fn ($item) => "{$item->variantLabel()} × {$item->quantity} {$item->fragrance_name_snapshot}")
             ->implode(', ');
 
         // Tenant-aware admin URL: the panel carries the shop segment since 25a.

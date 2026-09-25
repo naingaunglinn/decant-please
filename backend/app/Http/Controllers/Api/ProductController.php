@@ -20,7 +20,11 @@ class ProductController extends Controller
         // The shop's template decides which attributes filter (step 37): ?gender=
         // for decant. A select matches its stored value; a text attribute is a
         // substring of search_text, never a LIKE into jsonb.
-        $attributeFilters = Templates::forShop()->filterable();
+        $template = Templates::forShop();
+        $attributeFilters = $template->filterable();
+        // Variant options filter too (step 38): ?option[Size]=M&option[Color]=Blue.
+        // Only the template's option names are accepted — each becomes a JSON path.
+        $optionNames = $template->measure() === null ? $template->variantOptions() : [];
 
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -32,6 +36,10 @@ class ProductController extends Controller
             'featured' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['newest', 'price_asc', 'price_desc', 'name'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            ...($optionNames === [] ? [] : [
+                'option' => ['nullable', 'array:'.implode(',', $optionNames)],
+                'option.*' => ['nullable', 'string', 'max:50'],
+            ]),
             ...collect($attributeFilters)->mapWithKeys(fn (Attribute $attribute): array => [
                 $attribute->key => $attribute->type === Attribute::SELECT
                     ? ['nullable', Rule::in(array_keys($attribute->options))]
@@ -62,7 +70,18 @@ class ProductController extends Controller
                     ->when($filters['min_price'] ?? null, fn (Builder $q, int $min) => $q->where('price_mmk', '>=', $min))
                     ->when($filters['max_price'] ?? null, fn (Builder $q, int $max) => $q->where('price_mmk', '<=', $max)))
             )
-            ->when($filters['featured'] ?? null, fn (Builder $query) => $query->where('is_featured', true));
+            ->when($filters['featured'] ?? null, fn (Builder $query) => $query->where('is_featured', true))
+            // One in-stock variant must match every picked option (M *and* Blue),
+            // not M on one variant and Blue on another. Exact JSON-path equality,
+            // like the select attributes — never a LIKE into jsonb.
+            ->when(array_filter($filters['option'] ?? [], fn ($value): bool => filled($value)), fn (Builder $query, array $picked) => $query
+                ->whereHas('activeVariants', function (Builder $variant) use ($picked): void {
+                    $variant->where('in_stock', true);
+
+                    foreach ($picked as $name => $value) {
+                        $variant->where("product_variants.options->{$name}", trim($value)); // stored trimmed
+                    }
+                }));
 
         // NULLS LAST rather than the `min_price IS NULL` prefix that did the same job:
         // min_price is a withMin() select alias, and Postgres resolves an alias in

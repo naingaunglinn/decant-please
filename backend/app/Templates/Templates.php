@@ -2,7 +2,9 @@
 
 namespace App\Templates;
 
+use App\Models\Shop;
 use App\Models\ShopSetting;
+use App\Support\TenantContext;
 use InvalidArgumentException;
 
 /**
@@ -15,6 +17,7 @@ final class Templates
     /** @var array<string, class-string<Template>> */
     private static array $registry = [
         'decant' => DecantTemplate::class,
+        'clothing' => ClothingTemplate::class,
     ];
 
     public static function get(string $key): Template
@@ -22,6 +25,12 @@ final class Templates
         $class = self::$registry[$key] ?? throw new InvalidArgumentException("Unknown template \"{$key}\".");
 
         return new $class;
+    }
+
+    /** @return array<string, string> key => admin label, for a template picker */
+    public static function options(): array
+    {
+        return array_map(fn (string $class): string => (new $class)->name(), self::$registry);
     }
 
     public static function has(string $key): bool
@@ -55,6 +64,27 @@ final class Templates
             throw new InvalidArgumentException(
                 "Template \"{$key}\" is outside this shop's group — a {$shopDefault->key()} shop can't sell it."
             );
+        }
+    }
+
+    /**
+     * Set a shop's default template (step 38) — the studio picks it when it
+     * registers a shop. Not withoutTenancy(): the settings row must be written as
+     * $shop's, so the context becomes $shop for the write and is restored even on
+     * a throw (the NationalGeography::seed pattern).
+     */
+    public static function assignToShop(Shop $shop, string $key): void
+    {
+        self::get($key); // unknown key → throws before anything is written
+
+        $context = app(TenantContext::class);
+        $previous = $context->get();
+        $context->set($shop);
+
+        try {
+            ShopSetting::current()->update(['template' => $key]);
+        } finally {
+            $context->set($previous);
         }
     }
 
