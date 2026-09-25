@@ -97,7 +97,7 @@ moves a studio user between shops**
 | Route | What it is |
 |---|---|
 | `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
-| `/studio/shops` | The shop registry (Step 34 PR-3): status pills, Owner, Last activity, Orders this month; status + needs-attention filters (archived hidden by default); register a shop (seeds its delivery geography and, by default, creates the owner's login) |
+| `/studio/shops` | The shop registry (Step 34 PR-3): status pills, Owner, Last activity, Orders this month; status + needs-attention filters (archived hidden by default); register a shop through `ShopRegistration::register()` (step 44a: DNS-label, non-reserved slug; seeds its delivery geography; its automatic `{slug}.{STOREFRONT_BASE_DOMAIN}` primary domain; by default, the owner's login) |
 | `/studio/shops/{shop}` | Read-only shop detail — owner/contact, configuration completeness (payment/Telegram/social/domain), activity counts, recent audit entries |
 | `/studio/roles` | Filament Shield role/permission management (Step 34) — studio-panel only |
 | `/studio/studio-audit-events` | The impersonation audit log (Step 34 PR-2) — read-only, filterable by shop; studio-panel only |

@@ -9,6 +9,32 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v52
+
+**v52** is step 44a (**#137**, RUN-QUEUE row 11): the foundation for self-serve sign-up.
+Spec: `prompts/44-self-serve-signup.md` (split: 44b, the seller-facing pages and phone
+verification, is row 11b). No migration.
+
+- **One registration method.** `App\Support\ShopRegistration::register()` creates the shop,
+  its category, the optional owner login (`shop_owner`, attached through `shop_user`), its
+  platform address and its delivery geography. The Studio's "Register a shop" action now
+  calls it; the sign-up (44b) will too. Shop, category, owner and address commit in one
+  transaction; the geography seeds after it, as before.
+- **Automatic platform address.** A registered shop gets `{slug}.{STOREFRONT_BASE_DOMAIN}`
+  as its primary, verified domain (the wildcard DNS and the Vercel wildcard reach it, so
+  there is nothing to verify). New env `STOREFRONT_BASE_DOMAIN` (`config/app.php`
+  `storefront_base_domain`): `cornerarea.me` in production, `localhost:3001` locally, blank
+  = off. The suite pins it blank; tests opt in. Existing shops' domain rows are unchanged.
+- **Slug rules** move with registration and are enforced inside `register()`, not only in
+  the form: a DNS label (lowercase letters, digits, single dashes, 3–40 characters) and
+  never a reserved platform name (`api`, `images`, `www`, `admin`, `studio`, …). The
+  Studio form uses the same rules on create and edit (max length 255 → 40).
+- **`Shop::publish(User $actor)`**: the seller's own go-live, onboarding → live only, by a
+  member of the shop or a studio admin. A suspended or archived shop can't publish itself
+  back (`activate()` still un-suspends; that stays a Studio power). Nothing calls it from
+  a screen yet (44b's Publish button).
+- `ShopRegistrationTest` (23 cases). `withoutTenancy()` stays at 2 of 5.
+
 ## 0. What changed in v51
 
 **v51** fixes the four pre-existing defects step 42 found (**#134**, RUN-QUEUE row 10b).

@@ -224,6 +224,15 @@ heroku run -a decant-please-api php artisan decant:fresh-start   # keeps admin +
 The first creates the admin user from `ADMIN_PASSWORD`; the second clears the demo
 catalog/orders while keeping the admin account and brand list, ready for real inventory.
 
+### Shop subdomains — `{slug}.cornerarea.me` (step 44a)
+
+Every newly registered shop gets `{slug}.cornerarea.me` as its primary storefront address,
+automatically, when `STOREFRONT_BASE_DOMAIN=cornerarea.me` is set on the Heroku app
+(`heroku config:set -a decant-please-api STOREFRONT_BASE_DOMAIN=cornerarea.me`; blank = off).
+The address only works once, by hand, the wildcard is in place: a `*.cornerarea.me` DNS
+record pointing at Vercel, and `*.cornerarea.me` added to the one storefront project
+(Vercel's wildcard-domain setup). Existing shops keep the domain rows they have.
+
 ### Custom domain + TLS
 
 ```bash
