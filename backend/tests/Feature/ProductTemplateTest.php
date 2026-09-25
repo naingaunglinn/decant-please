@@ -63,14 +63,27 @@ class ProductTemplateTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.template', 'decant')
             ->assertJsonPath('data.attributes', [
-                ['key' => 'concentration', 'label' => 'Concentration', 'value' => 'cologne', 'display' => 'Cologne'],
-                ['key' => 'gender', 'label' => 'Gender', 'value' => 'male', 'display' => 'Male'],
-                ['key' => 'notes', 'label' => 'Scent notes', 'value' => 'Orange, Sea Notes, Musk', 'display' => 'Orange, Sea Notes, Musk'],
-                ['key' => 'performance', 'label' => 'Performance', 'value' => 'Around 4-6 Hours', 'display' => 'Around 4-6 Hours'],
+                ['key' => 'concentration', 'label' => 'Concentration', 'value' => 'cologne', 'display' => 'Cologne', 'show' => 'headline'],
+                ['key' => 'gender', 'label' => 'Gender', 'value' => 'male', 'display' => 'Male', 'show' => 'pill'],
+                ['key' => 'notes', 'label' => 'Scent notes', 'value' => 'Orange, Sea Notes, Musk', 'display' => 'Orange, Sea Notes, Musk', 'show' => 'list'],
+                ['key' => 'performance', 'label' => 'Performance', 'value' => 'Around 4-6 Hours', 'display' => 'Around 4-6 Hours', 'show' => 'pill'],
             ])
             // the pre-37 flat keys still answer, from attributes
             ->assertJsonPath('data.concentration_label', 'Cologne')
             ->assertJsonPath('data.vibes', null);
+    }
+
+    public function test_show_follows_the_templates_headline_and_list_flags(): void
+    {
+        $decant = new DecantTemplate;
+        $this->assertSame(
+            ['concentration' => 'headline', 'gender' => 'pill', 'notes' => 'list', 'vibes' => 'list', 'performance' => 'pill'],
+            collect($decant->attributes())->mapWithKeys(fn (Attribute $a): array => [$a->key => $a->show($decant)])->all(),
+        );
+
+        // a template that names no headline shows every non-list attribute as a pill
+        $bags = new TestBagsTemplate;
+        $this->assertSame('pill', $bags->attributes()[0]->show($bags));
     }
 
     public function test_search_runs_on_search_text_case_insensitively_with_literal_wildcards(): void

@@ -20,12 +20,15 @@ export interface ProductVariant {
 }
 
 /** One template attribute on a product (step 37): `display` is what a customer
- *  reads — a select's label ("EDP"), else the value. Empty attributes are left out. */
+ *  reads — a select's label ("EDP"), else the value. Empty attributes are left out.
+ *  `show` (step 37b) says where it goes: `headline` beside the name and in the pill
+ *  row, `pill` in the pill row, `list` as its own section of comma-split pills. */
 export interface ProductAttribute {
   key: string;
   label: string;
   value: string | number;
   display: string;
+  show: "headline" | "pill" | "list";
 }
 
 export interface Product {
@@ -37,8 +40,9 @@ export interface Product {
   template: string;
   /** The template's attributes, in display order. */
   attributes: ProductAttribute[];
-  // The flat decant keys below come from `attributes` since step 37 and go after
-  // go-live (RUN-QUEUE row 32); new code reads `attributes`.
+  // @deprecated — the flat decant keys below come from `attributes` since step 37.
+  // The storefront stopped reading them in 37b; they go after go-live (RUN-QUEUE
+  // row 32). Read `attributes`.
   concentration: string;
   concentration_label: string;
   gender: "male" | "female" | "unisex";
@@ -89,6 +93,7 @@ export interface CatalogFilter {
 export interface CatalogMeta {
   filters: CatalogFilter[];
   brand_types: { value: string; label: string }[];
+  // @deprecated — read `filters`; these go after go-live (RUN-QUEUE row 32).
   genders: { value: string; label: string }[];
   concentrations: { value: string; label: string }[];
   sizes: number[];
@@ -100,10 +105,8 @@ export interface CatalogMeta {
 
 export interface ProductFilters {
   q?: string;
-  notes?: string;
   brand?: string; // comma-separated slugs
   type?: string;
-  gender?: string;
   size?: string;
   min_price?: string;
   max_price?: string;
@@ -111,6 +114,8 @@ export interface ProductFilters {
   sort?: string;
   page?: string;
   per_page?: string;
+  /** The template's filters (`CatalogMeta.filters` keys), e.g. `gender`, `notes`. */
+  [attribute: string]: string | undefined;
 }
 
 export interface CheckoutItem {

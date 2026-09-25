@@ -60,7 +60,9 @@ export async function getProducts(
   filters: ProductFilters = {},
 ): Promise<Paginated<Product>> {
   const params = new URLSearchParams(
-    Object.entries(filters).filter(([, value]) => value !== undefined && value !== ""),
+    Object.entries(filters).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== "",
+    ),
   );
   const qs = params.size > 0 ? `?${params}` : "";
 

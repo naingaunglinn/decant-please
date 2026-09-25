@@ -117,9 +117,9 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
              "type": "niche", "type_label": "Niche", "logo_url": null },
   "template": "decant",
   "attributes": [
-    { "key": "concentration", "label": "Concentration", "value": "edp", "display": "EDP" },
-    { "key": "gender", "label": "Gender", "value": "unisex", "display": "Unisex" },
-    { "key": "notes", "label": "Scent notes", "value": "amber, honey, vanilla", "display": "amber, honey, vanilla" },
+    { "key": "concentration", "label": "Concentration", "value": "edp", "display": "EDP", "show": "headline" },
+    { "key": "gender", "label": "Gender", "value": "unisex", "display": "Unisex", "show": "pill" },
+    { "key": "notes", "label": "Scent notes", "value": "amber, honey, vanilla", "display": "amber, honey, vanilla", "show": "list" },
     …
   ],
   "concentration": "edp", "concentration_label": "EDP",
@@ -135,7 +135,11 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
 
 `attributes` (step 37) lists the product's template attributes in display order; an
 empty one is left out. `display` is what a customer reads: a select's label, else the
-value. `template` is the product's template key.
+value. `template` is the product's template key. `show` (step 37b) says where a
+storefront puts it: `headline` beside the product's name (and in its pill row), `pill`
+in the pill row, `list` as its own section, the value split on commas. The template
+decides: `Template::headline()` names the headline attribute, `Attribute` `list: true`
+marks a list (decant: concentration is the headline; notes and vibes are lists).
 
 The flat `concentration`, `concentration_label`, `gender`, `gender_label`, `notes`,
 `vibes`, `performance` keys are read from `attributes` since step 37 and kept for the

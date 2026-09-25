@@ -5,12 +5,18 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import type { Brand, CatalogMeta } from "@/lib/types";
 
-/** URL params owned by the filter UI (page resets whenever one changes). */
-const FILTER_KEYS = ["q", "notes", "brand", "brand_type", "gender", "size", "min_price", "max_price", "sort"] as const;
+/** URL params owned by the filter UI (page resets whenever one changes): the core
+ *  ones plus the shop template's filters from /meta (step 37b — decant: gender, notes). */
+const CORE_KEYS = ["q", "brand", "brand_type", "size", "min_price", "max_price", "sort"];
 
-export function useActiveFilterCount(): number {
+const filterKeys = (meta: CatalogMeta): string[] => [
+  ...CORE_KEYS,
+  ...meta.filters.map((filter) => filter.key),
+];
+
+export function useActiveFilterCount(meta: CatalogMeta): number {
   const searchParams = useSearchParams();
-  return FILTER_KEYS.filter((key) => searchParams.has(key) && key !== "sort").length;
+  return filterKeys(meta).filter((key) => searchParams.has(key) && key !== "sort").length;
 }
 
 interface FilterControlsProps {
@@ -51,7 +57,9 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
     setParams({ [key]: searchParams.get(key) === value ? null : value });
   };
 
-  const activeCount = FILTER_KEYS.filter((key) => searchParams.has(key) && key !== "sort").length;
+  const activeCount = useActiveFilterCount(meta);
+  const textFilters = meta.filters.filter((filter) => filter.type === "text");
+  const selectFilters = meta.filters.filter((filter) => filter.type === "select");
 
   return (
     <div className="flex flex-col gap-8">
@@ -62,12 +70,14 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
         onCommit={(value) => setParams({ q: value || null })}
       />
 
-      <DebouncedInput
-        label="Scent notes"
-        placeholder="e.g. vanilla, musk…"
-        value={searchParams.get("notes") ?? ""}
-        onCommit={(value) => setParams({ notes: value || null })}
-      />
+      {textFilters.map((filter) => (
+        <DebouncedInput
+          key={filter.key}
+          label={filter.label}
+          value={searchParams.get(filter.key) ?? ""}
+          onCommit={(value) => setParams({ [filter.key]: value || null })}
+        />
+      ))}
 
       <FilterGroup label="Brand">
         <ul className="flex flex-col gap-2">
@@ -96,13 +106,15 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
         />
       </FilterGroup>
 
-      <FilterGroup label="Gender">
-        <PillToggleRow
-          options={meta.genders}
-          selected={searchParams.get("gender")}
-          onToggle={(value) => toggleValue("gender", value)}
-        />
-      </FilterGroup>
+      {selectFilters.map((filter) => (
+        <FilterGroup key={filter.key} label={filter.label}>
+          <PillToggleRow
+            options={filter.options}
+            selected={searchParams.get(filter.key)}
+            onToggle={(value) => toggleValue(filter.key, value)}
+          />
+        </FilterGroup>
+      ))}
 
       <FilterGroup label="Size">
         <PillToggleRow

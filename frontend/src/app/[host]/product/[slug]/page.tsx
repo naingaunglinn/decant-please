@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
-import { getProduct, getProducts } from "@/lib/api";
+import { getMeta, getProduct, getProducts } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
+import { headlineOf, listsOf, pillsOf, splitList } from "@/lib/attributes";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
 import { PurchasePanel } from "@/components/product/PurchasePanel";
@@ -10,7 +11,9 @@ import { FragranceCard } from "@/components/catalog/FragranceCard";
 import { RecordRecentlyViewed } from "@/components/catalog/RecentlyViewed";
 import type { Product } from "@/lib/types";
 
-/** Same-brand siblings first; if the brand is thin, top up with same-gender picks. */
+/** Same-brand siblings first; if the brand is thin, top up with products sharing its
+ *  first select filter (decant: gender). Only a /meta filter key is sent — the API
+ *  ignores any other attribute, which would top up with unrelated products. */
 async function getRelated(shop: string, fragrance: Product): Promise<Product[]> {
   try {
     const sameBrand = (
@@ -19,11 +22,17 @@ async function getRelated(shop: string, fragrance: Product): Promise<Product[]> 
 
     if (sameBrand.length >= 2) return sameBrand.slice(0, 4);
 
-    const sameGender = (
-      await getProducts(shop, { gender: fragrance.gender, per_page: "8" })
+    const shared = (await getMeta(shop)).filters
+      .filter((filter) => filter.type === "select")
+      .map((filter) => fragrance.attributes.find((attribute) => attribute.key === filter.key))
+      .find((attribute) => attribute !== undefined);
+    if (!shared) return sameBrand;
+
+    const sameAttribute = (
+      await getProducts(shop, { [shared.key]: String(shared.value), per_page: "8" })
     ).data.filter((f) => f.id !== fragrance.id && !sameBrand.some((b) => b.id === f.id));
 
-    return [...sameBrand, ...sameGender].slice(0, 4);
+    return [...sameBrand, ...sameAttribute].slice(0, 4);
   } catch {
     return []; // the detail page stands without the rail
   }
@@ -49,18 +58,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // metadata resolves before the loading.tsx shell streams, so throwing here
   // yields a real 404 status instead of a soft 200
   if (!fragrance) notFound();
+  const headline = headlineOf(fragrance);
 
   return {
     title: `${fragrance.brand.name} ${fragrance.name}`,
     description:
       fragrance.description ??
-      `${fragrance.brand.name} ${fragrance.name} (${fragrance.concentration_label}) — decants from ${fragrance.min_price_formatted ?? "—"}.`,
+      `${fragrance.brand.name} ${fragrance.name}${headline ? ` (${headline.display})` : ""} — decants from ${fragrance.min_price_formatted ?? "—"}.`,
     alternates: { canonical: `/product/${slug}` },
   };
 }
-
-const splitList = (value: string | null): string[] =>
-  value ? value.split(",").map((part) => part.trim()).filter(Boolean) : [];
 
 export default async function ProductPage({ params }: PageProps) {
   const { host, slug } = await params;
@@ -68,20 +75,22 @@ export default async function ProductPage({ params }: PageProps) {
   const fragrance = await getProduct(tenant.slug, slug);
   if (!fragrance) notFound();
 
-  const notes = splitList(fragrance.notes);
-  const vibes = splitList(fragrance.vibes);
+  const headline = headlineOf(fragrance);
+  const lists = listsOf(fragrance)
+    .map((attribute) => ({ ...attribute, items: splitList(attribute.display) }))
+    .filter((attribute) => attribute.items.length > 0);
   const related = await getRelated(tenant.slug, fragrance);
 
   return (
     <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">
       <RecordRecentlyViewed slug={fragrance.slug} />
-      {/* brand pill → name (concentration in pine) — the reference card, rebuilt */}
+      {/* brand pill → name (the template's headline attribute in pine) — the reference card, rebuilt */}
       <header className="flex flex-col items-start gap-4">
         <Pill>{fragrance.brand.name}</Pill>
         <div className="w-full rounded-2xl border border-rule px-6 py-5">
           <h1 className="text-[26px] font-bold uppercase leading-tight tracking-[0.1em] text-ink-strong sm:text-[30px]">
-            {fragrance.name}{" "}
-            <span className="font-medium text-pine">{fragrance.concentration_label}</span>
+            {fragrance.name}
+            {headline && <span className="font-medium text-pine"> {headline.display}</span>}
           </h1>
         </div>
       </header>
@@ -102,35 +111,24 @@ export default async function ProductPage({ params }: PageProps) {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {fragrance.performance && <Pill tone="pine">{fragrance.performance}</Pill>}
-        <Pill>{fragrance.gender_label}</Pill>
-        <Pill>{fragrance.concentration_label}</Pill>
+        {pillsOf(fragrance).map((attribute) => (
+          <Pill key={attribute.key}>{attribute.display}</Pill>
+        ))}
         <Pill tone="muted">{fragrance.brand.type_label}</Pill>
       </div>
 
-      {notes.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Notes</h2>
+      {lists.map((attribute, index) => (
+        <section key={attribute.key} className={index === 0 ? "mt-10" : "mt-8"}>
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
+            {attribute.label}
+          </h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {notes.map((note) => (
-              <Pill key={note}>{note}</Pill>
+            {attribute.items.map((item) => (
+              <Pill key={item}>{item}</Pill>
             ))}
           </div>
         </section>
-      )}
-
-      {vibes.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Vibes</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {vibes.map((vibe) => (
-              <Pill key={vibe} tone="soft">
-                {vibe}
-              </Pill>
-            ))}
-          </div>
-        </section>
-      )}
+      ))}
 
       {fragrance.description && (
         <section className="mt-10 border-t border-rule pt-8">

@@ -10,7 +10,7 @@ import type { Brand, CatalogMeta } from "@/lib/types";
 export function FilterSheet({ brands, meta }: { brands: Brand[]; meta: CatalogMeta }) {
   const [open, setOpen] = useState(false);
   const reduced = useReducedMotion();
-  const activeCount = useActiveFilterCount();
+  const activeCount = useActiveFilterCount(meta);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";

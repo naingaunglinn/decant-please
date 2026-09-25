@@ -32,6 +32,7 @@ class ProductResource extends JsonResource
                     'label' => $attribute->label,
                     'value' => $this->attr($attribute->key),
                     'display' => $attribute->display($this->attr($attribute->key)),
+                    'show' => $attribute->show($template),
                 ])->values()->all(),
             // The flat perfume keys the pre-37 storefront reads, now from attributes.
             // They go with the other deploy aliases after go-live (RUN-QUEUE row 32).

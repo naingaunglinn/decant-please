@@ -20,7 +20,7 @@ Principles P1–P6) throughout.
 - [x] **Pre-35 — #67 first** (correct money before the baseline) — merged before the baseline was recorded
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
 - [x] **36** — Product + Variant model — split in two (#105): **36a built** (v40: schema, models, admin; API unchanged), **36b built** (v41: API contract + storefront)
-- [ ] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), 37b next (storefront renders from `attributes` / `filters`)
+- [x] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), **37b built** (v43: storefront renders from `attributes` / `filters`)
 - [ ] **38** — Clothing template
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [ ] **39** — Status labels (template-driven; `decanted→prepared`)
@@ -323,8 +323,21 @@ PR. The seam is the storefront.
     template, so there is nothing to pick.
   - No admin screen for `categories` yet: menu categories are RUN-QUEUE row 20, and P3
     says a decant shop sees nothing new.
-- **37b: the storefront.** `FilterControls` renders from `/meta` `filters`, and the
+- **37b (v43): the storefront.** `FilterControls` renders from `/meta` `filters`, and the
   product page and cards render from `attributes` instead of the flat keys.
+  - **Added beyond the spec:** each product attribute carries `show`
+    (`headline` / `pill` / `list`). The storefront can't place an attribute from
+    `key/label/value/display` alone without guessing, and guessing "the first select is
+    the headline" breaks when a clothing template's first select is Material. So the
+    template says it: `Template::headline()` (default none; decant: concentration) and
+    `Attribute` `list: true` (decant: notes, vibes). `list` is separate from `long`,
+    which stays an admin textarea hint.
+  - The shop page awaits `/meta` before `/products` and forwards only the template's
+    filter keys (plus the core ones), so a stray query param never reaches the API.
+  - Related products top up by the first select *filter* the product has, not any
+    select: the API ignores a non-filterable key.
+  - Decant looks the same except pill order (template order), pill tones (one style)
+    and the "Notes" heading ("Scent notes").
 
 ## Step 38 — Clothing template
 

@@ -13,6 +13,8 @@ use LogicException;
  * - searchable: its value goes into products.search_text, so `q` finds it
  * - translatable: a flag for future Burmese values; no translated data exists yet
  * - long: a multi-line field in the admin (Textarea rather than TextInput)
+ * - list: a comma-separated text the storefront shows as its own section of pills
+ *   ("Scent notes"), not as one pill in the product's pill row
  *
  * A key is also a /products query parameter when filterable, so it may not be one
  * of the core parameters (RESERVED_KEYS) — a clash would replace their validation.
@@ -39,6 +41,7 @@ final readonly class Attribute
         public bool $searchable = false,
         public bool $translatable = false,
         public bool $long = false,
+        public bool $list = false,
         public ?string $help = null,
     ) {
         if (in_array($key, self::RESERVED_KEYS, true)) {
@@ -52,9 +55,9 @@ final readonly class Attribute
         return new self($key, $label, self::SELECT, $options, required: $required, filterable: $filterable, help: $help);
     }
 
-    public static function text(string $key, string $label, bool $required = false, bool $filterable = false, bool $searchable = false, bool $translatable = false, bool $long = false, ?string $help = null): self
+    public static function text(string $key, string $label, bool $required = false, bool $filterable = false, bool $searchable = false, bool $translatable = false, bool $long = false, bool $list = false, ?string $help = null): self
     {
-        return new self($key, $label, self::TEXT, required: $required, filterable: $filterable, searchable: $searchable, translatable: $translatable, long: $long, help: $help);
+        return new self($key, $label, self::TEXT, required: $required, filterable: $filterable, searchable: $searchable, translatable: $translatable, long: $long, list: $list, help: $help);
     }
 
     public static function number(string $key, string $label, bool $required = false, ?string $help = null): self
@@ -70,5 +73,19 @@ final readonly class Attribute
         }
 
         return $this->type === self::SELECT ? ($this->options[$value] ?? (string) $value) : (string) $value;
+    }
+
+    /**
+     * How the storefront shows this attribute on a product (step 37b): `headline`
+     * beside the product's name (and in its pill row), `list` as its own section,
+     * otherwise `pill` — one pill in the pill row.
+     */
+    public function show(Template $template): string
+    {
+        return match (true) {
+            $template->headline() === $this->key => 'headline',
+            $this->list => 'list',
+            default => 'pill',
+        };
     }
 }

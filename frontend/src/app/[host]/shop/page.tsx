@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense, ViewTransition } from "react";
 import { getBrands, getProducts, getMeta } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
+import type { ProductFilters } from "@/lib/types";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FragranceGrid } from "@/components/catalog/FragranceGrid";
 import { FilterBar } from "@/components/catalog/FilterBar";
@@ -58,20 +59,26 @@ function ShopResultsSkeleton() {
   );
 }
 
-async function ShopResults({
-  shop,
-  filters,
-  flat,
-}: {
-  shop: string;
-  filters: Filters;
-  flat: Filters;
-}) {
-  const [fragrances, brands, meta] = await Promise.all([
-    getProducts(shop, filters),
-    getBrands(shop),
-    getMeta(shop),
-  ]);
+async function ShopResults({ shop, flat }: { shop: string; flat: Filters }) {
+  // /meta first: the shop template's filters (step 37b) decide which URL params
+  // reach /products. Only those keys are sent — an arbitrary param would mint a
+  // new fetch-cache entry per value. Both /meta and /brands are 60s-cached.
+  const [brands, meta] = await Promise.all([getBrands(shop), getMeta(shop)]);
+
+  const filters: ProductFilters = {
+    q: flat.q,
+    brand: flat.brand,
+    type: flat.brand_type,
+    size: flat.size,
+    min_price: flat.min_price,
+    max_price: flat.max_price,
+    sort: flat.sort,
+    page: flat.page,
+    per_page: "12",
+  };
+  for (const filter of meta.filters) filters[filter.key] = flat[filter.key];
+
+  const fragrances = await getProducts(shop, filters);
 
   return (
     <>
@@ -113,32 +120,11 @@ export default async function ShopPage({
   const { host } = await routeParams;
   const params = await searchParams;
 
-  const filters = {
-    q: first(params.q),
-    notes: first(params.notes),
-    brand: first(params.brand),
-    type: first(params.brand_type),
-    gender: first(params.gender),
-    size: first(params.size),
-    min_price: first(params.min_price),
-    max_price: first(params.max_price),
-    sort: first(params.sort),
-    page: first(params.page),
-    per_page: "12",
-  };
-
-  const flat: Filters = {
-    q: filters.q,
-    notes: filters.notes,
-    brand: filters.brand,
-    brand_type: first(params.brand_type),
-    gender: filters.gender,
-    size: filters.size,
-    min_price: filters.min_price,
-    max_price: filters.max_price,
-    sort: filters.sort,
-    page: filters.page,
-  };
+  // The page's own query, as given: the redirect below and the pagination links
+  // preserve it whole, template filters included (ShopResults picks the API keys).
+  const flat: Filters = Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [key, first(value)]),
+  );
 
   // The tenant gate runs before the <Suspense> boundary, so a secondary-domain
   // 308 (query preserved) fires as a real redirect, not a meta refresh.
@@ -150,7 +136,7 @@ export default async function ShopPage({
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 md:py-16">
       <Suspense fallback={<ShopResultsSkeleton />}>
-        <ShopResults shop={tenant.slug} filters={filters} flat={flat} />
+        <ShopResults shop={tenant.slug} flat={flat} />
       </Suspense>
     </div>
   );

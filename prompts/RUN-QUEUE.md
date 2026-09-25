@@ -23,7 +23,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 4 | Step 36a: product + variant schema, models, admin (API contract unchanged) | §36, as amended by item 1 | pr-open | 105-product-variant-model | #120 |
 | 4b | Step 36b: `/products` API, checkout by `variant_id`, storefront `/product/[slug]` + redirect, `types.ts`, `api.md` | §36 "As built" (split from row 4); issue #105, don't file another | pr-open | 105-products-api | #121 |
 | 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | pr-open | 106-templates-attributes | #122 |
-| 5b | Step 37b: storefront renders from `/meta` `filters` and product `attributes` (FilterControls, product page, cards) | §37 "As built" (split from row 5); issue #106, don't file another | todo | | |
+| 5b | Step 37b: storefront renders from `/meta` `filters` and product `attributes` (FilterControls, product page, cards) | §37 "As built" (split from row 5); issue #106, don't file another | in-progress | 106-storefront-attributes | |
 | 6 | Step 38: clothing template, variant photos | §38, as amended | todo | | |
 | 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | todo | | |
 | 8 | Step 40: stock modes (pooled / per variant), Myanmar weight units | §40 + roadmap group 1 | todo | | |
