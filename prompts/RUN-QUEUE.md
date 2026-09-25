@@ -19,7 +19,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 0 | Commit the runner files; #112: money-table FKs cascade → restrict (orders, order_items, expenses `shop_id`) | issue #112 | pr-open | 112-money-fk-restrict | #114 |
 | 1 | Record the CornerArea scope | `prompts/queue-01-scope-docs.md` | pr-open | 115-cornerarea-scope-docs | #117 |
 | 2 | Invoice and print letterheads use the shop's name, not "Decant Please!" | roadmap: shared foundation (letterhead bug); issue #116 already filed, don't file another | pr-open | 116-shop-name-letterheads | #118 |
-| 3 | Step 35: baseline parity test | `35-generic-shop-plan.md` §35 (stack from here, not from the #67 branch; #67 is merged) | in-progress | 104-parity-baseline | |
+| 3 | Step 35: baseline parity test | `35-generic-shop-plan.md` §35 (stack from here, not from the #67 branch; #67 is merged) | pr-open | 104-parity-baseline | #119 |
 | 4 | Step 36: product + variant model | §36, as amended by item 1 | todo | | |
 | 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | todo | | |
 | 6 | Step 38: clothing template, variant photos | §38, as amended | todo | | |
@@ -55,3 +55,4 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 2026-09-25 · 0 · runner files committed (2b132c3); #112 money-table shop_id FKs cascade → restrict, verified up/down/up on Postgres, 352 tests green · #114
 2026-09-25 · 1 · CornerArea scope recorded (docs only): P5 replaced, roadmap 43, ADR-0005, steps 36–38 amended; letterhead bug filed as #116 (row 2) · #117
 2026-09-25 · 2 · letterheads (invoice + day sheet) print the shop's name, two-shop tests, 354 tests green · #118
+2026-09-25 · 3 · step 35 parity baseline: GenericShopParityTest (10 tests, literal Kyat, second-shop leak guard); step-40 COGS formula corrected in the plan; 364 tests green · #119
