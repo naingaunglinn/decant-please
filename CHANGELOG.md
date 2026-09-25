@@ -64,7 +64,9 @@ Touches money-record integrity: one migration, no code path, no dependency.
   migrated Postgres.
 - **Tooling (separate commit):** the unattended queue runner (`prompts/run-step.md`,
   `prompts/RUN-QUEUE.md`, `scripts/run-queue.sh`, the `pr-reviewer` agent and the
-  project `.claude/settings.json` permission allowlist). No app code.
+  project `.claude/settings.json` permission allowlist). No app code. Owner review
+  tightened the deny list: `+refspec` force pushes, `…:refs/heads/main|develop` pushes,
+  and `docker compose down`.
 
 ## 0.1 What changed in v35
 
