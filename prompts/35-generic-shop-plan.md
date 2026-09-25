@@ -126,8 +126,8 @@ with checkout keyed by variant. Server still derives every price.
 - **(amended)** `product_variants` gains `is_active` boolean (default true): a size or colour
   is archived, never deleted. Archived variants drop out of the storefront and checkout but
   stay on placed orders.
-- **(amended)** `product_variants` gains `position` int for display order (S, M, L, XL isn't
-  alphabetical).
+- **(amended)** `product_variants` gains `position` int (not null, default 0) for display order
+  (S, M, L, XL isn't alphabetical). Backfill existing variants by `size_ml` ascending.
 - `order_items`: `renameColumn fragrance_id → product_id` (keep FK `restrictOnDelete`); add
   nullable `product_variant_id` (FK → `product_variants`, same shop) + `variant_label_snapshot`;
   **backfill** both from `size_ml` for legacy rows (match product + size → variant; synthesize
@@ -137,7 +137,9 @@ with checkout keyed by variant. Server still derives every price.
 - **(amended)** `order_items.size_ml` becomes **nullable** — a clothing line has no ml.
   Existing values are untouched.
 - **(amended)** `products.brand_id` and `brands.type` become **nullable** — brand is optional
-  per template (a bakery has none).
+  per template (a bakery has none). `products.brand_id` moves from `cascadeOnDelete` to
+  **`nullOnDelete`**: deleting a brand clears it on its products, never deletes them (a
+  cascade would also hit the `order_items.product_id` restrict).
 - Preserve `BelongsToShop`, `shop_id`, `unique(shop_id, slug)` on products.
 
 **API changes.** Routes `/fragrances`→`/products`, `/fragrances/{slug}`→`/products/{slug}`
@@ -151,13 +153,17 @@ carries product + price + measure) — **price still re-derived server-side**. U
 fields).
 
 **Admin / storefront.** Filament `Resources/Fragrances/ → Resources/Products/` (dir + classes +
-form/table). Storefront `[host]/fragrance/[slug]/ → [host]/product/[slug]/` **with a redirect**
+form/table). **(amended)** Variants are archived with an `is_active` toggle, never removed:
+the variant repeater must not delete child rows on save (a variant on a placed order would
+hit the restrict). Storefront `[host]/fragrance/[slug]/ → [host]/product/[slug]/` **with a redirect**
 from the old path (keep the `[host]` tenant segment). `types.ts` `Fragrance→Product`,
 `DecantPrice→ProductVariant`, `CheckoutItem` `{variant_id, quantity}`; `api.ts` fetchers;
 `FilterControls` stays `/meta`-driven.
 
 **Tests.** **Update the existing suite** (`TenantIsolationTest`, `PublicApiTest`,
-`AdminCatalogTest`, `DecantStockTest`, `DecantCostTest`, …) for the new names/payload. No new
+`AdminCatalogTest`, `DecantStockTest`, `DecantCostTest`, …) for the new names/payload.
+**(amended)** An archived variant is refused at checkout on the server (money path), is hidden
+from the catalog, and still shows on placed orders; a variant on an order can't be deleted. No new
 isolation test (renames). Parity (35) green with field-name updates only.
 
 **Risks.** Breaks much of the 28-file suite — update in-PR. FK/rename correctness on **Postgres**
@@ -190,7 +196,9 @@ concept for a category.
   step 38 already needs it. Backfill existing shops to `decant`.
 - A per-shop **`categories`** table (menu sections, "tops / dresses"): `shop_id` +
   `BelongsToShop`, `name`, `position`, `unique(shop_id, name)`; `products.category_id`
-  nullable FK. A new tenant table, so **its isolation test ships in the same PR**.
+  nullable FK (→ `categories`, same shop, **`nullOnDelete`** — deleting a menu section never
+  deletes or blocks its products). A new tenant table, so **its isolation test ships in the
+  same PR**.
 
 **Templates.** `App\Templates\` classes (base + `DecantTemplate`). A template defines: attributes
 (name; type text/select/number; `filterable`; `searchable`; `translatable`), variant option
@@ -235,7 +243,8 @@ variant option names (`"Size"`,`"Color"`), status labels, default modules. Varia
 variants flow through checkout by `variant_id`.
 
 **Tests.** A clothing shop seeds, lists, filters by material/size/color, checks out by variant;
-the decant shop's parity (35) stays green.
+the decant shop's parity (35) stays green. **(amended)** A variant photo is stored under the
+shop's `shops/{id}/…` prefix.
 
 **Risks.** This is the proof step — surface any 36–37 gap (multi-option variants, attribute types)
 and fix it upstream.
@@ -307,7 +316,8 @@ low-stock; parity green.
 **Schema / migrations.** `shop_settings` gains `modules` (jsonb enabled set). Defaults from the
 template; overridable. **(amended)** `shop_settings.template` moved to step 37.
 
-**Modules.** `production_schedule, stock, cost_margin, promo_codes, expenses`. Disabled → hidden
+**Modules.** `production_schedule, stock, cost_margin, promo_codes, expenses` (later groups
+add theirs; see the default-modules table in `prompts/43-cornerarea-roadmap.md`). Disabled → hidden
 from Filament nav, widgets, and API responses (e.g. `/meta` omits a disabled module's fields).
 
 **Admin.** A settings surface to toggle modules; nav/widget registration reads `modules`.

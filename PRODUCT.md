@@ -10,9 +10,9 @@ Multi-tenancy design and its ADRs live in `prompts/multi-tenancy-design.md`.
 
 **CornerArea** is a **multi-tenant SaaS** for Myanmar social sellers — in **any
 category** — who run a shop from their phone. Decant Please is shop #1 on it (the code and
-this repo still carry the Decant Please name until the post-go-live rename). One codebase serves many independent shops. Each shop gets a storefront
-on its own domain and an admin panel scoped to its own data; the studio operator sees
-across all of them.
+this repo still carry the Decant Please name until the post-go-live rename). One codebase
+serves many independent shops. Each shop gets a storefront on its own domain and an admin
+panel scoped to its own data; the studio operator sees across all of them.
 
 **Decant is the first template, not the whole product.** The platform is being generalized
 so it fits perfume decants, clothing, bakery pre-orders, cosmetics, and more — each category

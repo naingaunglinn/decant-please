@@ -95,8 +95,8 @@ Uses the existing flow: order → slip/COD → pack → courier → delivered.
 | Local produce (lahpet, dried fish, honey) | region of origin | weight in kyatthar / viss (1 viss = 100 kyatthar) | pooled by weight |
 | Online store (general) | none | seller-named options | per variant |
 
-Group 1 still needs: the two stock modes (step 40), variant photos and position (steps 36,
-38), and Myanmar weight units.
+Group 1 still needs: the two stock modes (step 40), variant photos and position (planned in
+steps 38 and 36), and Myanmar weight units.
 
 ## Group 2: pre-order
 

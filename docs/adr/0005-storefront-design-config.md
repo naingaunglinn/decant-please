@@ -1,6 +1,6 @@
 # ADR-0005: Per-shop storefront design is a config the AI edits, not code
 
-**Status:** Accepted — 2026-09-25
+**Status:** Accepted
 **Date:** 2026-09-25
 **Deciders:** Naing Aung Linn
 **Resolves:** `PRODUCT.md` open question 3 (per-shop theming)

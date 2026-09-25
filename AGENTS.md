@@ -106,8 +106,8 @@ so one platform fits perfume decants, clothing, bakery pre-orders, cosmetics, an
 each category is a *template* (attributes, variants, status labels, default modules)
 defined in code. The generic-shop refactor is planned in `prompts/35-generic-shop-plan.md`
 (steps 35–42), and the categories, groups and build order beyond it live in
-`prompts/43-cornerarea-roadmap.md`; **multi-tenancy is already built** (steps 23–25 in #58, plus 32–34) and the
-refactor builds on that seam.
+`prompts/43-cornerarea-roadmap.md`; **multi-tenancy is already built** (steps 23–25 in
+#58, plus 32–34) and the refactor builds on that seam.
 
 Older docs describe this as a single-decanter perfume tool. They are superseded.
 
