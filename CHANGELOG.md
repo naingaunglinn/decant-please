@@ -35,8 +35,8 @@ sign-up. Spec: `prompts/44-self-serve-signup.md` §44b and its "As built".
   a member with a verified phone only; its confirmation lists what's still missing (no
   products, no active delivery township) without blocking.
 - `register()` accepts an already-verified `phone` on the owner. `SelfServeSignupTest`
-  (20 cases); `ShopRegistrationTest` publish cases now use verified owners, plus one for
-  an owner without a phone. `withoutTenancy()` stays at 2 of 5. 523 tests on Postgres 17.
+  (22 cases); `ShopRegistrationTest` publish cases now use verified owners, plus one for
+  an owner without a phone. `withoutTenancy()` stays at 2 of 5. 525 tests on Postgres 17.
 
 ## 0. What changed in v52
 

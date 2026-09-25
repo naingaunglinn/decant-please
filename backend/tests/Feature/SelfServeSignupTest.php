@@ -203,8 +203,30 @@ class SelfServeSignupTest extends TestCase
             PhoneVerification::send('+95979000000'.$n, '10.0.0.1');
         }
 
-        $this->expectException(ValidationException::class);
-        PhoneVerification::send('+959790000009', '10.0.0.1');
+        try {
+            PhoneVerification::send('+959790000009', '10.0.0.1');
+            $this->fail('An eleventh code went out from one IP.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('Too many codes', $e->errors()['phone'][0]);
+        }
+    }
+
+    public function test_the_right_code_still_works_after_four_wrong_ones(): void
+    {
+        $this->signUpOn();
+        PhoneVerification::send('+959791234567', '10.0.0.1');
+        $wrong = $this->code === '000000' ? '111111' : '000000';
+
+        for ($i = 1; $i < PhoneVerification::MAX_ATTEMPTS; $i++) {
+            try {
+                PhoneVerification::check('+959791234567', $wrong);
+            } catch (ValidationException $e) {
+                $this->assertStringContainsString('Wrong code', $e->errors()['code'][0]);
+            }
+        }
+
+        PhoneVerification::check('+959791234567', (string) $this->code);
+        $this->addToAssertionCount(1); // no exception
     }
 
     public function test_a_phone_that_already_has_an_account_gets_no_code(): void
@@ -238,6 +260,7 @@ class SelfServeSignupTest extends TestCase
             '+95 9' => ['+95 9 791234567', '+959791234567'],
             '959' => ['959791234567', '+959791234567'],
             'dashes' => ['09-4500-1234', '+95945001234'],
+            '+95 09' => ['+95 09 791 234 567', '+959791234567'],
             'landline' => ['01 234 567', null],
             'foreign' => ['+66 81 234 5678', null],
             'too short' => ['09 12', null],
@@ -259,7 +282,8 @@ class SelfServeSignupTest extends TestCase
         $owner->assignRole('shop_owner');
 
         $this->actingAs($owner);
-        app(TenantContext::class)->set($shop);
+        // no TenantContext::set here: setTenant() must hand the shop over itself
+        // (SyncTenantContextFromFilament) — the checklist queries depend on it
         Filament::setTenant($shop);
 
         return $shop;
@@ -267,11 +291,18 @@ class SelfServeSignupTest extends TestCase
 
     public function test_a_verified_owner_publishes_from_the_dashboard(): void
     {
+        // the default shop (the suite's preset context) has a product and an
+        // active township; the new shop has neither — the checklist must say so
+        $this->itemFragrance();
+        $this->serviceableTownship();
         $shop = $this->onboardingShopOwnedBy(User::factory()->phoneVerified()->create());
+        $this->assertSame($shop->id, app(TenantContext::class)->id());
 
         Livewire::test(Dashboard::class)
             ->assertActionVisible('publish')
-            ->callAction('publish')
+            ->mountAction('publish')
+            ->assertMountedActionModalSee(['No products yet', 'No delivery township switched on'])
+            ->callMountedAction()
             ->assertNotified();
 
         $this->assertSame(ShopStatus::Live, $shop->fresh()->status);

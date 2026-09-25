@@ -14,8 +14,12 @@ use Throwable;
 
 /**
  * The self-serve sign-up's phone check (step 44b): a 6-digit code, stored hashed
- * in the cache for 10 minutes, 5 wrong tries, sends throttled per phone and per
- * IP. Platform-level on purpose — no shop exists yet, so no shop is in any key.
+ * in the cache for 10 minutes, 5 tries, sends throttled per phone and per IP.
+ * Platform-level on purpose — no shop exists yet, so no shop is in any key.
+ *
+ * Known limit: a code belongs to the phone, not the browser, so a stranger who
+ * types the seller's number can replace the seller's code (and spend its three
+ * sends). A nuisance, never a bypass — the stranger can't read the new code.
  *
  * Fails closed (P2): with no working sender, sign-up is off — never "verification
  * skipped". The `log` driver counts only in local and testing.
@@ -49,7 +53,7 @@ class PhoneVerification
     public static function normalize(?string $input): ?string
     {
         $digits = preg_replace('/[\s\-().]/', '', (string) $input);
-        $digits = preg_replace('/^(\+?95|0)(?=9)/', '', $digits);
+        $digits = preg_replace('/^(?:\+?95)?0?(?=9)/', '', $digits); // 09…, 959…, +95 9…, +95 09…
 
         return preg_match('/^9\d{7,9}$/', $digits) === 1 ? '+95'.$digits : null;
     }
@@ -61,10 +65,6 @@ class PhoneVerification
 
         if ($sender === null) {
             throw ValidationException::withMessages(['phone' => 'Sign-up is closed right now. · ယခု အကောင့်ဖွင့်၍ မရသေးပါ။']);
-        }
-
-        if (User::query()->where('phone', $phone)->exists()) {
-            throw ValidationException::withMessages(['phone' => 'This phone number already has an account. · ဤဖုန်းနံပါတ်ဖြင့် အကောင့်ဖွင့်ပြီးသား ဖြစ်ပါသည်။']);
         }
 
         foreach (['phone:'.sha1($phone) => [3, 900], 'ip:'.$ip => [10, 3600]] as $key => [$max, $decay]) {
@@ -80,13 +80,18 @@ class PhoneVerification
         RateLimiter::hit('phone-otp-send:phone:'.sha1($phone), 900);
         RateLimiter::hit('phone-otp-send:ip:'.$ip, 3600);
 
+        // after the throttle, so it can't be looped to list whose phones have accounts
+        if (User::query()->where('phone', $phone)->exists()) {
+            throw ValidationException::withMessages(['phone' => 'This phone number already has an account. · ဤဖုန်းနံပါတ်ဖြင့် အကောင့်ဖွင့်ပြီးသား ဖြစ်ပါသည်။']);
+        }
+
         $code = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
 
         Cache::put(self::key($phone), [
             'hash' => Hash::make($code),
-            'attempts' => 0,
             'expires_at' => now()->addSeconds(self::CODE_TTL_SECONDS)->getTimestamp(),
         ], self::CODE_TTL_SECONDS);
+        Cache::put(self::attemptsKey($phone), 0, self::CODE_TTL_SECONDS);
 
         try {
             $sender->send($phone, $code);
@@ -100,8 +105,10 @@ class PhoneVerification
 
     /**
      * Checks the code without using it up — the sign-up form may still fail on
-     * another field. A wrong try counts; the fifth drops the code. Throws
-     * ValidationException keyed `code`. consume() after the account exists.
+     * another field. Every try counts, counted atomically before the hash is
+     * compared (parallel guesses can't share one count); after the fifth the code
+     * is dropped. Throws ValidationException keyed `code`. consume() after the
+     * account exists.
      */
     public static function check(string $phone, string $code): void
     {
@@ -111,17 +118,25 @@ class PhoneVerification
             throw ValidationException::withMessages(['code' => 'This code has expired. Ask for a new one. · ကုဒ် သက်တမ်းကုန်သွားပါပြီ။ ကုဒ်အသစ် တောင်းပါ။']);
         }
 
-        if (Hash::check($code, $entry['hash'])) {
-            return;
-        }
+        // add() first: some stores' increment() does nothing on a missing key
+        Cache::add(self::attemptsKey($phone), 0, $entry['expires_at'] - now()->getTimestamp());
+        $tries = (int) Cache::increment(self::attemptsKey($phone));
 
-        if (++$entry['attempts'] >= self::MAX_ATTEMPTS) {
-            Cache::forget(self::key($phone));
+        if ($tries > self::MAX_ATTEMPTS) {
+            self::consume($phone);
 
             throw ValidationException::withMessages(['code' => 'Too many wrong codes. Ask for a new one. · ကုဒ်မှားတာ များလွန်းပါသည်။ ကုဒ်အသစ် တောင်းပါ။']);
         }
 
-        Cache::put(self::key($phone), $entry, $entry['expires_at'] - now()->getTimestamp());
+        if (Hash::check($code, $entry['hash'])) {
+            return;
+        }
+
+        if ($tries === self::MAX_ATTEMPTS) {
+            self::consume($phone);
+
+            throw ValidationException::withMessages(['code' => 'Too many wrong codes. Ask for a new one. · ကုဒ်မှားတာ များလွန်းပါသည်။ ကုဒ်အသစ် တောင်းပါ။']);
+        }
 
         throw ValidationException::withMessages(['code' => 'Wrong code. · ကုဒ် မှားနေပါသည်။']);
     }
@@ -130,10 +145,16 @@ class PhoneVerification
     public static function consume(string $phone): void
     {
         Cache::forget(self::key($phone));
+        Cache::forget(self::attemptsKey($phone));
     }
 
     private static function key(string $phone): string
     {
         return 'phone-otp:'.sha1($phone);
+    }
+
+    private static function attemptsKey(string $phone): string
+    {
+        return 'phone-otp-tries:'.sha1($phone);
     }
 }

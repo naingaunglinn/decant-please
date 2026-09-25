@@ -138,9 +138,14 @@ What changed from the plan above, and why:
   the shop (name, address, category) on one form, and calls `register()` once. A
   signed-up seller gets exactly one shop; more are a Studio step.
 - **The code lives in the cache, not a table** (`PhoneVerification`, `phone-otp:{sha1}`):
-  hashed, 10 minutes, 5 wrong tries, then ask again. Checked before registering and used
+  hashed, 10 minutes, 5 tries (counted atomically, so parallel guesses can't share a
+  count), then ask again. Checked before registering and used
   up only after the account exists, so a slug error doesn't burn the code. Sends: 3 per
   phone per 15 min, 10 per IP per hour, and none to a phone that already has an account.
+- **Known limit:** a code belongs to the phone, not the browser. A stranger who types a
+  seller's number can replace the seller's code and use up its three sends for 15 minutes:
+  a nuisance, never a bypass. Row 11c should also cap sends platform-wide, because a paid
+  SMS driver can be run up by rotating IPs (SMS pumping).
 - **Myanmar mobiles only**, one spelling `+959…` (`09…`, `959…`, `+95 9…` all collapse),
   so one SIM is one key and one account (`users.phone` unique).
 - **The sender:** `CodeSender` interface + `LogCodeSender`. `PHONE_VERIFICATION_DRIVER`
