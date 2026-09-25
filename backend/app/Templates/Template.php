@@ -20,6 +20,15 @@ abstract class Template
     /** @return list<Attribute> in admin and storefront display order */
     abstract public function attributes(): array;
 
+    /**
+     * The attribute a storefront shows beside a product's name ("Aventus EDP"), or
+     * null for none. Name one the template marks required, so every product has it.
+     */
+    public function headline(): ?string
+    {
+        return null;
+    }
+
     /** @return list<string> variant option names, e.g. ["Size"] or ["Size", "Color"] */
     abstract public function variantOptions(): array;
 

@@ -28,11 +28,16 @@ class DecantTemplate extends Template
         return [
             Attribute::select('concentration', 'Concentration', self::options(Concentration::cases()), required: true),
             Attribute::select('gender', 'Gender', self::options(Gender::cases()), required: true, filterable: true),
-            Attribute::text('notes', 'Scent notes', filterable: true, searchable: true, long: true,
+            Attribute::text('notes', 'Scent notes', filterable: true, searchable: true, long: true, list: true,
                 help: 'Comma separated — e.g. Citrus, Musk, Amber, Orange, Grapefruit'),
-            Attribute::text('vibes', 'Vibes', long: true, help: 'e.g. Modern, Clean, Alluring, Classy'),
+            Attribute::text('vibes', 'Vibes', long: true, list: true, help: 'e.g. Modern, Clean, Alluring, Classy'),
             Attribute::text('performance', 'Performance', help: 'e.g. Around 6-8 Hours'),
         ];
+    }
+
+    public function headline(): ?string
+    {
+        return 'concentration';
     }
 
     public function variantOptions(): array

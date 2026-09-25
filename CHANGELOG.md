@@ -9,6 +9,39 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v43
+
+**v43** is the second half of step 37 (**#106**). The storefront renders from the template
+instead of the perfume-only keys, so a clothing shop (step 38) gets its own filters and
+product details from its template. (Page copy such as "Shop decants" is still decant's —
+the template's words come later.) A decant shop sees the same pages, with four
+small differences listed below.
+
+- **Filters from `/meta` `filters`.** `FilterControls` renders each text filter as a box
+  and each select filter as a pill row, labelled by the template ("Scent notes",
+  "Gender"). The active-filter count and "Clear all" include the template's keys. The
+  shop page sends `/products` only the core keys plus the template's filter keys, so it
+  now awaits `/meta` (60s-cached) before `/products` instead of fetching them together.
+  A secondary domain's 308 and the pagination links keep the whole query.
+- **Product page and cards from `attributes`.** Each attribute gains `show`
+  (`headline` / `pill` / `list`), set by the template: `Template::headline()` (decant:
+  concentration) and a new `Attribute` `list` flag (decant: notes, vibes). The name
+  carries the headline, the pill row carries headline + pills, and each list gets its
+  own section. "You may also like" tops up by the template's first select filter the
+  product has (decant: gender, as before); if that fails, the same-brand picks still show.
+  `brand_type` is now a reserved attribute key (it is the storefront's URL name for `type`).
+- **Visible decant differences:** the pill row follows template order (EDP · Male ·
+  Around 8-10 Hours, was Around 8-10 Hours · Male · EDP); performance is no longer
+  pine-toned and vibes are no longer soft-toned (one pill style for all attributes);
+  the "Notes" heading reads "Scent notes"; the notes filter box has no example
+  placeholder.
+- The storefront reads none of the flat perfume keys any more (`concentration_label`,
+  `gender`, `notes`, `/meta` `genders`…); they are marked deprecated in `types.ts` and go
+  after go-live (RUN-QUEUE row 32). `ProductFilters` takes any template filter key.
+- **Deploy:** API first, as since 36b. A storefront on a cached pre-37b product response
+  (no `show`, up to 60s) shows every attribute as a plain pill without the headline.
+  Nothing breaks.
+
 ## 0. What changed in v42
 
 **v42** is the first half of step 37 (**#106**). Catalog attributes move into code-defined

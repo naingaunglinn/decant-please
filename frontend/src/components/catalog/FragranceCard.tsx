@@ -2,9 +2,12 @@ import Link from "next/link";
 import { ViewTransition } from "react";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
+import { headlineOf } from "@/lib/attributes";
 import type { Product } from "@/lib/types";
 
 export function FragranceCard({ fragrance }: { fragrance: Product }) {
+  const headline = headlineOf(fragrance);
+
   return (
     <Link href={`/product/${fragrance.slug}`} className="group block">
       <ViewTransition name={`fragrance-image-${fragrance.slug}`} share="morph" default="none">
@@ -17,7 +20,7 @@ export function FragranceCard({ fragrance }: { fragrance: Product }) {
         <Pill tone="muted">{fragrance.brand.name}</Pill>
         <h3 className="text-sm font-medium uppercase leading-snug tracking-[0.12em] text-ink group-hover:text-pine">
           {fragrance.name}
-          <span className="ml-2 text-muted">{fragrance.concentration_label}</span>
+          {headline && <span className="ml-2 text-muted">{headline.display}</span>}
         </h3>
         <p className="text-sm text-pine">
           {fragrance.min_price_formatted
