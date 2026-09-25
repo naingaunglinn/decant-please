@@ -85,7 +85,10 @@ class ShopRegistration
     }
 
     /**
-     * @param  array{name: string, email: string, password: string}|null  $owner
+     * `$owner['phone']`, when given, is a number the caller has already verified
+     * (the sign-up's PhoneVerification) — stored normalized and marked verified.
+     *
+     * @param  array{name: string, email: string, password: string, phone?: string}|null  $owner
      */
     public static function register(
         string $name,
@@ -95,11 +98,12 @@ class ShopRegistration
         ?array $owner = null,
     ): Shop {
         Validator::make(
-            ['slug' => $slug, 'email' => $owner['email'] ?? null],
+            ['slug' => $slug, 'email' => $owner['email'] ?? null, 'phone' => $owner['phone'] ?? null],
             [
                 'slug' => self::slugRules(),
                 // users are platform-wide, so a plain unique across the table
                 'email' => $owner === null ? [] : ['required', 'email', 'max:255', 'unique:users,email'],
+                'phone' => ['nullable', 'string', 'unique:users,phone'],
             ],
         )->validate();
 
@@ -111,7 +115,7 @@ class ShopRegistration
             // lost a race with another registration between the checks above and
             // the insert — the same answer the checks would have given, not a 500
             throw ValidationException::withMessages([
-                'slug' => 'This name or email was just taken. Please try again.',
+                'slug' => 'This name, email or phone was just taken. Please try again.',
             ]);
         }
 
@@ -125,7 +129,7 @@ class ShopRegistration
     }
 
     /**
-     * @param  array{name: string, email: string, password: string}|null  $owner
+     * @param  array{name: string, email: string, password: string, phone?: string}|null  $owner
      */
     private static function create(string $name, string $slug, string $template, ShopStatus $status, ?array $owner, ?string $host): Shop
     {
@@ -138,6 +142,9 @@ class ShopRegistration
                 'email' => $owner['email'],
                 'password' => $owner['password'], // hashed cast
             ]);
+            if (isset($owner['phone'])) {
+                $user->forceFill(['phone' => $owner['phone'], 'phone_verified_at' => now()])->save();
+            }
             $user->shops()->attach($shop);
             // The capability role (Shield). WHICH shop stays the membership
             // above + canAccessTenant/BelongsToShop. Never studio_admin.

@@ -96,6 +96,7 @@ moves a studio user between shops**
 
 | Route | What it is |
 |---|---|
+| `/admin/register` | Self-serve sign-up (step 44b): account, phone code and shop on one page, through `ShopRegistration::register()`; the shop starts `onboarding` and its owner publishes it from the dashboard. 404 while `PHONE_VERIFICATION_DRIVER` has no working sender (`log` counts in local/testing only) |
 | `/studio/login` | Same users table and session guard as `/admin` — one login serves both |
 | `/studio/shops` | The shop registry (Step 34 PR-3): status pills, Owner, Last activity, Orders this month; status + needs-attention filters (archived hidden by default); register a shop through `ShopRegistration::register()` (step 44a: DNS-label, non-reserved slug; seeds its delivery geography; its automatic `{slug}.{STOREFRONT_BASE_DOMAIN}` primary domain; by default, the owner's login) |
 | `/studio/shops/{shop}` | Read-only shop detail — owner/contact, configuration completeness (payment/Telegram/social/domain), activity counts, recent audit entries |

@@ -258,8 +258,10 @@ class ShopRegistrationTest extends TestCase
             'name' => 'Ma Thida',
             'email' => 'owner@mandalaymusk.local',
             'password' => 'a-strong-password',
+            'phone' => '+959791234567', // verified by the sign-up (step 44b)
         ]);
         $owner = User::where('email', 'owner@mandalaymusk.local')->firstOrFail();
+        $this->assertNotNull($owner->phone_verified_at);
 
         $this->getJson('/api/v1/_storefront/host/mandalay-musk.cornerarea.me')->assertNotFound();
         $this->getJson('/api/v1/mandalay-musk/meta')->assertNotFound();
@@ -281,7 +283,7 @@ class ShopRegistrationTest extends TestCase
     public function test_a_stale_model_cannot_publish_a_shop_the_studio_has_since_suspended(): void
     {
         $shop = $this->register();
-        $owner = User::factory()->create();
+        $owner = User::factory()->phoneVerified()->create();
         $owner->shops()->attach($shop);
 
         $stale = Shop::findOrFail($shop->id); // loaded while still onboarding
@@ -300,13 +302,28 @@ class ShopRegistrationTest extends TestCase
     public function test_another_shops_owner_cannot_publish_it(): void
     {
         $shop = $this->register();
-        $stranger = User::factory()->create();
+        $stranger = User::factory()->phoneVerified()->create();
         $stranger->shops()->attach(Shop::factory()->create());
 
         $this->expectException(AuthorizationException::class);
 
         try {
             $shop->publish($stranger);
+        } finally {
+            $this->assertSame(ShopStatus::Onboarding, $shop->fresh()->status);
+        }
+    }
+
+    public function test_a_member_without_a_verified_phone_cannot_publish(): void
+    {
+        $shop = $this->register();
+        $owner = User::factory()->create(); // a Studio-registered owner: no phone
+        $owner->shops()->attach($shop);
+
+        $this->expectException(AuthorizationException::class);
+
+        try {
+            $shop->publish($owner);
         } finally {
             $this->assertSame(ShopStatus::Onboarding, $shop->fresh()->status);
         }
@@ -337,7 +354,7 @@ class ShopRegistrationTest extends TestCase
     public function test_only_an_onboarding_shop_can_be_published(ShopStatus $status): void
     {
         $shop = Shop::factory()->status($status)->create();
-        $owner = User::factory()->create();
+        $owner = User::factory()->phoneVerified()->create();
         $owner->shops()->attach($shop);
 
         $this->expectException(\DomainException::class);

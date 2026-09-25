@@ -46,6 +46,15 @@ class UserFactory extends Factory
         ]);
     }
 
+    /** A seller who signed up with a verified phone (step 44b). */
+    public function phoneVerified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'phone' => '+959'.fake()->unique()->numerify('#########'),
+            'phone_verified_at' => now(),
+        ]);
+    }
+
     /**
      * A platform (studio) admin. The `studio_admin` role IS the grant now — issue
      * #110 retired the `is_studio` column, so tests say `->studio()` instead of
