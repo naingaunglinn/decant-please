@@ -22,14 +22,19 @@ Principles P1–P6) throughout.
 - [ ] **36** — Product + Variant model
 - [ ] **37** — Templates + attributes
 - [ ] **38** — Clothing template
-- [ ] **⛔ GATE — real-seller trial** (stop; owner decides 39–41 order & scope)
+- [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [ ] **39** — Status labels (template-driven; `decanted→prepared`)
 - [ ] **40** — Stock modes (`per_variant` / `pooled`)
 - [ ] **41** — Module toggles
 - [ ] **42** — Design-spec sync (docs)
 
-Issues: 35–38 created with this plan (#103's PR); **39–42 issues are deferred** until after
-the step-38 gate, because their order and scope are decided then.
+Issues: 35–38 created with this plan (#103's PR); 39–42 issues are opened as each step starts
+(the unattended run in `prompts/RUN-QUEUE.md`).
+
+> **Amended 2026-09-25 (#115, the catalog review + the CornerArea scope).** Steps 36–38 gained
+> the columns the category roadmap (`prompts/43-cornerarea-roadmap.md`) needs; the step-38
+> gate is now a review stop, not a real-seller trial (`AGENTS.md` P5 as replaced). Amended
+> lines are marked **(amended)**.
 
 ---
 
@@ -44,10 +49,10 @@ the step-38 gate, because their order and scope are decided then.
    (`deposit_mmk` capture defaults, `balance_due_mmk` sign, the "Balance outstanding" stat)
    and a **one-time, explicit re-baseline is allowed in #67's PR** — the only sanctioned
    time the recorded values move.
-2. **Gate after step 38.** Steps 35–38 make the product fit a new category (P5: removes an
-   onboarding blocker). **Stop after 38** so the owner can trial it with a real seller before
-   building 39–41; the owner decides their order and scope then. Step 42 (spec sync) depends
-   on 39–41 and runs last.
+2. **Review stop after step 38 (amended).** Steps 35–38 make the product fit a new category.
+   The owner reviews after 38, then 39–41 continue; the build no longer waits for a real
+   seller (`AGENTS.md` P5: every category ships complete). Step 42 (spec sync) depends on
+   39–41 and runs last.
 
 ## Cross-cutting invariants (every step)
 
@@ -55,8 +60,9 @@ the step-38 gate, because their order and scope are decided then.
   change a *field name*; it must never move a recorded *value*. The **step-35 parity test is
   the guard** for this, not a thing later steps "update."
 - **Tenancy unchanged.** Renamed tables keep `BelongsToShop` + `shop_id`; `TenantIsolationTest`
-  stays green. No new tenant-owned *table* is created (renames + jsonb columns + `shop_settings`
-  columns), so **no new isolation test is required** — but the existing suite that names
+  stays green. The only new tenant-owned table is step 37's per-shop `categories`
+  **(amended)**, which ships with its own isolation test in the same PR; everything else is
+  renames + jsonb columns + `shop_settings` columns. The existing suite that names
   `fragrances`/`decant_prices` must be updated in the same PR.
 - **Portability.** Any step adding/altering a query with `LIKE`/`ORDER BY`/alias runs
   `backend/scripts/verify-postgres-portability.sh`. Search uses the denormalized `search_text`
@@ -117,10 +123,27 @@ with checkout keyed by variant. Server still derives every price.
 - `Schema::rename('fragrances','products')`, `Schema::rename('decant_prices','product_variants')`.
 - `product_variants`: add `options` jsonb (e.g. `{"Size":"10ml"}`), nullable `measure` int
   (10 for 10ml); keep `price_mmk`, `in_stock`, `size_ml` (legacy + measure source).
+- **(amended)** `product_variants` gains `is_active` boolean (default true): a size or colour
+  is archived, never deleted. Archived variants drop out of the storefront and checkout but
+  stay on placed orders.
+- **(amended)** `product_variants` gains `position` int (not null, default 0) for display order
+  (S, M, L, XL isn't alphabetical). Backfill existing variants by `size_ml` ascending.
 - `order_items`: `renameColumn fragrance_id → product_id` (keep FK `restrictOnDelete`); add
   nullable `product_variant_id` (FK → `product_variants`, same shop) + `variant_label_snapshot`;
   **backfill** both from `size_ml` for legacy rows (match product + size → variant; synthesize
   `"10ml"` label). `size_ml` and `fragrance_name_snapshot` **stay** (frozen snapshots).
+  **(amended)** `order_items.product_variant_id` **restricts delete** (the variant is
+  archived via `is_active`, never deleted, so a placed order never loses its line's variant).
+- **(amended)** `order_items.size_ml` becomes **nullable** — a clothing line has no ml.
+  Existing values are untouched.
+- **(amended)** `products.brand_id` and `brands.type` become **nullable** — brand is optional
+  per template (a bakery has none). **(amended, #117 review)** `products.brand_id` moves from
+  `cascadeOnDelete` to **`restrictOnDelete`**: a brand that still has products can't be
+  deleted — it is archived with the existing `brands.is_active`, like products and variants.
+  A brand with no products still deletes. (Not `nullOnDelete`: a database-level null bypasses
+  the product `saving` hook, so step 37's `search_text` would keep the deleted brand's name,
+  and the seller would silently lose the brand on every product. A cascade would also hit the
+  `order_items.product_id` restrict.)
 - Preserve `BelongsToShop`, `shop_id`, `unique(shop_id, slug)` on products.
 
 **API changes.** Routes `/fragrances`→`/products`, `/fragrances/{slug}`→`/products/{slug}`
@@ -134,14 +157,19 @@ carries product + price + measure) — **price still re-derived server-side**. U
 fields).
 
 **Admin / storefront.** Filament `Resources/Fragrances/ → Resources/Products/` (dir + classes +
-form/table). Storefront `[host]/fragrance/[slug]/ → [host]/product/[slug]/` **with a redirect**
+form/table). **(amended)** Variants are archived with an `is_active` toggle, never removed:
+the variant repeater must not delete child rows on save (a variant on a placed order would
+hit the restrict). Storefront `[host]/fragrance/[slug]/ → [host]/product/[slug]/` **with a redirect**
 from the old path (keep the `[host]` tenant segment). `types.ts` `Fragrance→Product`,
 `DecantPrice→ProductVariant`, `CheckoutItem` `{variant_id, quantity}`; `api.ts` fetchers;
 `FilterControls` stays `/meta`-driven.
 
 **Tests.** **Update the existing suite** (`TenantIsolationTest`, `PublicApiTest`,
-`AdminCatalogTest`, `DecantStockTest`, `DecantCostTest`, …) for the new names/payload. No new
-isolation test (renames). Parity (35) green with field-name updates only.
+`AdminCatalogTest`, `DecantStockTest`, `DecantCostTest`, …) for the new names/payload.
+**(amended)** An archived variant is refused at checkout on the server (money path), is hidden
+from the catalog, and still shows on placed orders; a variant on an order can't be deleted.
+**(amended, #117 review)** A brand with products can't be deleted (archive it instead); a brand
+with no products still deletes. No new isolation test (renames). Parity (35) green with field-name updates only.
 
 **Risks.** Breaks much of the 28-file suite — update in-PR. FK/rename correctness on **Postgres**
 (migrate a real pgsql + portability). Legacy `product_variant_id`/`variant_label_snapshot`
@@ -164,6 +192,19 @@ to migrate there; templates may mark an attribute `translatable` for future i18n
 stays on `brands`** — not moved into attributes; the template decides whether "brand" is a
 concept for a category.
 
+**(amended)** Also in this step:
+- `products.template` (string key, not null): set per product, copied from the shop's default
+  on create. A shop may mix templates only **within its own group** (clothes + bags: yes; cafe
+  drinks + shipped coffee beans: no — see the roadmap's groups). Backfill existing products to
+  `decant`.
+- `shop_settings.template` (the shop's default template key) **moves here from step 41** —
+  step 38 already needs it. Backfill existing shops to `decant`.
+- A per-shop **`categories`** table (menu sections, "tops / dresses"): `shop_id` +
+  `BelongsToShop`, `name`, `position`, `unique(shop_id, name)`; `products.category_id`
+  nullable FK (→ `categories`, same shop, **`nullOnDelete`** — deleting a menu section never
+  deletes or blocks its products). A new tenant table, so **its isolation test ships in the
+  same PR**.
+
 **Templates.** `App\Templates\` classes (base + `DecantTemplate`). A template defines: attributes
 (name; type text/select/number; `filterable`; `searchable`; `translatable`), variant option
 names (Decant: `"Size"`), **status labels** (Decanted/Packed/Baked — consumed by step 39), and
@@ -176,11 +217,17 @@ definitions from the template** instead of hardcoded enum lists. `ProductResourc
 
 **Admin / storefront.** Filament product form fields generated from the template; storefront
 `FilterControls` stays `/meta`-driven, now with template options. `search_text` kept fresh via a
-model hook.
+model hook. **(amended, #117 review)** When a brand's name changes, rebuild `search_text` for its
+products (a `Brand` `saved` hook when `name` is dirty) — the product hook alone never sees a
+brand rename.
 
 **Tests.** Parity (35) green — `/meta` + filter *values* unchanged for the decant template;
 attribute round-trip; `search_text` search (**portability mandatory** — new `LIKE`); filterable/
 searchable honor the template. Update `PublicApiTest`/`AdminCatalogTest` for the attribute shape.
+**(amended)** `categories` isolation test (two shops, same category name, no leak); a product
+takes the shop's default template on create; a template outside the shop's group is refused.
+**(amended, #117 review)** Renaming a brand rebuilds its products' `search_text`: search finds
+them by the new name, not the old one.
 
 **Risks.** jsonb + search (use `search_text`, not jsonb `ilike`); the 5-column data migration must
 be lossless (parity guards values); template-driven Filament forms are the trickiest UI.
@@ -193,8 +240,9 @@ be lossless (parity guards values); template-driven Filament forms are the trick
 **Goal.** Prove 36–37 with a real second category: **Size + Color** variants and a **material**
 attribute. If the design doesn't fit, **fix 36–37 here**, don't work around it.
 
-**Schema / migrations.** None new (uses `products.attributes` + `product_variants.options`).
-Optionally a demo clothing shop seeder.
+**Schema / migrations.** **(amended)** `product_variants.image_path` (nullable string): a photo
+per colour, stored under the shop's `shops/{id}/…` prefix like product images. Otherwise uses
+`products.attributes` + `product_variants.options`. Optionally a demo clothing shop seeder.
 
 **Templates.** `App\Templates\ClothingTemplate` — attributes (material: select; brand optional),
 variant option names (`"Size"`,`"Color"`), status labels, default modules. Variant options like
@@ -204,16 +252,18 @@ variant option names (`"Size"`,`"Color"`), status labels, default modules. Varia
 variants flow through checkout by `variant_id`.
 
 **Tests.** A clothing shop seeds, lists, filters by material/size/color, checks out by variant;
-the decant shop's parity (35) stays green.
+the decant shop's parity (35) stays green. **(amended)** A variant photo is stored under the
+shop's `shops/{id}/…` prefix.
 
 **Risks.** This is the proof step — surface any 36–37 gap (multi-option variants, attribute types)
 and fix it upstream.
 
 **Deliberately not built.** Only two templates (decant, clothing); bakery/cosmetics later.
 
-> **⛔ GATE — stop here.** Owner trials the product with a real seller before 39–41.
+> **⏸ Review stop (amended).** The owner reviews 35–38 here; then 39–41 continue. It no longer
+> waits for a real-seller trial (`AGENTS.md` P5 as replaced by #115).
 
-## Step 39 — Status labels (template-driven)  *(post-gate; order/scope may change)*
+## Step 39 — Status labels (template-driven)  *(after the review stop)*
 
 **Goal.** Fixed states, **template-supplied labels**; rename `decanted→prepared`,
 `decant_date→prep_date`.
@@ -243,7 +293,7 @@ guard that P&L/revenue don't move.
 
 **Deliberately not built.** States stay **fixed** — never configurable (P4); only labels vary.
 
-## Step 40 — Stock modes  *(post-gate)*
+## Step 40 — Stock modes  *(after the review stop)*
 
 **Goal.** Two stock modes, generalizing today's `stock_ml`.
 
@@ -268,14 +318,15 @@ low-stock; parity green.
 **Deliberately not built.** Per-bottle identity / batch / FIFO / weighted-average (NON-GOALS;
 #40/#41 parked). Stock mode is per-product/template, not arbitrary per-variant.
 
-## Step 41 — Module toggles  *(post-gate)*
+## Step 41 — Module toggles  *(after the review stop)*
 
 **Goal.** Opt-in modules; a shop that disables one sees **nothing new** (P3).
 
-**Schema / migrations.** `shop_settings` gains `template` (string key) + `modules` (jsonb enabled
-set). Defaults from the template; overridable.
+**Schema / migrations.** `shop_settings` gains `modules` (jsonb enabled set). Defaults from the
+template; overridable. **(amended)** `shop_settings.template` moved to step 37.
 
-**Modules.** `production_schedule, stock, cost_margin, promo_codes, expenses`. Disabled → hidden
+**Modules.** `production_schedule, stock, cost_margin, promo_codes, expenses` (later groups
+add theirs; see the default-modules table in `prompts/43-cornerarea-roadmap.md`). Disabled → hidden
 from Filament nav, widgets, and API responses (e.g. `/meta` omits a disabled module's fields).
 
 **Admin.** A settings surface to toggle modules; nav/widget registration reads `modules`.
@@ -289,7 +340,7 @@ order path is never broken by a disabled module (P2).
 **Deliberately not built.** No per-user module permissions (Shield handles auth); modules are
 per-shop.
 
-## Step 42 — Design-spec sync (docs)  *(post-gate, after 39–41)*
+## Step 42 — Design-spec sync (docs)  *(after 39–41)*
 
 **Goal.** Bring the tenancy/design docs to the new schema (this is the reconciled "update #58's
 spec" — #58 is merged, its living spec is the design doc).
@@ -309,9 +360,10 @@ pass.
 
 ## P6 answers (the refactor as a whole)
 
-1. **Which seller?** Onboarding a non-perfume seller (clothing/bakery). Today the model is
-   perfume-decant-only, so a clothing seller can't be onboarded at all — this removes that
-   onboarding blocker (P5).
+1. **Which category, and which seller?** Every category after decant, starting with clothing:
+   a clothing seller listing a top in S/M/L × two colours. Today the model is
+   perfume-decant-only, so no non-decant category can be built at all — this is the catalog
+   every category in `prompts/43-cornerarea-roadmap.md` stands on (P5, as amended).
 2. **What does a shop that doesn't need it see?** A decant shop sees **nothing new** — same
    catalog, filters, checkout, and dashboard *values* (the parity test guarantees it); only
    internal names generalize.
@@ -330,7 +382,10 @@ pass.
 
 - **#67 status + promotion state** — the executor confirms at the start of Phase 3 and applies
   the re-baseline fallback if #67's backend half is promotion-blocked.
-- **39–41 order & scope** — decided by the owner after the step-38 real-seller trial.
-- **"Brand" as a concept** — per-template (a bakery has none); decided inside steps 37–38.
+- ~~39–41 order & scope~~ — **resolved (#115)**: the step-38 gate is a review stop; 39–41 run
+  in order after it (`prompts/RUN-QUEUE.md`).
+- ~~"Brand" as a concept~~ — **resolved (#115)**: brand is optional per template.
+  `products.brand_id` and `brands.type` are nullable (step 36); the template decides whether
+  the form shows a brand.
 - **PRODUCT.md** — domain framing reframed in #103's docs PR; further per-feature updates land
   with the steps that change scope.
