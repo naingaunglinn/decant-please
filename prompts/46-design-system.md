@@ -77,7 +77,7 @@ theme. They are not in the list.
 | Type | Props | Renders (46b) |
 |---|---|---|
 | `announcement` | `text` ≤ 120 | a thin bar above the hero |
-| `hero` | `title` ≤ 80, `subtitle` ≤ 240, `button` ≤ 30, `image` | headline, Shop button, image (the first featured product's photo when `image` is null) |
+| `hero` | `title` ≤ 80, `subtitle` ≤ 240, `button` ≤ 30, `track_button` ≤ 30, `image` | headline, Shop button, a quieter order-tracking button (hidden when empty), image (the first featured product's photo when `image` is null) |
 | `featured` | `title` ≤ 40 | the featured-products rail |
 | `product_grid` | `title` ≤ 40 | the newest products |
 | `category_nav` | `title` ≤ 40 | links to the shop's categories (hidden when it has none) |
@@ -99,16 +99,24 @@ in the design config.
 - Unknown top-level keys, unknown section types, unknown props and duplicate types are
   refused with a message naming the path (`sections.2.props.title`). A missing prop is
   filled with its empty default, so the renderer always gets a complete shape.
-- Text is plain text: trimmed, control characters refused, lengths capped as above. The
+- Text is plain text: trimmed, control characters refused (and the invisible line and
+  direction controls, U+0085, U+2028/2029, U+202A–202E, U+2066–2069, which could reverse a
+  phone number; not ZWSP or ZWNJ, which Burmese uses), lengths capped as above. The
   storefront renders it as text, never as HTML.
 - `link` (tiles) is a path on the shop itself: it starts with one `/` and uses URL path and
-  query characters only. `//host`, `https://…` and `javascript:` are refused.
-- `map_link` is `https://` on a maps host (`google.com`, `www.google.com`,
-  `maps.google.com`, `maps.app.goo.gl`, `goo.gl`). Nothing else leaves the shop.
+  query characters only, with no empty (`//`) or dot (`.`, `..`) segment and no encoded
+  slash or dot. `//host`, `/.//host`, `https://…` and `javascript:` are refused.
+- `map_link` is `https://` on a maps host: `google.com` or `www.google.com` under
+  `/maps` (not `/url`, which redirects anywhere), `maps.google.com` under `/maps` or bare
+  (`?q=`), and `maps.app.goo.gl`. Not `goo.gl`: it shortened any URL. A path with an empty
+  or dot segment, or an encoded slash or dot, is refused. Nothing else leaves the shop.
 - `image` is null or a stored path under **this shop's** `shops/{id}/design/` prefix, with
-  no `..`. A path under another shop's prefix, or a URL, is refused. The API resolves
+  no `..`, ending in `.jpg`, `.jpeg`, `.png` or `.webp` (never SVG or HTML, which the
+  public disk serves as-is). A path under another shop's prefix, or a URL, is refused. The API resolves
   paths to URLs (46b). A config never holds a URL.
 - A section list longer than the library is refused.
+
+Rows are append-only by construction: `ShopDesign` throws on update.
 
 Old rows must keep rendering after the library grows: validation runs on **write** only.
 The renderer skips a section type or prop it doesn't know, and never errors on one.
@@ -204,8 +212,10 @@ but left out of the menu until 46b.
 ## Risks
 
 - **Parity.** 46b must render decant's Clean preset exactly as today's home page. The
-  preset's copy is taken verbatim from `app/[host]/page.tsx` and `Hero.tsx`, and 46b's
-  browser checks compare the two.
+  preset's copy is taken verbatim from `app/[host]/page.tsx` and `Hero.tsx` (both hero
+  buttons: `button` and `track_button`), and 46b's browser checks compare the two. The
+  Designer / Niche tiles keep today's rule: 46b hides a `brand_type` tile when `/meta`
+  has no brand types.
 - **Library drift.** An old row can name a section a later release retires. The renderer
   skips it (above), and the validator refuses it only on write.
 - **Contrast rule and presets.** Strong brand colours may fail 4.5:1 with white text. A

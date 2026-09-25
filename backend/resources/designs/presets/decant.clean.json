@@ -11,6 +11,7 @@
             "title": "Great perfume, five millilitres at a time.",
             "subtitle": "Authentic designer and niche bottles, hand-decanted into 5ml, 10ml and 30ml vials in Yangon — so you can wear the real thing before you commit to it.",
             "button": "Browse the shop",
+            "track_button": "Track an order",
             "image": null
         } },
         { "type": "featured", "on": true, "props": { "title": "Featured" } },

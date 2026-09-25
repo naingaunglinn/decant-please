@@ -8,17 +8,22 @@ use App\Design\Presets;
 use App\Design\Sections;
 use App\Design\Theme;
 use App\Enums\DesignSource;
+use App\Exceptions\ReadOnlyImpersonationException;
 use App\Filament\Pages\ManageDesign;
 use App\Models\Shop;
 use App\Models\ShopDesign;
 use App\Models\ShopSetting;
 use App\Models\User;
+use App\Support\Impersonation;
 use App\Support\TenantContext;
 use App\Templates\Templates;
+use Filament\Events\TenantSet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Livewire\Livewire;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -110,7 +115,7 @@ class DesignSystemTest extends TestCase
 
     public function test_an_unknown_preset_key_is_refused(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         Presets::get('../../.env');
     }
@@ -150,6 +155,9 @@ class DesignSystemTest extends TestCase
             'text too long' => [fn (array $c) => self::with($c, 'sections.1.props.title', str_repeat('က', 81)), 'sections.1.props.title'],
             'newline in a one-line field' => [fn (array $c) => self::with($c, 'sections.1.props.title', "a\nb"), 'sections.1.props.title'],
             'control character' => [fn (array $c) => self::with($c, 'sections.1.props.subtitle', "a\x07b"), 'sections.1.props.subtitle'],
+            'reversed text' => [fn (array $c) => self::with($c, 'sections.0.props.text', "Call 09\u{202E}987"), 'sections.0.props.text'],
+            'line separator' => [fn (array $c) => self::with($c, 'sections.0.props.text', "a\u{2028}b"), 'sections.0.props.text'],
+            'next line' => [fn (array $c) => self::with($c, 'sections.0.props.text', "a\u{85}b"), 'sections.0.props.text'],
             'text not a string' => [fn (array $c) => self::with($c, 'sections.1.props.title', ['x']), 'sections.1.props.title'],
             'image URL' => [fn (array $c) => self::with($c, 'sections.1.props.image', 'https://evil.example/x.jpg'), 'sections.1.props.image'],
             'too many items' => [fn (array $c) => self::with($c, 'sections.4.props.items', array_fill(0, 5, ['title' => 'x', 'text' => 'y'])), 'sections.4.props.items'],
@@ -176,6 +184,11 @@ class DesignSystemTest extends TestCase
             'javascript' => ['javascript:alert(1)', false],
             'backslash trick' => ['/\\evil.example', false],
             'relative' => ['shop', false],
+            'dot segment to protocol-relative' => ['/.//evil.example', false],
+            'empty segment' => ['/shop//evil.example', false],
+            'encoded slash' => ['/%2F/evil.example', false],
+            'parent segment' => ['/../x', false],
+            'encoded dot' => ['/%2e%2e/x', false],
         ];
     }
 
@@ -198,6 +211,13 @@ class DesignSystemTest extends TestCase
         return [
             'google maps' => ['https://www.google.com/maps/place/Yangon', true],
             'short link' => ['https://maps.app.goo.gl/AbCdEf123', true],
+            'maps.google.com query' => ['https://maps.google.com/?q=16.8,96.1', true],
+            'place with coordinates' => ['https://www.google.com/maps/place/Yangon/@16.8409,96.1735,12z', true],
+            'maps prefix, not a segment' => ['https://www.google.com/mapsevil', false],
+            'dot segment to the redirector' => ['https://www.google.com/maps/../url?q=https://evil.example', false],
+            'encoded dot segment' => ['https://www.google.com/maps/..%2F..%2Furl?q=https://evil.example', false],
+            'maps.google.com redirector' => ['https://maps.google.com/url?q=https://evil.example', false],
+            'generic shortener' => ['https://goo.gl/abc123', false],
             'http' => ['http://maps.app.goo.gl/AbCdEf123', false],
             'google search, not maps' => ['https://www.google.com/search?q=x', false],
             'lookalike host' => ['https://maps.app.goo.gl.evil.example/x', false],
@@ -227,10 +247,18 @@ class DesignSystemTest extends TestCase
         $config['sections'][1]['props']['image'] = $prefix.'hero-1.jpg';
         $this->assertSame($prefix.'hero-1.jpg', DesignConfig::validate($config, $this->shopId())['sections'][1]['props']['image']);
 
-        foreach ([$prefix.'../../other/x.jpg', 'shops/'.$this->shopId().'/proofs/slip.jpg', $prefix.'a b.jpg'] as $path) {
+        foreach ([$prefix.'../../other/x.jpg', 'shops/'.$this->shopId().'/proofs/slip.jpg', $prefix.'a b.jpg', $prefix.'x.svg', $prefix.'x.html', $prefix.'noext'] as $path) {
             $config['sections'][1]['props']['image'] = $path;
             $this->assertContains('sections.1.props.image', $this->refusedPaths($config), $path);
         }
+    }
+
+    public function test_burmese_text_with_zero_width_characters_is_accepted(): void
+    {
+        // ZWSP and ZWNJ are ordinary in Burmese text; only direction and line controls are refused.
+        $config = self::with($this->config(), 'sections.0.props.text', "ပို့ခ\u{200B}သက်သာ\u{200C}");
+
+        $this->assertSame("ပို့ခ\u{200B}သက်သာ\u{200C}", DesignConfig::validate($config, $this->shopId())['sections'][0]['props']['text']);
     }
 
     public function test_the_contrast_ratio_matches_wcag(): void
@@ -276,12 +304,48 @@ class DesignSystemTest extends TestCase
         Designs::publish($bold->id);
         $this->assertSame($bold->id, Designs::published()->id);
         $this->assertSame(2, ShopDesign::count());
-        $this->assertEquals($bold->updated_at, $bold->fresh()->updated_at);
+        $this->assertEquals(Presets::get('decant.bold'), $bold->fresh()->config);
+    }
+
+    public function test_a_design_row_can_never_be_updated(): void
+    {
+        $design = Designs::usePreset('decant.bold');
+
+        try {
+            $design->update(['source' => DesignSource::Manual]);
+            $this->fail('A design row was updated.');
+        } catch (LogicException) {
+            $this->assertSame(DesignSource::Preset, $design->fresh()->source);
+        }
+    }
+
+    public function test_a_read_only_studio_operator_cannot_publish_or_add_a_design(): void
+    {
+        $shop = Shop::factory()->create(['slug' => 'alpha']);
+        app(TenantContext::class)->set($shop);
+        $bold = Designs::usePreset('decant.bold'); // seeded before anyone is impersonating
+        Designs::usePreset('decant.warm');
+
+        $this->actingAs(User::factory()->studio()->create());
+        event(new TenantSet($shop, auth()->user()));
+        $this->assertTrue(app(Impersonation::class)->isReadOnly());
+
+        foreach ([fn () => Designs::usePreset('decant.clean'), fn () => Designs::publish($bold->id)] as $write) {
+            try {
+                $write();
+                $this->fail('A read-only operator changed the design.');
+            } catch (ReadOnlyImpersonationException) {
+                // expected
+            }
+        }
+
+        $this->assertSame(2, ShopDesign::count());
+        $this->assertSame('decant.warm', Designs::published()->config['preset']);
     }
 
     public function test_a_preset_from_another_template_is_refused(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         Designs::usePreset('clothing.bold');
     }
@@ -333,12 +397,12 @@ class DesignSystemTest extends TestCase
         $this->actingAs($owner);
 
         $this->get(ManageDesign::getUrl())->assertOk()
-            ->assertSee('Clean · ရိုးရှင်း — default')
+            ->assertSee('Clean · ရိုးရှင်း — default · မူလ')
             ->assertSee('No changes yet.');
 
         Livewire::test(ManageDesign::class)
             ->callAction('usePreset', arguments: ['preset' => 'decant.bold'])
-            ->assertNotified('Design published.');
+            ->assertNotified('Design published · ဒီဇိုင်း ပြောင်းပြီးပါပြီ');
 
         $bold = Designs::published();
         $this->assertSame('decant.bold', $bold->config['preset']);
@@ -350,6 +414,12 @@ class DesignSystemTest extends TestCase
             ->assertSee('Preset: Warm · နွေးထွေး')
             ->callAction('publish', arguments: ['design' => $bold->id]);
 
+        $this->assertSame($bold->id, Designs::published()->id);
+
+        // A tampered request naming another template's preset changes nothing and doesn't 500.
+        Livewire::test(ManageDesign::class)
+            ->callAction('usePreset', arguments: ['preset' => 'clothing.bold'])
+            ->assertNotified('That design isn\'t available for this shop.');
         $this->assertSame($bold->id, Designs::published()->id);
     }
 

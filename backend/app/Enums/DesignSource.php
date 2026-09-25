@@ -13,7 +13,7 @@ enum DesignSource: string
     {
         return match ($this) {
             self::Preset => 'Preset',
-            self::Manual => 'Edited',
+            self::Manual => 'Edited · ပြင်ထားတာ',
             self::Ai => 'AI',
         };
     }

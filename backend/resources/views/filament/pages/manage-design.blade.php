@@ -20,7 +20,7 @@
 
     <x-filament::section>
         <x-slot name="heading">Presets · ဒီဇိုင်းများ</x-slot>
-        <x-slot name="description">Start from one of these. Your products, prices and orders don't change.</x-slot>
+        <x-slot name="description">Start from one of these. Your products, prices and orders don't change. · ပစ္စည်း၊ ဈေးနှုန်းနဲ့ အော်ဒါတွေ မပြောင်းပါ။</x-slot>
 
         <div class="dz-grid">
             @foreach ($this->getPresets() as $key => $preset)
@@ -28,7 +28,7 @@
                     <div>
                         <strong>{{ $preset['label'] }}</strong>
                         @if ($preset['live'])
-                            <span class="dz-badge">Live</span>
+                            <span class="dz-badge">Live · သုံးနေ</span>
                         @endif
                         <p class="dz-muted">{{ $preset['description'] }}</p>
                     </div>
@@ -45,11 +45,11 @@
 
     <x-filament::section>
         <x-slot name="heading">History · မှတ်တမ်း</x-slot>
-        <x-slot name="description">Every change is kept. To undo, use an older design again.</x-slot>
+        <x-slot name="description">Every change is kept. To undo, use an older design again. · ပြောင်းတိုင်း သိမ်းထားပါတယ်။</x-slot>
 
         @php($history = $this->getHistory())
         @if ($history->isEmpty())
-            <p class="dz-muted">No changes yet. Your shop uses the Clean design.</p>
+            <p class="dz-muted">No changes yet. Your shop uses the Clean design. · မပြောင်းရသေးပါ။</p>
         @else
             <table class="dz-history">
                 @foreach ($history as $design)
@@ -62,7 +62,7 @@
                         </td>
                         <td>
                             @if ($live?->is($design))
-                                <span class="dz-badge">Live</span>
+                                <span class="dz-badge">Live · သုံးနေ</span>
                             @else
                                 {{ ($this->publishAction)(['design' => $design->id]) }}
                             @endif

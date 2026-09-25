@@ -29,20 +29,22 @@ picker, with the API unchanged; 46b (row 13b) renders the design on the storefro
   - `Theme`: the Clean, Bold and Warm bases, four colours, three font keys, and the WCAG
     contrast check.
   - `DesignConfig`: the one validator. It refuses unknown keys, sections and props,
-    duplicate sections, non-hex or unreadable colours (below 4.5:1), over-long or
-    control-character text, a tile link off the shop, a map link that isn't Google Maps
-    over https, and an image outside this shop's `shops/{id}/design/` prefix. It fills
-    missing props.
+    duplicate sections, non-hex or unreadable colours (below 4.5:1), over-long text,
+    control and direction-override characters (not Burmese ZWSP/ZWNJ), a tile link off
+    the shop (including `/.//host` and encoded-dot tricks), a map link that isn't Google
+    Maps over https (`/url` redirector and `goo.gl` refused), and an image outside this
+    shop's `shops/{id}/design/` prefix or not jpg/png/webp. It fills missing props.
   - `Presets`: data in `resources/designs/presets/{template}.{base}.json`.
   - `Designs`: the only writer. `create`, `publish` (a scoped lookup, so another shop's
     id is a not-found), `usePreset` and `live`.
+- **Append-only by construction**: `ShopDesign` throws on update.
 - **Presets**: three each for decant and clothing. Decant's Clean is today's storefront
   word for word (English, today's colours). The other five carry Burmese sample copy.
 - **Design · ဒီဇိုင်း page** (`ManageDesign`): the live design, three preset cards
   (swatches, Use this design) and the history with Use this one (undo). It stays out of
   the menu until 46b renders the design.
-- `DesignSystemTest` (51 cases) and 2 new `TenantIsolationTest` cases. 588 tests on
-  Postgres 17 (587 + 1 skip on SQLite). `schema.dbml` updated.
+- `DesignSystemTest` (68 cases, including read-only impersonation) and 2 new
+  `TenantIsolationTest` cases. 606 tests on Postgres 17 (605 + 1 skip on SQLite). `schema.dbml` updated.
 - **Found on Postgres:** jsonb doesn't keep object key order, so a stored config compares
   equal to its preset but not identical. Order that means something (sections, items)
   is always a list.

@@ -41,6 +41,8 @@ final class Sections
                 'title' => self::text(80),
                 'subtitle' => self::text(240),
                 'button' => self::text(30),
+                // A second, quieter button to order tracking; empty hides it.
+                'track_button' => self::text(30),
                 'image' => ['kind' => self::IMAGE],
             ]],
             'featured' => ['label' => 'Featured products', 'props' => [

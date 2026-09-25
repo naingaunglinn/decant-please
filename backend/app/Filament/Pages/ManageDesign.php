@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use UnitEnum;
 
 /**
@@ -33,6 +34,8 @@ class ManageDesign extends Page
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $title = 'Design · ဒီဇိုင်း';
+
+    private const PUBLISHED = 'Design published · ဒီဇိုင်း ပြောင်းပြီးပါပြီ';
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -80,12 +83,19 @@ class ManageDesign extends Page
         return Action::make('usePreset')
             ->label('Use this design · ဒီဒီဇိုင်းသုံးမယ်')
             ->requiresConfirmation()
-            ->modalHeading('Use this design?')
-            ->modalDescription('Your shop switches to this design. You can switch back any time from History below.')
+            ->modalHeading('Use this design? · ဒီဒီဇိုင်း သုံးမလား')
+            ->modalDescription('Your shop switches to this design. You can switch back any time from History below. · အောက်က မှတ်တမ်းကနေ အချိန်မရွေး ပြန်ပြောင်းနိုင်ပါတယ်။')
             ->action(function (array $arguments): void {
-                Designs::usePreset((string) ($arguments['preset'] ?? ''), auth()->user());
+                try {
+                    Designs::usePreset((string) ($arguments['preset'] ?? ''), auth()->user());
+                } catch (InvalidArgumentException) {
+                    // Only a tampered request names a preset that isn't on this page.
+                    Notification::make()->danger()->title('That design isn\'t available for this shop.')->send();
 
-                Notification::make()->success()->title('Design published.')->send();
+                    return;
+                }
+
+                Notification::make()->success()->title(self::PUBLISHED)->send();
             });
     }
 
@@ -95,11 +105,11 @@ class ManageDesign extends Page
             ->label('Use this one · ဒါကိုသုံးမယ်')
             ->color('gray')
             ->requiresConfirmation()
-            ->modalHeading('Switch back to this design?')
+            ->modalHeading('Switch back to this design? · ဒီဒီဇိုင်းကို ပြန်သုံးမလား')
             ->action(function (array $arguments): void {
                 Designs::publish((int) ($arguments['design'] ?? 0));
 
-                Notification::make()->success()->title('Design published.')->send();
+                Notification::make()->success()->title(self::PUBLISHED)->send();
             });
     }
 }

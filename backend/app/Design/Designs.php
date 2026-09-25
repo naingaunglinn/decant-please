@@ -89,7 +89,7 @@ final class Designs
     public static function describe(?ShopDesign $design): string
     {
         if ($design === null) {
-            return self::baseLabel(Presets::DEFAULT_BASE).' — default';
+            return self::baseLabel(Presets::DEFAULT_BASE).' — default · မူလ';
         }
 
         return $design->source === DesignSource::Preset

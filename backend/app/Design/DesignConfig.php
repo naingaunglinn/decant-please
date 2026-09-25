@@ -21,8 +21,11 @@ final class DesignConfig
 {
     public const VERSION = 1;
 
-    /** Hosts a location section's "Open in Maps" link may point at. */
-    private const MAP_HOSTS = ['google.com', 'www.google.com', 'maps.google.com', 'maps.app.goo.gl', 'goo.gl'];
+    /** Hosts a location section's "Open in Maps" link may point at. goo.gl is not one: it shortened any URL. */
+    private const MAP_HOSTS = ['google.com', 'www.google.com', 'maps.google.com', 'maps.app.goo.gl'];
+
+    /** Image types a design may show — never SVG or HTML, which the public disk would serve as-is. */
+    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
 
     /** @var array<string, list<string>> */
     private array $errors = [];
@@ -237,9 +240,12 @@ final class DesignConfig
         }
 
         $value = trim(str_replace("\r\n", "\n", $value));
-        // Control characters are refused (a newline only where the field is multi-line);
+        // Control characters are refused (a newline only where the field is multi-line),
+        // and so are the invisible ones that break a line or reverse text — a spoofed
+        // phone number. Not every format character: Burmese uses ZWSP and ZWNJ.
         // preg_match returns false on invalid UTF-8, which is refused too.
-        $control = $multiline ? '/[\x00-\x09\x0B-\x1F\x7F]/u' : '/[\x00-\x1F\x7F]/u';
+        $invisible = '\x{7F}-\x{9F}\x{2028}\x{2029}\x{202A}-\x{202E}\x{2066}-\x{2069}';
+        $control = $multiline ? "/[\\x{00}-\\x{09}\\x{0B}-\\x{1F}{$invisible}]/u" : "/[\\x{00}-\\x{1F}{$invisible}]/u";
 
         if (preg_match($control, $value) !== 0) {
             $this->fail($path, $multiline ? 'Must be plain text.' : 'Must be plain text on one line.');
@@ -265,7 +271,8 @@ final class DesignConfig
         $prefix = self::imagePrefix($this->shopId);
 
         if (! is_string($value) || ! str_starts_with($value, $prefix) || strlen($value) > 255
-            || ! preg_match('#^[A-Za-z0-9/_.\-]+$#', $value) || str_contains($value, '..') || str_contains($value, '//')) {
+            || ! preg_match('#^[A-Za-z0-9/_.\-]+$#', $value) || str_contains($value, '..') || str_contains($value, '//')
+            || ! in_array(strtolower(pathinfo($value, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true)) {
             $this->fail($path, 'Must be an image uploaded to this shop.');
 
             return null;
@@ -280,8 +287,11 @@ final class DesignConfig
             return '/';
         }
 
-        // A path on the shop itself: one leading slash, then path and query characters.
-        if (! is_string($value) || strlen($value) > 200 || ! preg_match('#^/(?!/)[A-Za-z0-9\-._~/?=&%+]*$#', $value)) {
+        // A path on the shop itself: one leading slash, then path and query characters,
+        // with no empty or dot segment in the path — "/.//evil.example" resolves to
+        // "//evil.example", which a redirect would send off the shop.
+        if (! is_string($value) || strlen($value) > 200 || ! preg_match('#^/[A-Za-z0-9\-._~/?=&%+]*$#', $value)
+            || self::unsafePath(explode('?', $value, 2)[0])) {
             $this->fail($path, 'Must be a page on your shop, like /shop.');
 
             return '/';
@@ -305,8 +315,10 @@ final class DesignConfig
             && ($parts['scheme'] ?? null) === 'https'
             && ! isset($parts['user']) && ! isset($parts['pass']) && ! isset($parts['port'])
             && in_array($host, self::MAP_HOSTS, true)
-            // Google's own domain only under /maps; the short-link hosts are maps-only.
-            && (! in_array($host, ['google.com', 'www.google.com'], true) || str_starts_with($parts['path'] ?? '', '/maps'));
+            && ! self::unsafePath($parts['path'] ?? '')
+            // Google's own domains only under /maps (google.com/url is a redirector);
+            // maps.google.com also takes its bare ?q= form. maps.app.goo.gl is maps-only.
+            && ($host === 'maps.app.goo.gl' || self::mapsPath($parts['path'] ?? '', $host === 'maps.google.com'));
 
         if (! $valid) {
             $this->fail($path, 'Must be a Google Maps link.');
@@ -344,6 +356,19 @@ final class DesignConfig
             $value,
             array_keys($value),
         );
+    }
+
+    /** Whether a URL path has an empty or dot segment, or an encoded slash, backslash or dot. */
+    private static function unsafePath(string $path): bool
+    {
+        return str_contains($path, '//')
+            || preg_match('#%(2f|5c|2e)#i', $path) === 1
+            || preg_match('#(^|/)\.{1,2}(/|$)#', $path) === 1;
+    }
+
+    private static function mapsPath(string $path, bool $bareAllowed): bool
+    {
+        return $path === '/maps' || str_starts_with($path, '/maps/') || ($bareAllowed && in_array($path, ['', '/'], true));
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToShop;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 /**
  * One version of a shop's storefront design (step 46). Rows are append-only:
@@ -21,6 +22,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ShopDesign extends Model
 {
     use BelongsToShop;
+
+    protected static function booted(): void
+    {
+        // Append-only by construction, like an order's snapshots: a published row
+        // that changed under the shop would move its live storefront (and undo).
+        static::updating(function (): never {
+            throw new LogicException('A shop design is never updated. Create a new one with App\\Design\\Designs::create().');
+        });
+    }
 
     protected function casts(): array
     {
