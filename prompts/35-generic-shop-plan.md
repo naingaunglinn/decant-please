@@ -19,7 +19,7 @@ Principles P1–P6) throughout.
 
 - [x] **Pre-35 — #67 first** (correct money before the baseline) — merged before the baseline was recorded
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
-- [ ] **36** — Product + Variant model — split in two (#105): **36a built** (schema, models, admin; API unchanged), **36b** queued (API contract + storefront)
+- [x] **36** — Product + Variant model — split in two (#105): **36a built** (v40: schema, models, admin; API unchanged), **36b built** (v41: API contract + storefront)
 - [ ] **37** — Templates + attributes
 - [ ] **38** — Clothing template
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
@@ -213,9 +213,19 @@ spec's contract rule (a Resource change lands with `types.ts`) gives the seam:
   (position 0) first. Step 38's drag-to-reorder writes real positions. The admin URL stays
   `/admin/{shop}/fragrances` and the label stays "Fragrances" until step 37's template
   supplies them.
-- **36b (queued): the contract.** `/products` routes, `ProductController`,
+- **36b (v41): the contract.** `/products` routes, `ProductController`,
   `ProductResource`/`ProductVariantResource`, checkout by `items[].variant_id`, `types.ts`,
   the storefront `/product/[slug]` route with the redirect, and the `api.md` fixes.
+  **Deviations, for deploy safety** (Heroku and Vercel don't deploy atomically, and old
+  carts live in customers' browsers):
+  - The product object keeps the `prices` key. Each entry only gains `id` and `label`.
+  - `/fragrances` and `/fragrances/{slug}` stay as aliases.
+  - Checkout still resolves a legacy `fragrance_id` + `size_ml` line.
+
+  Both alias paths go after go-live (a RUN-QUEUE row). The storefront cart moved to a `v2`
+  storage key, so a pre-deploy cart is dropped rather than migrated. Component names
+  (`FragranceCard`, `FragranceGrid`) and the tracking receipt's `fragrance_name`/`size_ml`
+  are unchanged. Step 37's template decides the storefront's words.
 
 Brandless products (possible once a brand is deleted) are hidden from the storefront and
 refused at checkout until 36b/37 make brand optional in the API contract; the admin still

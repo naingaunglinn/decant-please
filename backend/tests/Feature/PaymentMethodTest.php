@@ -233,8 +233,7 @@ class PaymentMethodTest extends TestCase
             'address_line' => 'Sanchaung, Yangon',
             'payment_method' => $method,
             'items' => [[
-                'fragrance_id' => $price->product_id,
-                'size_ml' => $price->size_ml,
+                'variant_id' => $price->id,
                 'quantity' => 1,
             ]],
         ], fn ($v) => $v !== null);

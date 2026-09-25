@@ -25,8 +25,8 @@
 //     foreach ([['decant-please', 55000], ['verify-b', 66000]] as [\$slug, \$price]) {
 //       \$ctx->set(App\Models\Shop::where('slug', \$slug)->firstOrFail());
 //       \$brand = App\Models\Brand::firstOrCreate(['name' => 'Verify Brand'], ['type' => 'niche', 'is_active' => true]);
-//       \$frag = App\Models\Fragrance::firstOrCreate(['name' => 'Cache Probe'], ['brand_id' => \$brand->id, 'concentration' => 'edp', 'gender' => 'unisex', 'is_active' => true]);
-//       \$frag->decantPrices()->firstOrCreate(['size_ml' => 10], ['price_mmk' => \$price, 'in_stock' => true]);
+//       \$frag = App\Models\Product::firstOrCreate(['name' => 'Cache Probe'], ['brand_id' => \$brand->id, 'concentration' => 'edp', 'gender' => 'unisex', 'is_active' => true]);
+//       \$frag->variants()->firstOrCreate(['size_ml' => 10], ['price_mmk' => \$price, 'in_stock' => true]);
 //     }
 //     echo 'fixtures ok';"
 //
@@ -119,7 +119,7 @@ console.log(`tenants: "${NAME_A}" @ ${HOST_A} · "${NAME_B}" @ ${HOST_B} (+ ${HO
 // The step-32 case needs one slug that exists in BOTH catalogs — discover it
 // from the API rather than assuming what HasSlug generated for the fixture.
 async function catalogSlugs(shop) {
-  const res = await request(API_URL, `/v1/${shop}/fragrances?per_page=50`); // 50 is the API's cap
+  const res = await request(API_URL, `/v1/${shop}/products?per_page=50`); // 50 is the API's cap
   return res.status === 200 ? JSON.parse(res.body).data.map((f) => f.slug) : [];
 }
 const slugsA = await catalogSlugs(tenantA.slug);
@@ -129,7 +129,7 @@ if (!sharedSlug) {
   console.error("No fragrance slug shared by both tenants — run the fixture snippet in this script's header.");
   process.exit(2);
 }
-const PROBE_PATH = `/fragrance/${sharedSlug}`;
+const PROBE_PATH = `/product/${sharedSlug}`;
 console.log(`probe path: ${PROBE_PATH}`);
 
 // ---- 1+2: each host serves its own storefront --------------------------------
@@ -175,7 +175,7 @@ for (const path of [
   "/",
   "/shop",
   "/shop?brand_type=niche&sort=price_asc",
-  PROBE_PATH, // /fragrance/{shared slug}
+  PROBE_PATH, // /product/{shared slug}
   "/checkout",
   "/track?code=PROBE12345",
   "/order/complete?code=PROBE12345",

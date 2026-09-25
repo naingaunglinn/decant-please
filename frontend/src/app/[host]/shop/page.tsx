@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense, ViewTransition } from "react";
-import { getBrands, getFragrances, getMeta } from "@/lib/api";
+import { getBrands, getProducts, getMeta } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FragranceGrid } from "@/components/catalog/FragranceGrid";
@@ -68,7 +68,7 @@ async function ShopResults({
   flat: Filters;
 }) {
   const [fragrances, brands, meta] = await Promise.all([
-    getFragrances(shop, filters),
+    getProducts(shop, filters),
     getBrands(shop),
     getMeta(shop),
   ]);

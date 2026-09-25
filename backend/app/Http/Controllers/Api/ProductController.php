@@ -5,14 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Enums\BrandType;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\FragranceResource;
+use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
-class FragranceController extends Controller
+class ProductController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -67,18 +67,18 @@ class FragranceController extends Controller
             default => $query->latest()->orderByDesc('id'),
         };
 
-        return FragranceResource::collection(
+        return ProductResource::collection(
             $query->paginate($filters['per_page'] ?? 12)->withQueryString()
         );
     }
 
-    public function show(string $slug): FragranceResource
+    public function show(string $slug): ProductResource
     {
-        $fragrance = $this->baseQuery()->where('slug', $slug)->first();
+        $product = $this->baseQuery()->where('slug', $slug)->first();
 
-        abort_if($fragrance === null, 404, 'Fragrance not found.');
+        abort_if($product === null, 404, 'Fragrance not found.');
 
-        return FragranceResource::make($fragrance);
+        return ProductResource::make($product);
     }
 
     protected function baseQuery(): Builder

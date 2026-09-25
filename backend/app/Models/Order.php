@@ -141,7 +141,7 @@ class Order extends Model
      * and the delivery fee is read off the validated township row, never from the
      * client (the price-trust rule, extended to the fee).
      *
-     * @param  array{customer_name: string, phone: string, delivery_township: DeliveryTownship, address_line: string, address_extra?: ?string, notes?: ?string, items: array<array{fragrance_id: int, size_ml: int, quantity: int}>}  $data
+     * @param  array{customer_name: string, phone: string, delivery_township: DeliveryTownship, address_line: string, address_extra?: ?string, notes?: ?string, items: array<array{variant_id?: int, fragrance_id?: int, size_ml?: int, quantity: int}>}  $data
      */
     public static function newFromCheckout(array $data): self
     {
@@ -163,7 +163,7 @@ class Order extends Model
             ]);
 
             foreach ($data['items'] as $i => $item) {
-                $price = self::currentPriceFor((int) $item['fragrance_id'], (int) $item['size_ml']);
+                $price = self::currentVariantFor($item);
 
                 if (! $price) {
                     throw ValidationException::withMessages([
@@ -216,15 +216,25 @@ class Order extends Model
     }
 
     /**
-     * The current-catalog price lookup checkout and promo preview both use. An
+     * The current-catalog variant lookup checkout and promo preview both use. An
      * archived variant is not for sale, so it never resolves — the server refuses
-     * it whatever the client sends.
+     * it whatever the client sends. A line names its variant by `variant_id`
+     * (step 36b); the legacy `fragrance_id` + `size_ml` pair still resolves so a
+     * storefront or a saved cart from before the deploy keeps checking out
+     * (removed after go-live, RUN-QUEUE).
+     *
+     * @param  array{variant_id?: int, fragrance_id?: int, size_ml?: int}  $item
      */
-    public static function currentPriceFor(int $productId, int $sizeMl): ?ProductVariant
+    public static function currentVariantFor(array $item): ?ProductVariant
     {
         return ProductVariant::query()
-            ->where('product_id', $productId)
-            ->where('size_ml', $sizeMl)
+            ->when(
+                isset($item['variant_id']),
+                fn ($query) => $query->whereKey((int) $item['variant_id']),
+                fn ($query) => $query
+                    ->where('product_id', (int) $item['fragrance_id'])
+                    ->where('size_ml', (int) $item['size_ml']),
+            )
             ->where('in_stock', true)
             ->where('is_active', true)
             ->whereHas('product', fn ($query) => $query
@@ -591,13 +601,18 @@ class Order extends Model
      */
     public static function unavailableItemMessage(array $item): string
     {
-        $product = Product::query()->find($item['fragrance_id'] ?? null);
+        $variant = isset($item['variant_id']) ? ProductVariant::query()->find($item['variant_id']) : null;
+        $product = isset($item['variant_id'])
+            ? $variant?->product
+            : Product::query()->find($item['fragrance_id'] ?? null);
 
         if (! $product || ! $product->is_active || ! $product->brand?->is_active) {
             return 'That fragrance is no longer available.';
         }
 
-        return "{$item['size_ml']}ml of {$product->name} just sold out — pick another size.";
+        $label = $variant ? $variant->label() : "{$item['size_ml']}ml";
+
+        return "{$label} of {$product->name} just sold out — pick another size.";
     }
 
     public static function generateTrackingCode(): string

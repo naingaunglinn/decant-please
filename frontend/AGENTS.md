@@ -93,8 +93,8 @@ Format through `lib/format.ts`. Integer Kyat, comma-separated, `Ks` suffix — `
 Never a decimal, never a currency symbol.
 
 The cart subtotal is **display only**. The server re-derives the real total at checkout.
-Never send a price, a total, or a delivery fee to the API — only `fragrance_id`,
-`size_ml`, `quantity`, `delivery_township_id`.
+Never send a price, a total, or a delivery fee to the API — only `variant_id`,
+`quantity`, `delivery_township_id`.
 
 ## Acceptance checklist — every UI change
 

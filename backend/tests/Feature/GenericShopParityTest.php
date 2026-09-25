@@ -121,7 +121,7 @@ class GenericShopParityTest extends TestCase
 
     public function test_fragrance_list_objects_and_min_prices(): void
     {
-        $response = $this->getJson('/api/v1/decant-please/fragrances')->assertOk();
+        $response = $this->getJson('/api/v1/decant-please/products')->assertOk();
 
         $response->assertJsonPath('meta.total', 3); // GIT inactive, Ghost's brand inactive
 
@@ -141,7 +141,7 @@ class GenericShopParityTest extends TestCase
     public function test_fragrance_filters_and_sorts(): void
     {
         $names = fn (string $query): array => array_column(
-            $this->getJson("/api/v1/decant-please/fragrances?{$query}")->assertOk()->json('data'), 'name');
+            $this->getJson("/api/v1/decant-please/products?{$query}")->assertOk()->json('data'), 'name');
 
         // unsorted filters keep the default newest-first (id desc) order
         $this->assertSame(['Love In White'], $names('gender=female'));
@@ -163,13 +163,13 @@ class GenericShopParityTest extends TestCase
 
     public function test_fragrance_detail_object(): void
     {
-        $allure = $this->getJson('/api/v1/decant-please/fragrances/chanel-allure-homme-sport')
+        $allure = $this->getJson('/api/v1/decant-please/products/chanel-allure-homme-sport')
             ->assertOk()
             ->json('data');
 
         $this->assertSame($this->allureObject(), $this->pick($allure, $this->allureObject()));
 
-        $this->getJson('/api/v1/decant-please/fragrances/creed-green-irish-tweed')->assertNotFound();
+        $this->getJson('/api/v1/decant-please/products/creed-green-irish-tweed')->assertNotFound();
     }
 
     public function test_meta_filter_options_price_bounds_and_sizes(): void
@@ -573,7 +573,7 @@ class GenericShopParityTest extends TestCase
                 'customer_name' => 'Other Customer', 'phone' => '09-700000001',
                 'delivery_township' => $this->serviceableTownship(fee: 1000, name: 'Sanchaung'),
                 'address_line' => '1 Other Road',
-                'items' => [['fragrance_id' => $fragrance->id, 'size_ml' => 5, 'quantity' => 3]],
+                'items' => [['variant_id' => $this->variantId($fragrance, 5), 'quantity' => 3]],
             ]);
             Expense::create(['spent_on' => '2026-03-15', 'category' => 'marketing', 'amount_mmk' => 77000]);
         } finally {
@@ -642,7 +642,7 @@ class GenericShopParityTest extends TestCase
     private function itemPayload(array $items): array
     {
         return array_map(fn (array $item) => [
-            'fragrance_id' => $item[0]->id, 'size_ml' => $item[1], 'quantity' => $item[2],
+            'variant_id' => $this->variantId($item[0], $item[1]), 'quantity' => $item[2],
         ], $items);
     }
 
@@ -681,9 +681,9 @@ class GenericShopParityTest extends TestCase
             'min_price_mmk' => 30000,
             'min_price_formatted' => '30,000 Ks',
             'prices' => [
-                ['size_ml' => 5, 'price_mmk' => 30000, 'price_formatted' => '30,000 Ks', 'in_stock' => true],
-                ['size_ml' => 10, 'price_mmk' => 55000, 'price_formatted' => '55,000 Ks', 'in_stock' => true],
-                ['size_ml' => 30, 'price_mmk' => 150000, 'price_formatted' => '150,000 Ks', 'in_stock' => false],
+                ['id' => $this->variantId($this->allure, 5), 'label' => '5ml', 'size_ml' => 5, 'price_mmk' => 30000, 'price_formatted' => '30,000 Ks', 'in_stock' => true],
+                ['id' => $this->variantId($this->allure, 10), 'label' => '10ml', 'size_ml' => 10, 'price_mmk' => 55000, 'price_formatted' => '55,000 Ks', 'in_stock' => true],
+                ['id' => $this->variantId($this->allure, 30), 'label' => '30ml', 'size_ml' => 30, 'price_mmk' => 150000, 'price_formatted' => '150,000 Ks', 'in_stock' => false],
             ],
         ];
     }
@@ -700,8 +700,8 @@ class GenericShopParityTest extends TestCase
             'min_price_mmk' => 65000,
             'min_price_formatted' => '65,000 Ks',
             'prices' => [
-                ['size_ml' => 5, 'price_mmk' => 65000, 'price_formatted' => '65,000 Ks', 'in_stock' => true],
-                ['size_ml' => 10, 'price_mmk' => 120000, 'price_formatted' => '120,000 Ks', 'in_stock' => true],
+                ['id' => $this->variantId($this->aventus, 5), 'label' => '5ml', 'size_ml' => 5, 'price_mmk' => 65000, 'price_formatted' => '65,000 Ks', 'in_stock' => true],
+                ['id' => $this->variantId($this->aventus, 10), 'label' => '10ml', 'size_ml' => 10, 'price_mmk' => 120000, 'price_formatted' => '120,000 Ks', 'in_stock' => true],
             ],
         ];
     }
@@ -716,7 +716,7 @@ class GenericShopParityTest extends TestCase
             'min_price_mmk' => 60000,
             'min_price_formatted' => '60,000 Ks',
             'prices' => [
-                ['size_ml' => 5, 'price_mmk' => 60000, 'price_formatted' => '60,000 Ks', 'in_stock' => true],
+                ['id' => $this->variantId($this->loveInWhite, 5), 'label' => '5ml', 'size_ml' => 5, 'price_mmk' => 60000, 'price_formatted' => '60,000 Ks', 'in_stock' => true],
             ],
         ];
     }

@@ -99,6 +99,12 @@ abstract class TestCase extends BaseTestCase
      * callers add one with unit_price_mmk = the intended line total. firstOrCreate keeps
      * it to one per shop, idempotent across repeated helper calls in a test.
      */
+    /** The id checkout names a line by (step 36b): the product's variant of that size. */
+    protected function variantId(Product $product, int $sizeMl): int
+    {
+        return $product->variants()->where('size_ml', $sizeMl)->valueOrFail('id');
+    }
+
     protected function itemFragrance(): Product
     {
         $brand = Brand::firstOrCreate(['name' => 'Fixture Brand'], ['type' => 'designer']);

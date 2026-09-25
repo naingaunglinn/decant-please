@@ -1,4 +1,4 @@
-import { getFragrances } from "@/lib/api";
+import { getProducts } from "@/lib/api";
 import { originForHost, resolveTenant } from "@/lib/tenant";
 
 // Per-tenant sitemap (ADR-0004): client-a.com/sitemap.xml arrives here as
@@ -24,10 +24,10 @@ export async function GET(
     let page = 1;
     let lastPage = 1;
     do {
-      const result = await getFragrances(tenant.slug, { per_page: "50", page: String(page) });
+      const result = await getProducts(tenant.slug, { per_page: "50", page: String(page) });
       lastPage = result.meta.last_page;
       for (const fragrance of result.data) {
-        entries.push(urlTag(`${origin}/fragrance/${fragrance.slug}`, "weekly", 0.7));
+        entries.push(urlTag(`${origin}/product/${fragrance.slug}`, "weekly", 0.7));
       }
       page++;
     } while (page <= lastPage && page <= 20); // ponytail: 1000-fragrance ceiling, plenty for one decanter

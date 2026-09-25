@@ -72,7 +72,7 @@ class PublicApiTest extends TestCase
 
     public function test_fragrance_list_hides_inactive_and_reports_in_stock_min_price(): void
     {
-        $response = $this->getJson('/api/v1/decant-please/fragrances')->assertOk();
+        $response = $this->getJson('/api/v1/decant-please/products')->assertOk();
 
         $names = collect($response->json('data'))->pluck('name');
         $this->assertEqualsCanonicalizing(['Allure Homme Sport', 'Aventus', 'Love In White'], $names->all());
@@ -87,7 +87,7 @@ class PublicApiTest extends TestCase
 
     public function test_fragrance_filters_narrow_the_catalog(): void
     {
-        $pluck = fn (string $query) => collect($this->getJson("/api/v1/decant-please/fragrances?{$query}")->assertOk()->json('data'))->pluck('name')->all();
+        $pluck = fn (string $query) => collect($this->getJson("/api/v1/decant-please/products?{$query}")->assertOk()->json('data'))->pluck('name')->all();
 
         $this->assertSame(['Love In White'], $pluck('gender=female'));
         $this->assertSame(['Allure Homme Sport'], $pluck('brand=chanel'));
@@ -104,14 +104,17 @@ class PublicApiTest extends TestCase
 
     public function test_fragrance_detail_by_slug_and_404_for_inactive(): void
     {
-        $this->getJson('/api/v1/decant-please/fragrances/chanel-allure-homme-sport')
+        $this->getJson('/api/v1/decant-please/products/chanel-allure-homme-sport')
             ->assertOk()
             ->assertJsonPath('data.name', 'Allure Homme Sport')
             ->assertJsonPath('data.concentration_label', 'Cologne')
             ->assertJsonPath('data.brand.type', 'designer')
-            ->assertJsonCount(3, 'data.prices');
+            ->assertJsonCount(3, 'data.prices')
+            // checkout names a line by this id (step 36b)
+            ->assertJsonPath('data.prices.0.id', $this->variantId($this->allure, 5))
+            ->assertJsonPath('data.prices.0.label', '5ml');
 
-        $this->getJson('/api/v1/decant-please/fragrances/creed-green-irish-tweed')->assertNotFound();
+        $this->getJson('/api/v1/decant-please/products/creed-green-irish-tweed')->assertNotFound();
     }
 
     public function test_meta_returns_filter_options_and_price_bounds(): void
@@ -130,8 +133,7 @@ class PublicApiTest extends TestCase
     {
         $response = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [[
-                'fragrance_id' => $this->allure->id,
-                'size_ml' => 10,
+                'variant_id' => $this->variantId($this->allure, 10),
                 'quantity' => 2,
                 'unit_price_mmk' => 1, // smuggled — must be ignored
             ]],
@@ -153,8 +155,8 @@ class PublicApiTest extends TestCase
         // out-of-stock size, second item
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [
-                ['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1],
-                ['fragrance_id' => $this->allure->id, 'size_ml' => 30, 'quantity' => 1],
+                ['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1],
+                ['variant_id' => $this->variantId($this->allure, 30), 'quantity' => 1],
             ],
         ]))->assertUnprocessable()->json('errors');
         $this->assertSame('30ml of Allure Homme Sport just sold out — pick another size.', $errors['items.1'][0]);
@@ -162,20 +164,58 @@ class PublicApiTest extends TestCase
         // inactive fragrance
         $git = Product::where('name', 'Green Irish Tweed')->firstOrFail();
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
-            'items' => [['fragrance_id' => $git->id, 'size_ml' => 5, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($git, 5), 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
         $this->assertSame('That fragrance is no longer available.', $errors['items.0'][0]);
 
-        // unknown fragrance id / unknown size
+        // unknown variant id
+        $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
+            'items' => [['variant_id' => 999999, 'quantity' => 1]],
+        ]))->assertUnprocessable()->json('errors');
+        $this->assertSame('That fragrance is no longer available.', $errors['items.0'][0]);
+
+        // a line that names nothing
         $this->postJson('/api/v1/decant-please/orders', $this->payload([
-            'items' => [['fragrance_id' => 999999, 'size_ml' => 5, 'quantity' => 1]],
-        ]))->assertUnprocessable();
+            'items' => [['quantity' => 1]],
+        ]))->assertUnprocessable()->assertJsonValidationErrors(['items.0.variant_id', 'items.0.fragrance_id']);
+
+        $this->assertSame(0, Order::count()); // nothing half-created
+    }
+
+    public function test_the_legacy_fragrance_and_size_pair_still_checks_out(): void
+    {
+        // A cart saved before step 36b has no variant id. Until go-live the pair
+        // resolves to the same variant and the same server-derived price.
+        $this->postJson('/api/v1/decant-please/orders', $this->payload([
+            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2, 'unit_price_mmk' => 1]],
+        ]))->assertCreated()->assertJsonPath('total_mmk', 110000);
+
+        $item = Order::firstOrFail()->items()->firstOrFail();
+        $this->assertSame($this->variantId($this->allure, 10), $item->product_variant_id);
+        $this->assertSame(55000, $item->unit_price_mmk);
+
+        $this->postJson('/api/v1/decant-please/orders/validate-promo', [
+            'code' => 'NONE', 'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+        ])->assertOk();
+
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 7, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
         $this->assertSame('7ml of Allure Homme Sport just sold out — pick another size.', $errors['items.0'][0]);
+    }
 
-        $this->assertSame(0, Order::count()); // nothing half-created
+    public function test_the_legacy_fragrances_routes_serve_the_products_response(): void
+    {
+        // the pagination links differ only by the path they echo
+        $products = $this->getJson('/api/v1/decant-please/products?sort=name')->assertOk();
+        $fragrances = $this->getJson('/api/v1/decant-please/fragrances?sort=name')->assertOk();
+        $this->assertCount(3, $products->json('data'));
+        $this->assertSame($products->json('data'), $fragrances->json('data'));
+        $this->assertSame($products->json('meta.total'), $fragrances->json('meta.total'));
+        $this->assertSame(
+            $this->getJson('/api/v1/decant-please/products/chanel-allure-homme-sport')->assertOk()->json(),
+            $this->getJson('/api/v1/decant-please/fragrances/chanel-allure-homme-sport')->assertOk()->json(),
+        );
     }
 
     public function test_checkout_honeypot_pretends_success_but_creates_nothing(): void
@@ -294,7 +334,7 @@ class PublicApiTest extends TestCase
             'delivery_township_id' => $this->serviceableTownship(nameMm: 'ဗဟန်း')->id,
             'address_line' => 'No. 12, Inya Road',
             'note' => 'Please call before delivery',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1]],
         ];
     }
 }

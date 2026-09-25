@@ -58,7 +58,7 @@ Public paths are unchanged; internally every one of them lives under `app/[host]
 |---|---|---|
 | `/` | ISR per host, 60s revalidate | Home — hero, featured rail, how-it-works, category tiles |
 | `/shop` | dynamic | Filterable catalog; all filter state lives in the URL query string |
-| `/fragrance/{slug}` | ISR per host+slug, 60s | Fragrance detail + size selector + add to cart (404s on unknown/inactive slugs) |
+| `/product/{slug}` | ISR per host+slug, 60s | Product detail + size selector + add to cart (404s on unknown/inactive slugs). The old `/fragrance/{slug}` 308-redirects here (`next.config.ts`) |
 | `/checkout` | ISR per host (static shell) | Cart summary + promo code + contact form with region → township selects — the delivery fee line comes from `/delivery-zones` and is re-derived server-side at submit (cart itself is client-side) |
 | `/order/complete?code=…` | dynamic | Full receipt (fetched by code + phone), printable, survives refresh via the URL |
 | `/track` | dynamic | Tracking code + phone → the same receipt, with the vial-fill timeline |
@@ -83,7 +83,7 @@ frontend/
 │   │       ├── layout.tsx                  # resolves host → shop (cached), tenant metadata/OG, nav + footer + cart, TenantProvider
 │   │       ├── page.tsx                    # /
 │   │       ├── shop/page.tsx               # /shop (+ loading.tsx skeleton)
-│   │       ├── fragrance/[slug]/page.tsx   # /fragrance/:slug
+│   │       ├── product/[slug]/page.tsx     # /product/:slug
 │   │       ├── checkout/page.tsx           # /checkout
 │   │       ├── order/complete/page.tsx     # /order/complete
 │   │       ├── track/page.tsx              # /track

@@ -222,21 +222,50 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopA);
         PromoCode::create(['code' => 'ONLYA', 'type' => PromoType::Fixed, 'value' => 5000]);
         $aItem = $this->makeFragrance();
+        $aVariantId = $this->variantId($aItem, 10);
 
         $this->forShop($this->shopB);
         $bItem = $this->makeFragrance();
+        $bVariantId = $this->variantId($bItem, 10);
 
         // Positive control: A's code validates under A's own path.
         $this->postJson("/api/v1/{$this->shopA->slug}/orders/validate-promo", [
             'code' => 'ONLYA',
-            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $aVariantId, 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 5000);
 
         // The same code under B's path does not exist — never A's discount in B's cart.
         $this->postJson("/api/v1/{$this->shopB->slug}/orders/validate-promo", [
             'code' => 'ONLYA',
-            'items' => [['fragrance_id' => $bItem->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $bVariantId, 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', false)->assertJsonPath('discount_mmk', 0);
+    }
+
+    public function test_checkout_cannot_buy_another_shops_variant(): void
+    {
+        // Step 36b: a line is named by a bare variant id, so a guessed id from
+        // another shop must resolve to nothing — refused, nothing created.
+        $this->forShop($this->shopB);
+        $bVariantId = $this->variantId($this->makeFragrance(), 10);
+        $this->forShop($this->shopA);
+        $township = $this->serviceableTownship();
+
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders", [
+            'customer_name' => 'Su Su',
+            'phone' => '09-771234561',
+            'delivery_township_id' => $township->id,
+            'address_line' => 'No. 12, Yangon',
+            'items' => [['variant_id' => $bVariantId, 'quantity' => 1]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('items.0');
+
+        $this->postJson("/api/v1/{$this->shopA->slug}/orders/validate-promo", [
+            'code' => 'ANY',
+            'items' => [['variant_id' => $bVariantId, 'quantity' => 1]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('items.0');
+
+        $this->assertSame(0, Order::count());
+        $this->forShop($this->shopB);
+        $this->assertSame(0, Order::count());
     }
 
     public function test_tracking_lookup_is_scoped_to_the_shop(): void
@@ -365,10 +394,10 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopB);
         $this->makeFragrance();
 
-        $this->getJson("/api/v1/{$this->shopA->slug}/fragrances")
+        $this->getJson("/api/v1/{$this->shopA->slug}/products")
             ->assertOk()->assertJsonPath('meta.total', 2);
 
-        $this->getJson("/api/v1/{$this->shopB->slug}/fragrances")
+        $this->getJson("/api/v1/{$this->shopB->slug}/products")
             ->assertOk()->assertJsonPath('meta.total', 1);
     }
 
@@ -538,6 +567,7 @@ class TenantIsolationTest extends TestCase
         // never routed to, or priced by, another shop's zone.
         $this->forShop($this->shopA);
         $aItem = $this->makeFragrance();
+        $aVariantId = $this->variantId($aItem, 10);
         $aTownship = $this->serviceableTownship(fee: 2000, name: 'Bahan');
 
         $this->forShop($this->shopB);
@@ -548,7 +578,7 @@ class TenantIsolationTest extends TestCase
             'phone' => '09-771234561',
             'delivery_township_id' => $townshipId,
             'address_line' => 'No. 12, Yangon',
-            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $aVariantId, 'quantity' => 1]],
         ];
 
         // Positive control: A's own township checks out at A's fee.
@@ -722,9 +752,9 @@ class TenantIsolationTest extends TestCase
 
         $this->assertSame($a->slug, $b->slug); // the (shop_id, slug) composite at work
 
-        $this->getJson("/api/v1/{$this->shopA->slug}/fragrances/{$a->slug}")
+        $this->getJson("/api/v1/{$this->shopA->slug}/products/{$a->slug}")
             ->assertOk()->assertJsonPath('data.id', $a->id);
-        $this->getJson("/api/v1/{$this->shopB->slug}/fragrances/{$b->slug}")
+        $this->getJson("/api/v1/{$this->shopB->slug}/products/{$b->slug}")
             ->assertOk()->assertJsonPath('data.id', $b->id);
     }
 
@@ -766,19 +796,21 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopA);
         PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 5000]);
         $aItem = $this->makeFragrance();
+        $aVariantId = $this->variantId($aItem, 10);
 
         $this->forShop($this->shopB);
         PromoCode::create(['code' => 'SUMMER26', 'type' => PromoType::Fixed, 'value' => 1000]);
         $bItem = $this->makeFragrance();
+        $bVariantId = $this->variantId($bItem, 10);
 
         $this->postJson("/api/v1/{$this->shopA->slug}/orders/validate-promo", [
             'code' => 'SUMMER26',
-            'items' => [['fragrance_id' => $aItem->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $aVariantId, 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 5000);
 
         $this->postJson("/api/v1/{$this->shopB->slug}/orders/validate-promo", [
             'code' => 'SUMMER26',
-            'items' => [['fragrance_id' => $bItem->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $bVariantId, 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', true)->assertJsonPath('discount_mmk', 1000);
     }
 

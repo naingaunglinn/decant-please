@@ -23,8 +23,8 @@ fail() {
 
 # meta.total, not a count of matched keys in data — every fragrance carries a nested
 # brand, so key-counting silently doubles and reports a number that isn't the answer.
-count() { curl -s "$API/fragrances?q=$1" | grep -o '"total":[0-9]*' | head -1 | cut -d: -f2; }
-status() { curl -s -o /dev/null -w '%{http_code}' "$API/fragrances?sort=$1"; }
+count() { curl -s "$API/products?q=$1" | grep -o '"total":[0-9]*' | head -1 | cut -d: -f2; }
+status() { curl -s -o /dev/null -w '%{http_code}' "$API/products?sort=$1"; }
 
 # 1. Case-insensitive search. Postgres's LIKE is case-sensitive, so a bare
 #    where(..., 'like', ...) silently returns nothing for a lowercase query.

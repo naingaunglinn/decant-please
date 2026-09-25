@@ -269,8 +269,8 @@ where applicable.
 
 | Method | Endpoint (under `/api/v1/{shop}`) | Purpose | Throttle |
 |---|---|---|---|
-| GET | `/fragrances` | Filterable catalog | 120/min |
-| GET | `/fragrances/{slug}` | Fragrance detail | 120/min |
+| GET | `/products` | Filterable catalog (`/fragrances` still answers until go-live) | 120/min |
+| GET | `/products/{slug}` | Product detail (`/fragrances/{slug}` likewise) | 120/min |
 | GET | `/brands` | Active brands | 120/min |
 | GET | `/meta` | Filter options, price bounds, social links, payment details | 120/min |
 | GET | `/delivery-zones` | Serviceable townships + delivery fees, grouped by region | 120/min |
@@ -288,7 +288,7 @@ hosts get one generic 404; 60/min per IP.
 Guarantees worth knowing:
 
 - **Prices are never trusted from the client — and neither is the delivery fee.**
-  Checkout receives only `fragrance_id`, `size_ml`, `quantity`, and a
+  Checkout receives only `variant_id`, `quantity`, and a
   `delivery_township_id`; the server re-derives every price from the current catalog,
   reads the fee off the township row, and stores immutable snapshots on the order.
 - **Tracking is not a guessing oracle.** Lookup requires an exact code + phone match;

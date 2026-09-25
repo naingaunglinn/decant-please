@@ -24,13 +24,13 @@ export function CartItemRow({ line, error }: { line: CartLine; error?: string })
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{line.brandName}</p>
           <Link
-            href={`/fragrance/${line.slug}`}
+            href={`/product/${line.slug}`}
             className="mt-0.5 block truncate text-sm font-medium uppercase tracking-[0.1em] text-ink hover:text-pine"
           >
             {line.name}
           </Link>
           <div className="mt-2 flex items-center gap-2">
-            <Pill tone="muted">{line.sizeMl}ml</Pill>
+            <Pill tone="muted">{line.label}</Pill>
             <span className="text-sm text-pine">{formatKyat(line.priceMmk)}</span>
           </div>
         </div>
@@ -41,7 +41,7 @@ export function CartItemRow({ line, error }: { line: CartLine; error?: string })
           compact
           value={line.quantity}
           onChange={(quantity) => updateQuantity(key, quantity)}
-          label={`Quantity of ${line.name} ${line.sizeMl}ml`}
+          label={`Quantity of ${line.name} ${line.label}`}
         />
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium tabular-nums">

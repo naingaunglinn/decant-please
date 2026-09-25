@@ -2,12 +2,12 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { Pill } from "@/components/ui/Pill";
-import type { DecantPrice } from "@/lib/types";
+import type { ProductVariant } from "@/lib/types";
 
 interface SizeSelectorProps {
-  prices: DecantPrice[];
+  prices: ProductVariant[];
   selected: number | null;
-  onSelect: (sizeMl: number) => void;
+  onSelect: (variantId: number) => void;
 }
 
 /** The price list, as a selector — tap a row to pick that size.
@@ -18,16 +18,16 @@ export function SizeSelector({ prices, selected, onSelect }: SizeSelectorProps) 
   return (
     <div role="radiogroup" aria-label="Decant size" className="overflow-hidden rounded-2xl border border-rule">
       {prices.map((price, index) => {
-        const isSelected = selected === price.size_ml;
+        const isSelected = selected === price.id;
 
         return (
           <button
-            key={price.size_ml}
+            key={price.id}
             type="button"
             role="radio"
             aria-checked={isSelected}
             disabled={!price.in_stock}
-            onClick={() => onSelect(price.size_ml)}
+            onClick={() => onSelect(price.id)}
             className={`relative flex min-h-14 w-full items-center justify-between gap-3 px-5 text-left transition-colors ${
               index > 0 ? "border-t border-rule" : ""
             } ${price.in_stock ? "cursor-pointer" : "cursor-not-allowed"}`}
@@ -42,7 +42,7 @@ export function SizeSelector({ prices, selected, onSelect }: SizeSelectorProps) 
             )}
 
             <span className={`relative text-sm font-medium uppercase tracking-[0.15em] ${price.in_stock ? "text-ink" : "text-muted"}`}>
-              {price.size_ml}ml
+              {price.label}
             </span>
 
             <span className="relative flex items-center gap-3">

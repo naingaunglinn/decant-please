@@ -2,11 +2,11 @@ import Link from "next/link";
 import { ViewTransition } from "react";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
-export function FragranceCard({ fragrance }: { fragrance: Fragrance }) {
+export function FragranceCard({ fragrance }: { fragrance: Product }) {
   return (
-    <Link href={`/fragrance/${fragrance.slug}`} className="group block">
+    <Link href={`/product/${fragrance.slug}`} className="group block">
       <ViewTransition name={`fragrance-image-${fragrance.slug}`} share="morph" default="none">
         <div className="transition-transform duration-300 ease-out group-hover:-translate-y-1">
           <ImagePlate src={fragrance.image_url} alt={fragrance.name} />

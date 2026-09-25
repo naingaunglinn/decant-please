@@ -47,8 +47,8 @@ class DecantStockTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [
-                ['fragrance_id' => $fragrance->id, 'size_ml' => 10, 'quantity' => 1],
-                ['fragrance_id' => $fragrance->id, 'size_ml' => 5, 'quantity' => 1],
+                ['variant_id' => $this->variantId($fragrance, 10), 'quantity' => 1],
+                ['variant_id' => $this->variantId($fragrance, 5), 'quantity' => 1],
             ],
         ]);
 
@@ -133,8 +133,7 @@ class DecantStockTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [[
-                'fragrance_id' => $fragrance->id,
-                'size_ml' => $sizeMl,
+                'variant_id' => $this->variantId($fragrance, $sizeMl),
                 'quantity' => $quantity,
             ]],
         ]);

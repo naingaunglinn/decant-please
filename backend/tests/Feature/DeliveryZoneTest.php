@@ -411,7 +411,7 @@ class DeliveryZoneTest extends TestCase
             'phone' => '09-771234561',
             'delivery_township_id' => $this->serviceableTownship()->id,
             'address_line' => 'No. 12, Baho Road',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1]],
         ];
     }
 

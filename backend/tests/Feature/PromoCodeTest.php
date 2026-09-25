@@ -38,7 +38,7 @@ class PromoCodeTest extends TestCase
         // two items → subtotal 110,000; 10% = 11,000; lowercase input matches
         $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'save10',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 2]],
         ])
             ->assertOk()
             ->assertJsonPath('valid', true)
@@ -60,7 +60,7 @@ class PromoCodeTest extends TestCase
 
         $preview = fn (string $code) => $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => $code,
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1]],
         ])->assertOk()->assertJsonPath('valid', false)->assertJsonPath('discount_mmk', 0);
 
         $preview('NOSUCHCODE')->assertJsonPath('message', "We couldn't find that code.");
@@ -79,13 +79,13 @@ class PromoCodeTest extends TestCase
         // 50% of 110,000 = 55,000 → capped at 20,000
         $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'HALF',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 2]],
         ])->assertJsonPath('discount_mmk', 20000);
 
         // fixed amount larger than the cart → clamped to the subtotal, total 0
         $this->postJson('/api/v1/decant-please/orders/validate-promo', [
             'code' => 'HUGE',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 1]],
         ])->assertJsonPath('discount_mmk', 55000)->assertJsonPath('new_total_formatted', '0 Ks');
     }
 
@@ -197,7 +197,7 @@ class PromoCodeTest extends TestCase
             'phone' => '09-771234561',
             'delivery_township_id' => $this->serviceableTownship()->id,
             'address_line' => 'No. 12, Bahan Township, Yangon',
-            'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 2]],
+            'items' => [['variant_id' => $this->variantId($this->allure, 10), 'quantity' => 2]],
         ];
     }
 }

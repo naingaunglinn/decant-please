@@ -258,8 +258,7 @@ class AdminOrdersTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [[
-                'fragrance_id' => $price->product_id,
-                'size_ml' => $price->size_ml,
+                'variant_id' => $price->id,
                 'quantity' => $quantity,
             ]],
         ]);

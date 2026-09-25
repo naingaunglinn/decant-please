@@ -7,10 +7,10 @@ import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { Button } from "@/components/ui/Button";
 import { useCart } from "@/hooks/useCart";
 import { formatKyat } from "@/lib/format";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
-export function PurchasePanel({ fragrance }: { fragrance: Fragrance }) {
-  const firstInStock = fragrance.prices.find((p) => p.in_stock)?.size_ml ?? null;
+export function PurchasePanel({ fragrance }: { fragrance: Product }) {
+  const firstInStock = fragrance.prices.find((p) => p.in_stock)?.id ?? null;
   const [selected, setSelected] = useState<number | null>(firstInStock);
   const [quantity, setQuantity] = useState(1);
   const { add } = useCart();
@@ -30,15 +30,15 @@ export function PurchasePanel({ fragrance }: { fragrance: Fragrance }) {
     return () => observer.disconnect();
   }, []);
 
-  const selectedPrice = fragrance.prices.find((p) => p.size_ml === selected);
+  const selectedPrice = fragrance.prices.find((p) => p.id === selected);
   const allSoldOut = firstInStock === null;
 
   const addToCart = () => {
     if (!selectedPrice) return;
     add(
       {
-        fragranceId: fragrance.id,
-        sizeMl: selectedPrice.size_ml,
+        variantId: selectedPrice.id,
+        label: selectedPrice.label,
         name: fragrance.name,
         brandName: fragrance.brand.name,
         slug: fragrance.slug,
@@ -77,7 +77,7 @@ export function PurchasePanel({ fragrance }: { fragrance: Fragrance }) {
             <div className="min-w-0">
               <p className="truncate text-xs font-medium uppercase tracking-[0.12em]">{fragrance.name}</p>
               <p className="text-sm text-pine">
-                {selectedPrice.size_ml}ml · {formatKyat(selectedPrice.price_mmk * quantity)}
+                {selectedPrice.label} · {formatKyat(selectedPrice.price_mmk * quantity)}
               </p>
             </div>
             <Button onClick={addToCart}>Add to cart</Button>

@@ -10,7 +10,7 @@ the tracking code + phone pair is the authentication*. CORS allows only the
 clients.
 
 **Tenant in the path (multi-tenancy Step 24).** Every endpoint below is prefixed with
-a `{shop}` slug: `GET /api/v1/{shop}/fragrances`, `POST /api/v1/{shop}/orders`, and so
+a `{shop}` slug: `GET /api/v1/{shop}/products`, `POST /api/v1/{shop}/orders`, and so
 on. The slug selects which decant shop the request is for; the storefront pins it once
 (one storefront serves exactly one shop). An unknown or inactive `{shop}` returns the
 same generic **404** as a bad tracking lookup — it is not a shop-enumeration oracle
@@ -29,7 +29,8 @@ decimals). Fields ending `*_formatted` carry the display form — `"50,000 Ks"` 
 so clients don't re-implement formatting, but the integers are authoritative.
 
 **Prices are never client-supplied.** Checkout and promo preview accept only
-`fragrance_id` + `size_ml` + `quantity` per line. The server re-derives every unit
+`variant_id` + `quantity` per line (step 36b; the variant id is `prices[].id` on the
+product object). The server re-derives every unit
 price from the live catalog at that moment and (at checkout) stores immutable
 snapshots on the order. A client that caches catalog prices for display must still
 expect the server's derived totals to win.
@@ -45,15 +46,15 @@ tries to distinguish; it can't.
 ```
 
 Item-level problems are keyed `items.N` (e.g. `items.0`) with one of:
-- `That fragrance is no longer available.` — unknown id, or fragrance/brand deactivated
-- `{size}ml of {name} just sold out — pick another size.` — size exists but out of stock
+- `That fragrance is no longer available.` — unknown id (or another shop's), or product/brand deactivated
+- `{label} of {name} just sold out — pick another size.` — the variant exists but is out of stock or archived (`{label}` is e.g. `10ml`)
 
 **Rate limits are per-endpoint buckets, keyed by client IP.** Exhausting one bucket
 never starves another (a burst of catalog browsing can't block a checkout):
 
 | Bucket | Endpoints | Limit |
 |---|---|---|
-| `catalog` | `GET /brands`, `/fragrances`, `/fragrances/{slug}`, `/meta` | 120/min |
+| `catalog` | `GET /brands`, `/products`, `/products/{slug}`, `/meta`, `/delivery-zones` | 120/min |
 | `checkout` | `POST /orders` | 10/min |
 | `tracking` | `GET /orders/track` | 20/min |
 | `cancel` | `POST /orders/cancel` | 10/min |
@@ -81,7 +82,12 @@ Active brands, ordered by name.
 
 `fragrances_count` counts **active** fragrances only. `type` is `designer | niche`.
 
-## `GET /fragrances`
+## `GET /products`
+
+> **Renamed in step 36b** from `GET /fragrances` (and `/fragrances/{slug}` →
+> `/products/{slug}`). The old paths still answer, identically, so the storefront and
+> the API can deploy in either order; they are removed after go-live. New clients use
+> `/products`.
 
 The filterable catalog. All parameters optional:
 
@@ -99,11 +105,11 @@ The filterable catalog. All parameters optional:
 | `per_page` | int 1–50 | default 12 |
 | `page` | int | standard Laravel pagination |
 
-Response is a standard Laravel paginated collection — `data` (array of fragrance
+Response is a standard Laravel paginated collection — `data` (array of product
 objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs),
 `meta` (`current_page`, `last_page`, `per_page`, `total`, …).
 
-**The fragrance object** (same shape in the index and show endpoints):
+**The product object** (same shape in the index and show endpoints):
 
 ```json
 {
@@ -116,16 +122,21 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
   "description": "…", "image_url": "https://…/storage/fragrances/….jpg",
   "is_featured": true,
   "min_price_mmk": 25000, "min_price_formatted": "25,000 Ks",
-  "prices": [ { "size_ml": 5, "price_mmk": 25000, "price_formatted": "25,000 Ks", "in_stock": true } ]
+  "prices": [ { "id": 51, "label": "5ml", "size_ml": 5, "price_mmk": 25000,
+                "price_formatted": "25,000 Ks", "in_stock": true } ]
 }
 ```
 
 `notes`, `vibes`, `performance`, `description`, `image_url`, `min_price_*` are all
 nullable. `concentration` is `edt|edp|parfum|cologne|extrait|other`.
 
-## `GET /fragrances/{slug}`
+Each `prices[]` entry is one **variant**: `id` is what checkout sends as `variant_id`,
+`label` is its display name (`"10ml"` for a decant). Archived variants are left out.
+The key is still `prices` (not `variants`) so the shape stayed additive across step 36b.
 
-`{ "data": { …fragrance object… } }`, or `404` `{ "message": "Fragrance not found." }` —
+## `GET /products/{slug}`
+
+`{ "data": { …product object… } }`, or `404` `{ "message": "Fragrance not found." }` —
 inactive fragrances and inactive brands 404 exactly like unknown slugs.
 
 ## `GET /meta`
@@ -140,12 +151,16 @@ Everything a client needs to build filter UI without hardcoding:
   "sizes": [5, 10, 30],
   "price": { "min": 8000, "max": 120000 },
   "sorts": ["newest", "price_asc", "price_desc", "name"],
-  "social": { "tiktok_url": "https://…", "facebook_url": null }
+  "social": { "tiktok_url": "https://…", "facebook_url": null },
+  "payment": { "kbzpay_name": "…", "kbzpay_number": "…", "wave_name": "…",
+               "wave_number": "…", "qr_url": "https://…", "instructions": "…" }
 }
 ```
 
 `sizes` and `price` reflect **in-stock** decants only; `price.min/max` are `null` on
-an empty catalog. `social` URLs are `null` when unconfigured.
+an empty catalog. `social` URLs are `null` when unconfigured. `payment` is the shop's
+offline transfer details (not a gateway): only the configured fields are present, and
+the whole block is `null` when none are set.
 
 ## `GET /delivery-zones`
 
@@ -197,10 +212,15 @@ falling back to a free-text address.
   "note": "call before delivery",         // optional, ≤1000 — fulfilment note, NOT address
   "promo_code": "WELCOME10",              // optional, ≤64 — case-insensitive
   "items": [                              // required, 1–20 lines
-    { "fragrance_id": 20, "size_ml": 10, "quantity": 2 }   // quantity 1–50
+    { "variant_id": 51, "quantity": 2 }   // quantity 1–50
   ]
 }
 ```
+
+> **Step 36b:** a line names its variant by `variant_id`. Until go-live the legacy
+> `{ "fragrance_id": 20, "size_ml": 10, "quantity": 2 }` line is also accepted and
+> resolves to the same variant and price — for storefronts deployed before 36b. A line
+> with neither gets a `422` on `items.N.variant_id`.
 
 The delivery fee is **never sent by the client** — it is read off the township row
 server-side, exactly as unit prices are. A township that is unknown, deactivated,
@@ -215,7 +235,8 @@ can't tell it was caught. Don't ever map a real UI field to `website`.
 What the server does, atomically:
 
 1. Validates the township is serviceable and reads its fee; re-validates every
-   line against the live catalog (active fragrance + brand, size in stock) —
+   line against the live catalog (variant of this shop, active and in stock; active
+   product + brand) —
    failures are `422` with `items.N` messages as above.
 2. Re-derives unit prices and stores them as immutable snapshots on the order
    items; snapshots the region/township names and composes the canonical
@@ -293,7 +314,20 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
 hand-edited discount can't distort it. A negative value means the customer **overpaid** —
 render an overpaid state, not a debt; `0` means settled. (This receipt also carries
 `payment_status`, `payment_method`, `has_payment_proof`, and `paid_at` from the payment
-steps; they are documented in the panel, not re-listed here.)
+steps — see below.)
+
+The payment fields on the receipt:
+
+```json
+{
+  "payment_status": "unpaid",          // unpaid | paid
+  "payment_status_label": "Unpaid",
+  "payment_method": "cod",             // cod | online
+  "payment_method_label": "Cash on delivery",
+  "has_payment_proof": false,          // a boolean only — the slip itself is never exposed
+  "paid_at": null                      // ISO datetime once the decanter marks it paid
+}
+```
 
 `status` is one of `awaiting_confirmation | pending | decanted | delivered |
 cancelled | rejected`; `status_label` is its human-ready form. Statuses only move

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getFragrances } from "@/lib/api";
+import { getProducts } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
 import { Hero } from "@/components/home/Hero";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
@@ -8,7 +8,7 @@ import { FeaturedRail } from "@/components/home/FeaturedRail";
 import { RecentlyViewedRail } from "@/components/catalog/RecentlyViewed";
 import { ImagePlate } from "@/components/ui/ImagePlate";
 import { Pill } from "@/components/ui/Pill";
-import type { Fragrance } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
 const STEPS = [
   {
@@ -51,9 +51,9 @@ export default async function HomePage({ params }: { params: Promise<{ host: str
   const { host } = await params;
   const tenant = await tenantPage(host, "/");
 
-  let featured: Fragrance[] = [];
+  let featured: Product[] = [];
   try {
-    featured = (await getFragrances(tenant.slug, { featured: "1", per_page: "8" })).data;
+    featured = (await getProducts(tenant.slug, { featured: "1", per_page: "8" })).data;
   } catch {
     // API unreachable (e.g. at build time) — the page still stands without the rail
   }
@@ -65,7 +65,7 @@ export default async function HomePage({ params }: { params: Promise<{ host: str
       <Hero
         visual={
           heroFragrance ? (
-            <Link href={`/fragrance/${heroFragrance.slug}`} className="group block">
+            <Link href={`/product/${heroFragrance.slug}`} className="group block">
               <ImagePlate
                 src={heroFragrance.image_url}
                 alt={`${heroFragrance.brand.name} ${heroFragrance.name}`}

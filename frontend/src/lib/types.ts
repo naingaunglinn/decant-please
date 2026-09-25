@@ -8,14 +8,18 @@ export interface Brand {
   fragrances_count?: number;
 }
 
-export interface DecantPrice {
+/** One sellable option of a product (was `DecantPrice`). Checkout names a line
+ *  by `id`; the server re-derives its price. */
+export interface ProductVariant {
+  id: number;
+  label: string;
   size_ml: number;
   price_mmk: number;
   price_formatted: string;
   in_stock: boolean;
 }
 
-export interface Fragrance {
+export interface Product {
   id: number;
   name: string;
   slug: string;
@@ -32,7 +36,7 @@ export interface Fragrance {
   is_featured: boolean;
   min_price_mmk: number | null;
   min_price_formatted: string | null;
-  prices: DecantPrice[];
+  prices: ProductVariant[];
 }
 
 export interface PaginationMeta {
@@ -69,7 +73,7 @@ export interface CatalogMeta {
   payment: PaymentInfo | null;
 }
 
-export interface FragranceFilters {
+export interface ProductFilters {
   q?: string;
   notes?: string;
   brand?: string; // comma-separated slugs
@@ -85,8 +89,7 @@ export interface FragranceFilters {
 }
 
 export interface CheckoutItem {
-  fragrance_id: number;
-  size_ml: number;
+  variant_id: number;
   quantity: number;
 }
 
@@ -208,8 +211,9 @@ export interface StorefrontHost {
 /** A cart line as stored client-side. Prices here are previews only —
  *  the server re-derives the authoritative total at checkout. */
 export interface CartLine {
-  fragranceId: number;
-  sizeMl: number;
+  variantId: number;
+  /** The variant's label, e.g. "10ml". */
+  label: string;
   quantity: number;
   name: string;
   brandName: string;

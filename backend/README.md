@@ -56,8 +56,8 @@ HTTPS, Heroku config vars, the R2 buckets) are covered in [`../DEPLOY.md`](../DE
 
 | Method | Route | Purpose | Throttle |
 |---|---|---|---|
-| GET | `/api/v1/{shop}/fragrances` | Filterable, paginated catalog | 120/min |
-| GET | `/api/v1/{shop}/fragrances/{slug}` | Fragrance detail (404 if inactive) | 120/min |
+| GET | `/api/v1/{shop}/products` | Filterable, paginated catalog (the old `/fragrances` path still answers until go-live) | 120/min |
+| GET | `/api/v1/{shop}/products/{slug}` | Product detail (404 if inactive; `/fragrances/{slug}` likewise) | 120/min |
 | GET | `/api/v1/{shop}/brands` | Active brands | 120/min |
 | GET | `/api/v1/{shop}/meta` | Filter options, price bounds, social links, payment details — all shop-resolved (shop settings → env default → off) | 120/min |
 | GET | `/api/v1/{shop}/delivery-zones` | Serviceable townships + fees by region (cached; no courier data) | 120/min |
@@ -182,7 +182,8 @@ backend/
 ## Domain rules that live here
 
 - **Order item prices are snapshots.** `Order::newFromCheckout()` accepts only
-  `fragrance_id` / `size_ml` / `quantity`, re-derives every price from the current catalog
+  `variant_id` / `quantity` (the legacy `fragrance_id` + `size_ml` pair until go-live),
+  re-derives every price from the current catalog
   (rejecting inactive or out-of-stock items), and freezes name + price onto the order item.
 - **Tracking codes** are 10 chars from an ambiguity-free alphabet (no `0/O/1/I`), generated
   on creation. Lookup requires an exact code + phone match; any mismatch returns the same
