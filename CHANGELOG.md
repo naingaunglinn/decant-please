@@ -9,6 +9,34 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v50
+
+**v50** is step 42 (**#133**), the last step of the generic-shop refactor. It is docs only:
+no code, no migration, no API change. The tenancy docs and the API contract now describe
+the code after steps 35–41.
+
+- **`prompts/multi-tenancy-design.md`**: the status header records the renames
+  (`fragrances` → `products`, `decant_prices` → `product_variants`). §7 records what the
+  refactor added: `categories` is the one new tenant-owned table, templates and modules are
+  one `shop_settings` column each, and the per-shop `once()` memos add no cache key. The
+  storage layout lists the real `shops/{id}/…` prefixes. §8 gains test rows for categories,
+  variant checkout, template words and modules. The `withoutTenancy()` ledger shows 2 of
+  the 5 allowed call sites in `app/`; steps 35–41 added none.
+- **`prompts/multi-tenancy-findings.md`**: one note maps the audit's old names to the new
+  ones. The audit body keeps its original names. `TENANCY-KIT.md` is unchanged.
+- **`backend/docs/api.md`**:
+  - Now lists ten `{shop}` endpoints. `POST /orders/payment-proof` was missing.
+  - Adds the platform host-resolve endpoint.
+  - CORS includes verified shop domains, and rate limits are keyed by shop + IP.
+  - Documents checkout's `payment_method` + `proof` fields.
+  - Catalog wording is generic.
+  - States that the receipt's item name comes from the current product.
+- **Found, not fixed**, filed as #134 and queued as RUN-QUEUE row 10b:
+  - The tracking receipt's item name is read live, not from the name snapshot.
+  - `decant:fresh-start` leaves variant photos behind.
+  - The payment-proof endpoint doesn't check order status.
+  - The customer-facing "fragrance" error strings reach a clothing shop.
+
 ## 0. What changed in v49
 
 **v49** is step 41 (**#131**). Each shop turns optional features on and off. A decant

@@ -3,6 +3,12 @@
 **Status:** Accepted — amended 30 July 2026 to match the codebase audit
 (`prompts/multi-tenancy-findings.md`); build steps written as `prompts/23`–`25`
 (Step C deferred until a second client exists)
+**Amended 25 September 2026 (step 42, #133):** synced to the generic-shop schema (steps
+35–41). `fragrances` → `products`, `decant_prices` → `product_variants` (models `Fragrance`
+/ `DecantPrice` → `Product` / `ProductVariant`); `/api/v1/{shop}/fragrances` →
+`/products` (the old path is an alias until go-live). The ADRs (§3–§6) are left as they
+were decided; §2, §7 and §8 describe the code as it is now. The `TopFragrances` widget
+kept its class name.
 **Date:** 30 July 2026
 **Deciders:** you (studio operator)
 **Scope:** one Laravel/Filament backend at `api.cornerarea.me` serving many decant shops, with a
@@ -85,7 +91,7 @@ driver — isolation and cost are.** Design accordingly and resist anything just
 
 ### Request flow, public API
 
-1. `GET /api/v1/fragnant/fragrances`
+1. `GET /api/v1/fragnant/products` (`/fragrances` until go-live, step 36b)
 2. `ResolveTenant` middleware looks up the slug, 404s on unknown or inactive shops, binds the
    `Shop` into a request-scoped `TenantContext` singleton
 3. Every query on a tenant-owned model is scoped by the global scope, automatically
@@ -389,7 +395,8 @@ of homes, not an accident.
 ### Gets `shop_id`
 
 `brands`, `fragrances`, `decant_prices`, `orders`, `order_items`, `promo_codes`,
-`shop_settings` — everything `decant:fresh-start` touches. `order_items` gets a denormalised
+`shop_settings` — everything `decant:fresh-start` touches. (Since step 36: `products` and
+`product_variants`; the reasoning below is unchanged by the rename.) `order_items` gets a denormalised
 `shop_id`: it makes the isolation test trivial and removes a join from every scoped query.
 `decant_prices` (added after the audit) gets one for the same reasons plus a sharper one: it has
 no Filament Resource, so without its own column neither scoping mechanism ever protects it
@@ -426,6 +433,40 @@ the create side — a bare scope can't do that second half; the hook has to.
   `app/Http`); the tenant scope is not what protects them, but it must not accidentally expose
   them either. The one integrity watch is `orders.delivery_township_id` pointing at another
   shop's township — closed by the checkout re-validation note below.
+
+**Added by the generic-shop refactor (steps 35–41, v39–v49; synced in step 42):**
+
+- **Renames, same rows, same `shop_id`.** `fragrances` → `products`, `decant_prices` →
+  `product_variants`, `fragrance_id` → `product_id` on both child tables (step 36). The
+  trait, the `(shop_id, slug)` composite and every isolation test moved with them; no row
+  changed shop. `order_items` gained `product_variant_id` + `variant_label_snapshot` (36a)
+  and a frozen `measure` (40b) — columns on a model already on this list.
+- **One new tenant-owned table: `categories`** (step 37) — per-shop, `shop_id` + trait,
+  unique `(shop_id, name)`; `products.category_id` points into it. Its isolation test
+  (`test_categories_are_scoped_and_a_product_cannot_take_another_shops`) shipped in the same
+  PR: a product can't take another shop's category, because the scoped lookup doesn't find it.
+- **Templates and modules are code plus one `shop_settings` column each.**
+  `shop_settings.template` (step 37) picks the shop's template (`App\Templates`), and
+  `shop_settings.modules` (step 41, null = the template's defaults) its enabled modules.
+  Neither is a table: they ride the one-row-per-shop `ShopSetting`, which already carries
+  the trait. `products.template`, `products.attributes` (jsonb) and `search_text`,
+  `products.stock_unit` and the variant `options`/`image_path`/`stock_qty`/`unit_cost_mmk`
+  columns all
+  ride `products`/`product_variants` the same way.
+- **Per-shop memos, not cache keys.** The template's status labels
+  (`Templates::statusLabels`) and the enabled modules (`Modules::enabled`) are memoised
+  per request with `once()`, keyed on the shop **id** (the closure captures it), and
+  flushed (`Once::flush()`) by `ShopSetting`'s `saved` hook. They never reach the cache
+  store, so there is no new shared key. `/meta` gained `filters`, `variant_options` and `modules` under the
+  existing per-shop `api.meta.{slug}` key, busted by the same hook.
+- **Cost stays admin-only.** The reference-cost pair (`reference_cost_mmk` /
+  `reference_amount`, renamed off `bottle_*` in 40b) and `product_variants.unit_cost_mmk`
+  are absent from `app/Http` like the columns above.
+- **No new bypass.** Steps 35–41 added no `withoutTenancy()` call site (§8's ledger).
+  `Templates::assignToShop()` (the studio's template pick) writes a shop's settings row
+  under that shop's context, and
+  `DemoClothingShopSeeder` seeds under its demo shop's context: cross-shop writes set the
+  context, they never bypass.
 
 ### Existing designs that need attention
 
@@ -500,6 +541,27 @@ Nothing scopes a storage path, so the prefix is enforced in code at every write 
 counts three (fragrance image uploads, checkout's slip store, ManagePayment's MMQR upload) plus
 `decant:fresh-start`'s directory wipe, which becomes per-shop.
 
+**As built (step 32, synced in step 42).** The prefix landed as `shops/{id}/…` — the shop's
+numeric **id**, not its slug, so a slug change never orphans a file — on both disks:
+
+```
+media disk (public):   shops/{id}/brands/        brand logos       (BrandForm)
+                       shops/{id}/fragrances/    product images    (ProductForm — prefix kept
+                                                 through the step-36 rename; stored paths
+                                                 never move)
+                       shops/{id}/variants/      variant photos    (ProductForm, step 38)
+                       shops/{id}/payment-qr/    the MMQR image    (ManagePayment)
+proofs disk (private): shops/{id}/payment-proofs/ transfer slips   (checkout, the payment-proof
+                                                 endpoint, the admin order form)
+```
+
+That is seven write sites, each building the prefix from `TenantContext::id()`.
+`decant:fresh-start` never wipes a directory (the trees are shared storage): it deletes
+the resolved shop's proof and product-image objects by their stored paths, which covers
+files written before the prefix landed too. It does not yet delete variant photos
+(step 38) — those objects outlive a reset as orphans on the public disk, never visible
+through another shop's catalog.
+
 ---
 
 ## 8. Isolation test strategy
@@ -508,7 +570,7 @@ This is not optional and it is not a follow-up. It ships with the seam.
 
 | Test | Asserts |
 |---|---|
-| Two shops, catalog | `GET /api/v1/a/fragrances` returns only A's rows, and the count is exact |
+| Two shops, catalog | `GET /api/v1/a/products` (`/fragrances` before step 36b) returns only A's rows, and the count is exact |
 | Two shops, tracking | A's code + phone against shop B's path returns the generic 404 |
 | Two shops, proof route | Admin of A requesting B's proof id gets 403/404, not bytes |
 | Two shops, admin table | Filament order list for A excludes every B row |
@@ -520,8 +582,12 @@ This is not optional and it is not a follow-up. It ships with the seam.
 | Two shops, P&L + expenses | A's Profit & loss counts only A's orders **and** A's expenses; an expense entered in B never moves A's net (custom page → app scope, findings A4) |
 | Two shops, delivery zones | `GET /api/v1/a/delivery-zones` returns only A's active/serviceable townships at A's fees; editing B's township busts only B's `api.delivery-zones` key |
 | Two shops, checkout township | A checkout under A's path with **B's** `delivery_township_id` gets a 422 (scoped `serviceable()->find()` returns null) — never routed to B's township or priced by B's fee |
+| Two shops, categories *(step 37)* | Each shop sees only its own categories; A's product can't take B's category id |
+| Two shops, checkout variant *(step 36b)* | A checkout under A's path naming **B's** `variant_id` gets the `items.N` 422 — never sold at B's price |
+| Two shops, template words *(step 39)* | The per-shop resolver never hands one shop another shop's status words, in the same request (`StatusLabelTest::test_each_shop_reads_prepared_in_its_own_templates_word`) |
+| Two shops, modules *(step 41)* | With every module off in A, B still resolves its own set in the same request — the memo is per shop id (`ModuleTogglesTest::test_one_shops_modules_never_reach_another`). `/meta` serves it under the per-shop key (`test_brands_and_meta_endpoints_are_per_shop_in_content`, `test_meta_cache_key_and_busting_are_per_shop`) |
 | Unscoped access throws | A tenant-owned query with no `TenantContext` raises, and does not return all rows |
-| Escape hatch works | `withoutTenancy()` returns cross-shop rows, and is used in ≤ 5 places repo-wide |
+| Escape hatch works | `withoutTenancy()` returns cross-shop rows, and is called in ≤ 5 places in `app/` (the test walks `app/` only — see the ledger below) |
 
 Note the pattern from the Telegram double-send: **assert counts, not presence.** "Returns A's rows"
 passes while also returning B's. Every row above says *only*, and the test must check the count.
@@ -530,9 +596,25 @@ Extend `verify-postgres-portability.sh` too — the `(shop_id, slug)` composite 
 TopFragrances join (an unqualified `shop_id` is ambiguous on Postgres, green on SQLite) behave
 differently on the real engine, and SQLite will not tell you.
 
-The `withoutTenancy()` ledger so far: tracking-code generation (§7), the Step A backfill
-migration, and the studio's cross-shop views when Step C builds them. Anything beyond that list
-needs its inline justification reviewed.
+The `withoutTenancy()` ledger as first planned: tracking-code generation (§7), the Step A
+backfill migration, and the studio's cross-shop views when Step C builds them. Anything beyond
+that list needs its inline justification reviewed. (All three are now built or done; the
+current state follows.)
+
+**The ledger as built (synced in step 42, after steps 35–41).** `TenantIsolationTest`
+(`test_without_tenancy_is_a_rare_audited_escape_hatch`) counts `->withoutTenancy(` calls
+in **`app/`** — not repo-wide — and caps them at 5. Two are spent:
+
+| Call site | Why it must see every shop |
+|---|---|
+| `Order::generateTrackingCode()` (`app/Models/Order.php`) | the dedup `exists()` checks every shop's codes, because the unique index is global (§7, tracking codes) |
+| `StudioShopStats::orderStats()` (`app/Support/StudioShopStats.php`) | the studio's per-shop order counts and last-order dates in one query (step 34, Step C) |
+
+The Step A backfill migration is done and no longer calls it. `database/` is not counted,
+and holds no call today: the audit-events migration and `DemoClothingShopSeeder` only
+mention it in comments (the seeder sets its demo shop's context instead). Steps 35–41 —
+products, templates, categories, clothing, status labels, stock modes, modules — added
+**none**: every new read runs under the shop's own context.
 
 ---
 

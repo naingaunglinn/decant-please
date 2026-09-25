@@ -14,6 +14,17 @@ Statements below about what "the doc" lacks or assumes describe the design doc *
 stood at audit time*; the amendments in the same PR resolve them. One finding (Q6's
 default-branch inference) was itself wrong and is corrected inline, marked as such.
 
+**Names since step 36 (noted in step 42, #133).** This audit is a point-in-time record and
+keeps the names it found. Read `Fragrance` / `fragrances` as `Product` / `products`,
+`DecantPrice` / `decant_prices` as `ProductVariant` / `product_variants`, `fragrance_id`
+as `product_id`, `/fragrances` as `/products`, and `bottle_cost_mmk` / `bottle_volume_ml`
+as `reference_cost_mmk` / `reference_amount` (step 40b). `TopFragrances` kept its class
+name; the scope still qualifies the `shop_id` inside its join (`order_items.shop_id`), and
+`decant:probe-postgres` still runs its exact builder. What the refactor added to the
+tenancy picture (the `categories` table, templates and modules on `shop_settings`, the
+per-shop `once()` memos, no new bypass) is recorded in `multi-tenancy-design.md` §7 and
+§8, not here.
+
 ---
 
 ## 1. `design-tokens.json` vs `globals.css` `@theme`
