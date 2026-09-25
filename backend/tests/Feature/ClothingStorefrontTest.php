@@ -117,9 +117,10 @@ class ClothingStorefrontTest extends TestCase
 
         $variant->update(['in_stock' => true]);
         $shirt->update(['is_active' => false]);
-        $this->assertSame('That fragrance is no longer available.', $order()['items.0'][0]);
+        $this->assertSame('That item is no longer available.', $order()['items.0'][0]);
         $this->assertSame([], $this->getJson('/api/v1/decant-please/products')->json('data'));
-        $this->getJson("/api/v1/decant-please/products/{$shirt->slug}")->assertNotFound();
+        $this->getJson("/api/v1/decant-please/products/{$shirt->slug}")->assertNotFound()
+            ->assertJsonPath('message', 'Product not found.'); // generic wording, not "Fragrance" (#134)
     }
 
     public function test_another_shops_brandless_product_never_crosses_over(): void

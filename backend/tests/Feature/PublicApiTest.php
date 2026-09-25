@@ -165,13 +165,13 @@ class PublicApiTest extends TestCase
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['variant_id' => $this->variantId($git, 5), 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
-        $this->assertSame('That fragrance is no longer available.', $errors['items.0'][0]);
+        $this->assertSame('That item is no longer available.', $errors['items.0'][0]);
 
         // unknown variant id
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['variant_id' => 999999, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');
-        $this->assertSame('That fragrance is no longer available.', $errors['items.0'][0]);
+        $this->assertSame('That item is no longer available.', $errors['items.0'][0]);
 
         // a line that names nothing
         $this->postJson('/api/v1/decant-please/orders', $this->payload([
@@ -262,7 +262,7 @@ class PublicApiTest extends TestCase
             ->assertJsonPath('phone', '09-771234561')
             // composed server-side: line, township (Burmese), region, smallest-to-largest
             ->assertJsonPath('address', "No. 12, Inya Road\nBahan (ဗဟန်း), Yangon Region")
-            ->assertJsonPath('items.0.fragrance_name', 'Chanel — Allure Homme Sport (Cologne)')
+            ->assertJsonPath('items.0.fragrance_name', 'Chanel Allure Homme Sport') // the frozen snapshot (#134)
             ->assertJsonPath('items.0.size_ml', 10)
             ->assertJsonPath('items.0.unit_price_mmk', 55000)
             ->assertJsonPath('items.0.line_total_mmk', 55000)
@@ -334,6 +334,21 @@ class PublicApiTest extends TestCase
         // buckets are per-endpoint: exhausting tracking must not starve checkout or cancel
         $this->postJson('/api/v1/decant-please/orders/cancel', ['tracking_code' => 'X', 'phone' => 'Y'])->assertNotFound();
         $this->postJson('/api/v1/decant-please/orders', [])->assertUnprocessable();
+    }
+
+    public function test_tracking_receipt_names_the_item_as_it_sold_after_a_rename(): void
+    {
+        // §4 rule 3 (#134): the receipt reads fragrance_name_snapshot, never the
+        // live catalog — renaming the product or its brand leaves old receipts alone.
+        $code = $this->postJson('/api/v1/decant-please/orders', $this->payload())->assertCreated()->json('tracking_code');
+
+        $this->allure->update(['name' => 'Allure Homme Sport Eau Extrême']);
+        $this->allure->brand->update(['name' => 'Chanel Paris']);
+
+        $this->getJson('/api/v1/decant-please/orders/track?tracking_code='.$code.'&phone=09-771234561')
+            ->assertOk()
+            ->assertJsonPath('items.0.fragrance_name', 'Chanel Allure Homme Sport')
+            ->assertJsonPath('items.0.variant_label', '10ml');
     }
 
     private function payload(array $overrides = []): array

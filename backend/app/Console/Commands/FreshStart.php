@@ -74,10 +74,15 @@ class FreshStart extends Command
             Order::query()->whereNotNull('payment_proof_path')->pluck('payment_proof_path')
                 ->each(fn (string $path) => $proofsDisk->delete($path));
             Order::query()->delete();
+            // Variant photos (step 38) sit on the media disk like product images —
+            // same by-stored-path delete, before the rows that name them go (#134).
+            $mediaDisk = Storage::disk(config('filesystems.media_disk'));
+            ProductVariant::query()->whereNotNull('image_path')->pluck('image_path')
+                ->each(fn (string $path) => $mediaDisk->delete($path));
             ProductVariant::query()->delete();
 
             Product::query()->whereNotNull('image_path')->pluck('image_path')
-                ->each(fn (string $path) => Storage::disk(config('filesystems.media_disk'))->delete($path));
+                ->each(fn (string $path) => $mediaDisk->delete($path));
             Product::query()->delete();
             PromoCode::query()->delete();
             // Expenses are this shop's own ledger — a reset that keeps them while

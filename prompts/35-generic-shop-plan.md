@@ -696,7 +696,10 @@ pass.
   name above; `decant:fresh-start`
   leaves variant photos on the public disk; the payment-proof endpoint's comment says it
   only makes sense before the order is settled, but it doesn't check the status; and the
-  customer-facing "fragrance" error strings reach a clothing shop.
+  customer-facing "fragrance" error strings reach a clothing shop. **All four fixed in
+  v51 (#134)**: the receipt reads the snapshot, fresh-start deletes variant photos,
+  payment-proof refuses a paid, cancelled or rejected order (409), and the strings say
+  item/product.
 
 ---
 

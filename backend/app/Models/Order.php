@@ -420,6 +420,18 @@ class Order extends Model
         $this->save();
     }
 
+    /**
+     * Whether the customer may still upload (or replace) a transfer screenshot:
+     * not once the order is paid — a replacement deletes the slip the seller
+     * confirmed against — and not on a cancelled or rejected order, where there
+     * is nothing to pay. Delivered-but-unpaid still accepts one (#134).
+     */
+    public function acceptsPaymentProof(): bool
+    {
+        return $this->payment_status !== PaymentStatus::Paid
+            && ! in_array($this->status, [OrderStatus::Cancelled, OrderStatus::Rejected], true);
+    }
+
     /** Store the customer's transfer screenshot; does NOT mark paid — the
      *  decanter still eyeballs it and confirms. */
     public function attachPaymentProof(string $path): void
@@ -623,7 +635,9 @@ class Order extends Model
         return self::query()
             ->where('tracking_code', Str::upper(trim($code)))
             ->where('phone', trim($phone))
-            ->with('items.product.brand')
+            // The receipt reads only the lines' own snapshots (#134); cancel()
+            // loadMissing()s the products it restocks.
+            ->with('items')
             ->first();
     }
 
@@ -636,7 +650,7 @@ class Order extends Model
     }
 
     /**
-     * A customer-actionable reason: name the fragrance/size so the frontend
+     * A customer-actionable reason: name the product/size so the frontend
      * can say more than "something failed".
      */
     public static function unavailableItemMessage(array $item): string
@@ -647,7 +661,7 @@ class Order extends Model
             : Product::query()->find($item['fragrance_id'] ?? null);
 
         if (! $product || ! $product->isSellable()) {
-            return 'That fragrance is no longer available.';
+            return 'That item is no longer available.';
         }
 
         $label = $variant ? $variant->label() : "{$item['size_ml']}ml";

@@ -1059,15 +1059,23 @@ class TenantIsolationTest extends TestCase
         // every shop's files however they were prefixed.
         Storage::fake(config('filesystems.proofs_disk'));
         $disk = Storage::disk(config('filesystems.proofs_disk'));
+        // Variant photos (step 38, #134) sit on the public media disk and go by
+        // stored path too — A's are deleted, B's survive.
+        Storage::fake(config('filesystems.media_disk'));
+        $media = Storage::disk(config('filesystems.media_disk'));
 
         $this->forShop($this->shopA);
-        $this->makeFragrance();
+        $aPhoto = UploadedFile::fake()->image('a-variant.jpg')
+            ->store('shops/'.$this->shopA->id.'/variant-photos', config('filesystems.media_disk'));
+        $this->makeFragrance()->variants()->firstOrFail()->update(['image_path' => $aPhoto]);
         $aPath = UploadedFile::fake()->image('a.jpg')
             ->store('shops/'.$this->shopA->id.'/payment-proofs', config('filesystems.proofs_disk'));
         $this->makeOrder()->update(['payment_proof_path' => $aPath]);
 
         $this->forShop($this->shopB);
-        $this->makeFragrance();
+        $bPhoto = UploadedFile::fake()->image('b-variant.jpg')
+            ->store('shops/'.$this->shopB->id.'/variant-photos', config('filesystems.media_disk'));
+        $this->makeFragrance()->variants()->firstOrFail()->update(['image_path' => $bPhoto]);
         $bPath = UploadedFile::fake()->image('b.jpg')
             ->store('payment-proofs', config('filesystems.proofs_disk')); // old-era path
         $this->makeOrder()->update(['payment_proof_path' => $bPath]);
@@ -1079,11 +1087,13 @@ class TenantIsolationTest extends TestCase
         $this->assertSame(0, Order::count());
         $this->assertSame(0, Product::count());
         $disk->assertMissing($aPath);
+        $media->assertMissing($aPhoto);
 
         $this->forShop($this->shopB);
         $this->assertSame(1, Order::count());
         $this->assertSame(1, Product::count());
         $disk->assertExists($bPath);
+        $media->assertExists($bPhoto);
     }
 
     public function test_fresh_start_refuses_without_a_resolved_shop(): void

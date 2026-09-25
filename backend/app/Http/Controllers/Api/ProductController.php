@@ -105,7 +105,7 @@ class ProductController extends Controller
     {
         $product = $this->baseQuery()->where('slug', $slug)->first();
 
-        abort_if($product === null, 404, 'Fragrance not found.');
+        abort_if($product === null, 404, 'Product not found.');
 
         return ProductResource::make($product);
     }

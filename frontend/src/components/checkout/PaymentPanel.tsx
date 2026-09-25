@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
-import { getMeta, uploadPaymentProof, ApiValidationError } from "@/lib/api";
+import { getMeta, trackOrder, uploadPaymentProof, ApiConflictError, ApiValidationError } from "@/lib/api";
 import { useTenant } from "@/lib/tenant-context";
 import { formatKyat } from "@/lib/format";
 import type { OrderStatusResponse, PaymentInfo } from "@/lib/types";
@@ -73,8 +73,17 @@ export function PaymentPanel({ order, onOrderUpdate }: PaymentPanelProps) {
       setError(
         e instanceof ApiValidationError
           ? (Object.values(e.errors)[0]?.[0] ?? e.message)
-          : "Upload didn't go through — check your connection and try again.",
+          : e instanceof ApiConflictError
+            ? e.message
+            : "Upload didn't go through — check your connection and try again.",
       );
+      // A 409 means this page is stale (the order was paid, cancelled or rejected
+      // meanwhile) — reload it so the panel shows where the order really is.
+      if (e instanceof ApiConflictError) {
+        trackOrder(shop, order.tracking_code, order.phone)
+          .then((fresh) => fresh && onOrderUpdate(fresh))
+          .catch(() => {});
+      }
     } finally {
       setUploading(false);
     }
