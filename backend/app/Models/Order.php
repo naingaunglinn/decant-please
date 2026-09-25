@@ -635,7 +635,9 @@ class Order extends Model
         return self::query()
             ->where('tracking_code', Str::upper(trim($code)))
             ->where('phone', trim($phone))
-            ->with('items.product.brand')
+            // The receipt reads only the lines' own snapshots (#134); cancel()
+            // loadMissing()s the products it restocks.
+            ->with('items')
             ->first();
     }
 

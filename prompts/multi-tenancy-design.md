@@ -558,9 +558,8 @@ proofs disk (private): shops/{id}/payment-proofs/ transfer slips   (checkout, th
 That is seven write sites, each building the prefix from `TenantContext::id()`.
 `decant:fresh-start` never wipes a directory (the trees are shared storage): it deletes
 the resolved shop's proof and product-image objects by their stored paths, which covers
-files written before the prefix landed too. It does not yet delete variant photos
-(step 38) — those objects outlive a reset as orphans on the public disk, never visible
-through another shop's catalog.
+files written before the prefix landed too. Variant photos (step 38) go the same way
+since #134 (v51); before that they outlived a reset as orphans on the public disk.
 
 ---
 

@@ -19,7 +19,8 @@ No migration.
   `Brand — Name (Concentration)` from the live product. Renaming a product or its brand no
   longer rewrites an old receipt (AGENTS.md §4 rule 3). The receipt string loses the
   em dash and the concentration suffix; it now matches the admin and the Telegram alert.
-  The `fragrance_name` key is unchanged.
+  The `fragrance_name` key is unchanged. `Order::findByTracking()` now eager-loads only
+  `items` (the brand and product were read only for that name).
 - **`decant:fresh-start` deletes variant photos** (`product_variants.image_path`, step 38)
   from the media disk by stored path, like product images. Scoped to the reset shop; the
   two-shop fresh-start isolation test now covers the photos too.
@@ -28,7 +29,7 @@ No migration.
   would delete the slip the seller confirmed against. Delivered-but-unpaid still accepts
   a slip. The wrong-credentials 404 is unchanged and comes first. The storefront shows the
   409's message instead of "check your connection" (`uploadPaymentProof` throws
-  `ApiConflictError`).
+  `ApiConflictError`), then reloads the order so a stale panel catches up.
 - **Generic wording**: `That item is no longer available.` and `Product not found.`
   replace the two "fragrance" strings a clothing shop's customers could see.
 - `backend/docs/api.md` updated: the snapshot rule for `fragrance_name`, the payment-proof
