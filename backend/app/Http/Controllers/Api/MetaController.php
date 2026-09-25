@@ -28,9 +28,7 @@ class MetaController extends Controller
             $available = ProductVariant::query()
                 ->where('in_stock', true)
                 ->where('is_active', true)
-                ->whereHas('product', fn (Builder $query) => $query
-                    ->where('is_active', true)
-                    ->whereHas('brand', fn (Builder $brand) => $brand->where('is_active', true)));
+                ->whereHas('product', fn (Builder $query) => $query->sellable());
 
             $template = Templates::forShop();
             $min = $available->clone()->min('price_mmk');
@@ -58,7 +56,8 @@ class MetaController extends Controller
                     ? self::variantOptions($template->variantOptions(), $available->clone())
                     : [],
                 // The pre-37 storefront's hardcoded lists — same values as before.
-                'brand_types' => $this->options(BrandType::cases()),
+                // Brand types only where the template uses them (step 38b: decant).
+                'brand_types' => $template->brandTypes() ? $this->options(BrandType::cases()) : [],
                 'genders' => $this->options(Gender::cases()),
                 'concentrations' => $this->options(Concentration::cases()),
                 // ->all(): cache a plain array — a Collection object doesn't survive

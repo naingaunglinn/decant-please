@@ -237,9 +237,7 @@ class Order extends Model
             )
             ->where('in_stock', true)
             ->where('is_active', true)
-            ->whereHas('product', fn ($query) => $query
-                ->where('is_active', true)
-                ->whereHas('brand', fn ($q) => $q->where('is_active', true)))
+            ->whereHas('product', fn ($query) => $query->sellable())
             ->with('product.brand')
             ->first();
     }
@@ -611,7 +609,7 @@ class Order extends Model
             ? $variant?->product
             : Product::query()->find($item['fragrance_id'] ?? null);
 
-        if (! $product || ! $product->is_active || ! $product->brand?->is_active) {
+        if (! $product || ! $product->isSellable()) {
             return 'That fragrance is no longer available.';
         }
 

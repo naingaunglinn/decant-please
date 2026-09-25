@@ -21,7 +21,7 @@ Principles P1–P6) throughout.
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
 - [x] **36** — Product + Variant model — split in two (#105): **36a built** (v40: schema, models, admin; API unchanged), **36b built** (v41: API contract + storefront)
 - [x] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), **37b built** (v43: storefront renders from `attributes` / `filters`)
-- [ ] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), 38b (storefront) next
+- [x] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), **38b built** (v45: storefront option picker + variant photo, option filters, optional brand, size guide, demo clothing shop)
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [ ] **39** — Status labels (template-driven; `decanted→prepared`)
 - [ ] **40** — Stock modes (`per_variant` / `pooled`)
@@ -400,10 +400,38 @@ shows it on the storefront.
     until 38b makes it optional in the API contract (the storefront still hides
     brandless products); `statusLabels()` and `defaultModules()` for clothing are data
     until steps 39 and 41 read them.
-- **38b (RUN-QUEUE row 6b): the storefront.** Option picker (Size then Color) with the
+- **38b (v45, RUN-QUEUE row 6b): the storefront.** Option picker (Size then Color) with the
   variant photo, option filter UI from `variant_options`, optional brand in the API
   contract (`brand: null`), a size guide, and a demo clothing shop seeder for the
   browser checks.
+
+  Decisions and deviations:
+  - **Optional brand is a template flag** (`Template::brandRequired()`; clothing false).
+    The rule "active, and the brand active if there is one" is `Product::scopeSellable()`,
+    shared by `/products`, `/meta` and checkout. Before, all four sites used
+    `whereHas('brand')` and hid brandless products.
+  - **Brand types are decant's** (`Template::brandTypes()`). `/meta` `brand_types` is
+    empty otherwise, so clothing gets no Designer/Niche filter, pill or home tile. The
+    admin hides the brand's type there too. A new brand still stores the column's
+    default (`designer`), but no clothing surface shows it.
+  - **The CSV import still requires a brand.** It only runs for ml (decant) shops since
+    38a, where a brand is required anyway.
+  - **The size guide is a per-product text attribute** (`size_guide`, `Attribute`
+    `section: true` → `show: "section"`), not a shop setting. It needs no migration, and
+    fit differs by garment. A shop-wide size chart can come with the design system's
+    size-guide section (RUN-QUEUE row 13).
+  - **The picker is chosen per product**: any variant with `size_ml: null` gets the
+    option picker; ml variants keep the size list, so decant is unchanged. A later
+    option lists only the values that exist for the earlier picks.
+  - **Filter groups hide when empty** (Brand, Brand type, ml Size), which never happens
+    for decant.
+  - `next.config.ts` gains a dev-only `allowedDevOrigins` for `*.decant.localhost`, so the
+    demo shop hydrates under `next dev`.
+  - Not built: shop-wide copy is still decant's ("Shop decants", "Fragrance or brand…",
+    the footer blurb). The template's own words and Burmese sample content come with the
+    design system and group-1 presets (rows 13 and 15). Also not built: colour swatches
+    (pills and the variant photo instead; a raw colour would need a token decision) and
+    a per-product template picker.
 
 > **⏸ Review stop (amended).** The owner reviews 35–38 here; then 39–41 continue. It no longer
 > waits for a real-seller trial (`AGENTS.md` P5 as replaced by #115).

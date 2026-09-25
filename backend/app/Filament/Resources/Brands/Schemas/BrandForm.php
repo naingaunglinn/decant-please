@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Brands\Schemas;
 
 use App\Enums\BrandType;
 use App\Support\TenantContext;
+use App\Templates\Templates;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -16,6 +17,9 @@ class BrandForm
 {
     public static function configure(Schema $schema): Schema
     {
+        // Designer / niche is a perfume idea (step 38b): other templates don't ask.
+        $typed = Templates::forShop()->brandTypes();
+
         return $schema
             ->components([
                 TextInput::make('name')
@@ -37,7 +41,8 @@ class BrandForm
                 Select::make('type')
                     ->options(BrandType::class)
                     ->default(BrandType::Designer->value)
-                    ->required(),
+                    ->visible($typed)
+                    ->required($typed),
                 FileUpload::make('logo_path')
                     ->label('Logo')
                     ->image()

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { FragranceGrid } from "@/components/catalog/FragranceGrid";
 import { FilterBar } from "@/components/catalog/FilterBar";
 import { FilterSheet } from "@/components/catalog/FilterSheet";
+import { optionKey } from "@/lib/attributes";
 import { Pagination } from "@/components/catalog/Pagination";
 
 export const metadata: Metadata = {
@@ -69,7 +70,8 @@ async function ShopResults({ shop, flat }: { shop: string; flat: Filters }) {
   const filters: ProductFilters = {
     q: flat.q,
     brand: flat.brand,
-    type: flat.brand_type,
+    // brand_type only where the template has brand types (step 38b) — no hidden filter
+    type: meta.brand_types.length > 0 ? flat.brand_type : undefined,
     size: flat.size,
     min_price: flat.min_price,
     max_price: flat.max_price,
@@ -78,6 +80,10 @@ async function ShopResults({ shop, flat }: { shop: string; flat: Filters }) {
     per_page: "12",
   };
   for (const filter of meta.filters) filters[filter.key] = flat[filter.key];
+  // variant options (step 38b): ?option[Size]=M reaches the API as the same bracket key
+  for (const option of meta.variant_options) {
+    filters[optionKey(option.name)] = flat[optionKey(option.name)];
+  }
 
   const fragrances = await getProducts(shop, filters);
 

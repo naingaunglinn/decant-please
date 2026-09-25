@@ -63,8 +63,10 @@ never starves another (a burst of catalog browsing can't block a checkout):
 Over the limit: `429` with `{ "message": "Too Many Attempts." }` and a `Retry-After`
 header. Clients should back off, not retry-loop.
 
-**Catalog visibility.** Every catalog response is pre-filtered to active fragrances
-whose brand is also active. `min_price_mmk` is the lowest **in-stock** decant price;
+**Catalog visibility.** Every catalog response is pre-filtered to active products
+whose brand, if they have one, is also active (step 38b: a brandless product is
+listed; a hidden brand still hides its products). Checkout sells by the same rule
+(`Product::scopeSellable`). `min_price_mmk` is the lowest **in-stock** decant price;
 `null` means every size is sold out (the fragrance still appears — sold out is a
 state, not a deletion). `/brands` and `/meta` are server-cached for 10 minutes, so
 admin catalog edits can lag there by up to that long.
@@ -139,9 +141,14 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
 empty one is left out. `display` is what a customer reads: a select's label, else the
 value. `template` is the product's template key. `show` (step 37b) says where a
 storefront puts it: `headline` beside the product's name (and in its pill row), `pill`
-in the pill row, `list` as its own section, the value split on commas. The template
-decides: `Template::headline()` names the headline attribute, `Attribute` `list: true`
-marks a list (decant: concentration is the headline; notes and vibes are lists).
+in the pill row, `list` as its own section, the value split on commas, `section`
+(step 38b) as its own titled paragraph with line breaks kept. The template decides:
+`Template::headline()` names the headline attribute, `Attribute` `list: true` marks a
+list, `section: true` a section (decant: concentration is the headline; notes and
+vibes are lists; clothing: `size_guide` is a section).
+
+`brand` is `null` when the product has no brand (step 38b) — a template may make brand
+optional (clothing does; decant requires one). Clients must handle both.
 
 The flat `concentration`, `concentration_label`, `gender`, `gender_label`, `notes`,
 `vibes`, `performance` keys are read from `attributes` since step 37 and kept for the
@@ -159,7 +166,7 @@ The key is still `prices` (not `variants`) so the shape stayed additive across s
 ## `GET /products/{slug}`
 
 `{ "data": { …product object… } }`, or `404` `{ "message": "Fragrance not found." }` —
-inactive fragrances and inactive brands 404 exactly like unknown slugs.
+inactive products and products of inactive brands 404 exactly like unknown slugs.
 
 ## `GET /meta`
 
@@ -189,6 +196,9 @@ Everything a client needs to build filter UI without hardcoding:
 a `/products` query parameter named by `key`. A `select` lists its options; a `text`
 filter is a free-text box. `genders` and `concentrations` are the pre-37 lists, same
 values as before.
+
+`brand_types` (step 38b) is empty unless the shop's template uses brand types
+(`Template::brandTypes()` — decant only); a storefront shows no brand-type filter then.
 
 `variant_options` (step 38) is empty for decant. For a template whose variants aren't ml
 sizes it lists each option name with the values in stock now, in variant display order —

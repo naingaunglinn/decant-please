@@ -22,7 +22,8 @@ class ProductResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
-            'brand' => BrandResource::make($this->whenLoaded('brand')),
+            // null for a brandless product — brand is optional for some templates (step 38b)
+            'brand' => $this->whenLoaded('brand', fn ($brand) => BrandResource::make($brand)),
             'template' => $template->key(),
             // The template's attributes in display order, empty ones left out (step 37).
             'attributes' => collect($template->attributes())

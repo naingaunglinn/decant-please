@@ -49,6 +49,26 @@ abstract class Template
         return null;
     }
 
+    /**
+     * Whether every product needs a brand (step 38b). A perfume always has a house;
+     * most clothes a social seller sells have none, so clothing leaves it optional
+     * and the API sends `brand: null`.
+     */
+    public function brandRequired(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Whether a brand's type (designer / niche) means something to this category's
+     * buyers (step 38b). Only perfume: /meta sends no `brand_types` otherwise, so
+     * the storefront shows no brand-type filter or pill.
+     */
+    public function brandTypes(): bool
+    {
+        return false;
+    }
+
     /** Whether each variant may carry its own photo (a photo per colour). */
     public function variantPhotos(): bool
     {

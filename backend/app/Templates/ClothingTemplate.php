@@ -47,7 +47,16 @@ class ClothingTemplate extends Template
                 'unisex' => 'Unisex',
                 'kids' => 'Kids',
             ], filterable: true),
+            // The seller's measurements, shown under its own heading beside the
+            // picker's sizes — per product, because a fit differs by garment.
+            Attribute::text('size_guide', 'Size guide', long: true, section: true,
+                help: 'One size per line, e.g. "M — chest 38 in, length 27 in".'),
         ];
+    }
+
+    public function brandRequired(): bool
+    {
+        return false;
     }
 
     public function variantOptions(): array

@@ -22,7 +22,9 @@ export function CartItemRow({ line, error }: { line: CartLine; error?: string })
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{line.brandName}</p>
+          {line.brandName && (
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{line.brandName}</p>
+          )}
           <Link
             href={`/product/${line.slug}`}
             className="mt-0.5 block truncate text-sm font-medium uppercase tracking-[0.1em] text-ink hover:text-pine"

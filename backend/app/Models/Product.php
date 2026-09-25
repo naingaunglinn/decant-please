@@ -115,6 +115,26 @@ class Product extends Model
     }
 
     /**
+     * What the storefront lists and checkout sells (step 38b): an active product
+     * whose brand, if it has one, is active too. Brand is optional for a template
+     * like clothing, so a brandless product sells; a hidden brand still hides its
+     * products. The one place this rule lives — the API, /meta and checkout call it.
+     */
+    public function scopeSellable(Builder $query): Builder
+    {
+        return $query->where('products.is_active', true)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('products.brand_id')
+                ->orWhereHas('brand', fn (Builder $brand) => $brand->where('is_active', true)));
+    }
+
+    /** scopeSellable() for a loaded product. */
+    public function isSellable(): bool
+    {
+        return $this->is_active && ($this->brand_id === null || (bool) $this->brand?->is_active);
+    }
+
+    /**
      * Substring search over search_text. Case-folded in PHP on both sides, so the
      * column is never wrapped in LOWER(), and `%` / `_` in the needle are literal.
      */
