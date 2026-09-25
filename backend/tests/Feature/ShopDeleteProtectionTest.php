@@ -101,8 +101,10 @@ class ShopDeleteProtectionTest extends TestCase
             // the RefreshDatabase transaction on Postgres
             DB::transaction(fn () => $shop->delete());
             $this->fail('A shop holding money records was deleted.');
-        } catch (QueryException) {
-            // refused by the FK — expected
+        } catch (QueryException $e) {
+            // refused by the FK: integrity violation (SQLite 23000, Postgres 23503),
+            // not some unrelated SQL error
+            $this->assertContains((string) $e->getCode(), ['23000', '23503'], $e->getMessage());
         }
 
         $this->assertDatabaseHas('shops', ['id' => $shop->id]);
