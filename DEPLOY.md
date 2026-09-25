@@ -248,10 +248,10 @@ The admin's Help button opens a chat with the studio. It stays hidden until at l
 handle is set on the Heroku app:
 
 ```bash
-heroku config:set -a decant-please-api SUPPORT_TELEGRAM_USERNAME=<studio username, no @> SUPPORT_VIBER_NUMBER=<09… Myanmar mobile>
+heroku config:set -a decant-please-api SUPPORT_TELEGRAM_USERNAME=studio_username SUPPORT_VIBER_NUMBER=09xxxxxxxxx
 ```
 
-Either one on its own is fine. A malformed value hides that channel; it never breaks a
+Replace both example values with the studio's own: the username without `@`, the number a Myanmar mobile. Either one on its own is fine. A malformed value hides that channel; it never breaks a
 page.
 
 ### Custom domain + TLS

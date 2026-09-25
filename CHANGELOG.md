@@ -28,8 +28,8 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 - New platform env `SUPPORT_TELEGRAM_USERNAME` / `SUPPORT_VIBER_NUMBER`
   (`config/services.php` `support`, not the `telegram` order-alert block, and not a
   ShopConfig read). The suite pins both blank.
-- No migration, no API or storefront change. `HelpButtonTest` (8 tests) covers shop
-  naming, including another shop's panel. 533 tests on Postgres 17.
+- No migration, no API or storefront change. `HelpButtonTest` (10 tests) covers shop
+  naming, including another shop's panel. 535 tests on Postgres 17.
 
 ## 0. What changed in v53
 

@@ -32,7 +32,7 @@ draws for the customer's booking deep link.
 The `/studio` panel doesn't get the button.
 
 **The dropdown** lists the channels that are set up (Telegram, Viber). Inside a shop it
-also shows the shop's name and address, so the seller can tell us which shop they mean.
+also shows the shop's name and slug, so the seller can tell us which shop they mean.
 The link pre-fills a first message that names the shop (Telegram `?text=`, Viber
 `&draft=`). A client that ignores the pre-fill still opens the right chat.
 
@@ -53,8 +53,8 @@ studio's public handle.
 value hides that channel. With both hidden, the button isn't rendered at all. A bad env
 value never becomes a 500 on an admin page.
 
-- Telegram username: 5–32 letters, digits or underscores (Telegram's rule), leading `@`
-  stripped. Link: `https://t.me/{username}?text=…`.
+- Telegram username: 5–32 letters, digits or underscores, starting with a letter
+  (Telegram's rule), leading `@` stripped. Link: `https://t.me/{username}?text=…`.
 - Viber number: normalized by `PhoneVerification::normalize()` (one Myanmar-mobile rule in
   one place, P4). Link: `viber://chat?number=%2B959…&draft=…`. It opens in the same tab,
   because a custom scheme opened in a new tab leaves an empty tab on a phone.
@@ -93,7 +93,7 @@ None. The storefront and `types.ts` are unchanged.
   opens the web page (`t.me`) or nothing (`viber://`). The seller is phone-first (P1), so
   that's acceptable.
 - Pre-fill support differs between clients. The dropdown shows the shop's name and
-  address, so the seller can say which shop even when the pre-fill doesn't appear.
+  slug, so the seller can say which shop even when the pre-fill doesn't appear.
 
 ## Deliberately not built
 

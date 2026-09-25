@@ -63,11 +63,43 @@ class HelpButtonTest extends TestCase
 
     public function test_each_channel_renders_on_its_own(): void
     {
+        $shop = Shop::factory()->create(['slug' => 'thida-closet']);
+        $this->actingAs($this->ownerOf($shop));
+
         $this->channels('cornerarea_help', null);
-        $this->assertSame(['telegram'], array_column(StudioHelp::links(null), 'channel'));
+        $this->get('/admin/thida-closet')->assertOk()
+            ->assertSee('https://t.me/cornerarea_help', false)
+            ->assertDontSee('viber://', false);
 
         $this->channels(null, '+959791234567');
-        $this->assertSame(['viber'], array_column(StudioHelp::links(null), 'channel'));
+        $this->get('/admin/thida-closet')->assertOk()
+            ->assertSee('viber://chat?number=%2B959791234567', false)
+            ->assertDontSee('t.me/', false);
+    }
+
+    public function test_viber_opens_in_the_same_tab_and_telegram_in_a_new_one(): void
+    {
+        $this->channels('cornerarea_help', '09791234567');
+        $shop = Shop::factory()->create(['slug' => 'thida-closet']);
+        $this->actingAs($this->ownerOf($shop));
+
+        $html = $this->get('/admin/thida-closet')->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<a[^>]*href="https:\/\/t\.me\/[^"]*"[^>]*target="_blank"|<a[^>]*target="_blank"[^>]*href="https:\/\/t\.me\//s', $html);
+        preg_match('/<a[^>]*href="viber:\/\/[^>]*>/s', $html, $viber);
+        $this->assertNotEmpty($viber);
+        $this->assertStringNotContainsString('target=', $viber[0]);
+    }
+
+    public function test_a_sellers_shop_name_is_escaped(): void
+    {
+        $this->channels('cornerarea_help', null);
+        $shop = Shop::factory()->create(['slug' => 'thida-closet', 'name' => '<b>X</b> & "Y"']);
+        $this->actingAs($this->ownerOf($shop));
+
+        $this->get('/admin/thida-closet')->assertOk()
+            ->assertSee('fi-help-menu', false)
+            ->assertDontSee('<b>X</b>', false);
     }
 
     public function test_a_malformed_value_hides_that_channel_and_never_breaks_the_page(): void
@@ -81,6 +113,9 @@ class HelpButtonTest extends TestCase
 
         $this->channels('abc', '+959791234567'); // too short for Telegram
         $this->assertSame(['viber'], array_column(StudioHelp::links($shop), 'channel'));
+
+        $this->channels('1studio_help', null); // Telegram usernames start with a letter
+        $this->assertSame([], StudioHelp::links($shop));
     }
 
     public function test_a_burmese_shop_name_is_url_encoded(): void
@@ -100,14 +135,18 @@ class HelpButtonTest extends TestCase
         $this->channels('cornerarea_help', '09791234567');
         $a = Shop::factory()->create(['slug' => 'shop-alpha', 'name' => 'Alpha Scents']);
         $b = Shop::factory()->create(['slug' => 'shop-bravo', 'name' => 'Bravo Wear']);
-        $this->actingAs($this->ownerOf($b));
+        $owner = $this->ownerOf($b);
+        $owner->shops()->attach($a); // a member of both: the switcher lists A, the help names only B
+        $this->actingAs($owner);
 
         $this->get('/admin/shop-bravo')->assertOk()
             ->assertSee(rawurlencode(StudioHelp::message($b)), false)
-            ->assertDontSee('Alpha Scents')
-            ->assertDontSee('shop-alpha');
+            ->assertDontSee(rawurlencode(StudioHelp::message($a)), false)
+            ->assertDontSee('Alpha Scents (shop-alpha)');
 
-        $this->get("/admin/{$a->slug}")->assertNotFound();
+        $this->get('/admin/shop-alpha')->assertOk()
+            ->assertSee(rawurlencode(StudioHelp::message($a)), false)
+            ->assertDontSee(rawurlencode(StudioHelp::message($b)), false);
     }
 
     public function test_a_studio_admin_sees_no_help_button(): void

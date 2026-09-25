@@ -28,7 +28,7 @@ class StudioHelp
         $links = [];
 
         $username = ltrim(trim((string) config('services.support.telegram_username')), '@');
-        if (preg_match('/^[A-Za-z0-9_]{5,32}$/', $username) === 1) {
+        if (preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $username) === 1) {
             $links[] = [
                 'channel' => 'telegram',
                 'label' => 'Telegram',
