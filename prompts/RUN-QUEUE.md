@@ -35,7 +35,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 11 | Step 44a: shop registration foundation — one `ShopRegistration::register()` (Studio + sign-up), reserved slugs, automatic `slug.cornerarea.me` address, `Shop::publish()` | `prompts/44-self-serve-signup.md` §44a (roadmap: shared foundation). The wildcard DNS/Vercel attach is an owner step: document it, don't do it | pr-open | 137-self-serve-signup | #138 |
 | 11b | Step 44b: seller sign-up in the admin panel (account + create-your-shop), phone verification (sender interface, fails closed when unconfigured), Publish button, English + Burmese | §44b (split from row 11); issue #137, don't file another | pr-open | 137-seller-signup | #139 |
 | 11c | Phone-code provider driver for sign-up (a `CodeSender` for the owner's chosen SMS / Telegram Gateway account) plus a platform-wide send cap (SMS pumping); production sign-up stays off until it exists | §44b "As built"; the provider and its account are the owner's decision | needs-owner | | |
-| 12 | Help button (admin → studio on Viber/Telegram) | roadmap: shared foundation | todo | | |
+| 12 | Help button (admin → studio on Viber/Telegram) | roadmap: shared foundation | in-progress | 140-help-button | |
 | 13 | Design system: section library, 3 base designs, `shop_designs`, preset picker, manual editor (no AI) | roadmap: design system | todo | | |
 | 14 | AI design editor + per-shop quota | roadmap: design system. API key from env (owner step); tests mock the API | todo | | |
 | 15 | Group 1: 11 templates + presets + Burmese sample content | roadmap: group 1 | todo | | |
