@@ -28,12 +28,15 @@ verification, is row 11b). No migration.
 - **Slug rules** move with registration and are enforced inside `register()`, not only in
   the form: a DNS label (lowercase letters, digits, single dashes, 3–40 characters) and
   never a reserved platform name (`api`, `images`, `www`, `admin`, `studio`, …). The
-  Studio form uses the same rules on create and edit (max length 255 → 40).
+  Studio form uses the same rules (max length 255 → 40), including "this address is
+  already taken" when a hand-mapped domain owns the host. A registration that loses a
+  race answers with that validation error, not a 500.
 - **`Shop::publish(User $actor)`**: the seller's own go-live, onboarding → live only, by a
   member of the shop or a studio admin. A suspended or archived shop can't publish itself
-  back (`activate()` still un-suspends; that stays a Studio power). Nothing calls it from
-  a screen yet (44b's Publish button).
-- `ShopRegistrationTest` (23 cases). `withoutTenancy()` stays at 2 of 5.
+  back (`activate()` still un-suspends; that stays a Studio power). One conditional
+  `UPDATE`, so a stale model can't un-suspend; it busts the CORS origin cache. Nothing
+  calls it from a screen yet (44b's Publish button).
+- `ShopRegistrationTest` (28 cases). `withoutTenancy()` stays at 2 of 5. 502 tests on Postgres 17.
 
 ## 0. What changed in v51
 

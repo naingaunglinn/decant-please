@@ -27,7 +27,7 @@ class ShopForm
                 ->required()
                 ->maxLength(40)
                 ->rules(fn (?Shop $record): array => ShopRegistration::slugRules($record))
-                ->helperText('Lowercase letters, numbers and single dashes, 3–40 characters — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}) and its automatic address {slug}.cornerarea.me. Renaming it later does not move that address (edit Domains by hand), and it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
+                ->helperText('Lowercase letters, numbers and single dashes, 3–40 characters — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}) and its automatic storefront address {slug}.{platform domain}. Renaming it later does not move that address (edit Domains by hand), and it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
             // The shop's category (step 38): what its products carry and how its
             // admin reads. Picked once, at registration — changing it later is
             // not built (its products would keep the old template's attributes).

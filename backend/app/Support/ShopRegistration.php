@@ -8,6 +8,7 @@ use App\Models\ShopDomain;
 use App\Models\User;
 use App\Templates\Templates;
 use Closure;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -41,11 +42,12 @@ class ShopRegistration
      * pass for the platform. Adding a platform subdomain means adding it here first.
      */
     public const RESERVED_SLUGS = [
-        'about', 'account', 'admin', 'api', 'app', 'assets', 'auth', 'billing', 'blog',
-        'cdn', 'cornerarea', 'dashboard', 'dev', 'docs', 'files', 'ftp', 'help',
-        'images', 'img', 'login', 'mail', 'media', 'ns1', 'ns2', 'pay', 'register',
-        'root', 'secure', 'shop', 'shops', 'signup', 'smtp', 'staging', 'static',
-        'status', 'storefront', 'studio', 'support', 'test', 'www',
+        'about', 'account', 'admin', 'api', 'app', 'assets', 'auth', 'autoconfig',
+        'autodiscover', 'billing', 'blog', 'cdn', 'cornerarea', 'dashboard', 'dev',
+        'docs', 'email', 'files', 'ftp', 'help', 'images', 'img', 'login', 'mail',
+        'media', 'ns1', 'ns2', 'pay', 'register', 'root', 'secure', 'shop', 'shops',
+        'signup', 'smtp', 'staging', 'static', 'status', 'storefront', 'studio',
+        'support', 'test', 'webmail', 'www',
     ];
 
     /**
@@ -70,6 +72,15 @@ class ShopRegistration
                 }
             },
             'unique:shops,slug'.($ignore ? ','.$ignore->getKey() : ''),
+            // the address this slug would get must be free too — a custom domain
+            // the Studio mapped by hand may already own it
+            function (string $attribute, mixed $value, Closure $fail): void {
+                $host = is_string($value) ? self::platformHost($value) : null;
+
+                if ($host !== null && ShopDomain::query()->where('host', $host)->exists()) {
+                    $fail('This address is already taken.');
+                }
+            },
         ];
     }
 
@@ -83,42 +94,63 @@ class ShopRegistration
         ShopStatus $status = ShopStatus::Onboarding,
         ?array $owner = null,
     ): Shop {
-        Validator::make(['slug' => $slug], ['slug' => self::slugRules()])->validate();
+        Validator::make(
+            ['slug' => $slug, 'email' => $owner['email'] ?? null],
+            [
+                'slug' => self::slugRules(),
+                // users are platform-wide, so a plain unique across the table
+                'email' => $owner === null ? [] : ['required', 'email', 'max:255', 'unique:users,email'],
+            ],
+        )->validate();
 
         $host = self::platformHost($slug);
 
-        if ($host !== null && ShopDomain::query()->where('host', $host)->exists()) {
-            throw ValidationException::withMessages(['slug' => 'This address is already taken.']);
+        try {
+            $shop = DB::transaction(fn (): Shop => self::create($name, $slug, $template, $status, $owner, $host));
+        } catch (UniqueConstraintViolationException) {
+            // lost a race with another registration between the checks above and
+            // the insert — the same answer the checks would have given, not a 500
+            throw ValidationException::withMessages([
+                'slug' => 'This name or email was just taken. Please try again.',
+            ]);
         }
 
-        $shop = DB::transaction(function () use ($name, $slug, $template, $status, $owner, $host): Shop {
-            $shop = Shop::create(['name' => $name, 'slug' => $slug, 'status' => $status]);
-            Templates::assignToShop($shop, $template);
-
-            if ($owner !== null) {
-                $user = User::create([
-                    'name' => $owner['name'],
-                    'email' => $owner['email'],
-                    'password' => $owner['password'], // hashed cast
-                ]);
-                $user->shops()->attach($shop);
-                // The capability role (Shield). WHICH shop stays the membership
-                // above + canAccessTenant/BelongsToShop. Never studio_admin.
-                $user->assignRole('shop_owner');
-            }
-
-            if ($host !== null) {
-                $shop->domains()->create([
-                    'host' => $host,
-                    'is_primary' => true,
-                    'verified_at' => now(),
-                ]);
-            }
-
-            return $shop;
-        });
+        // the address row joined the CORS allowlist inside the transaction; bust
+        // again now it is committed, so no request re-cached the old list meanwhile
+        ShopDomain::forgetCorsOrigins();
 
         NationalGeography::seed($shop);
+
+        return $shop;
+    }
+
+    /**
+     * @param  array{name: string, email: string, password: string}|null  $owner
+     */
+    private static function create(string $name, string $slug, string $template, ShopStatus $status, ?array $owner, ?string $host): Shop
+    {
+        $shop = Shop::create(['name' => $name, 'slug' => $slug, 'status' => $status]);
+        Templates::assignToShop($shop, $template);
+
+        if ($owner !== null) {
+            $user = User::create([
+                'name' => $owner['name'],
+                'email' => $owner['email'],
+                'password' => $owner['password'], // hashed cast
+            ]);
+            $user->shops()->attach($shop);
+            // The capability role (Shield). WHICH shop stays the membership
+            // above + canAccessTenant/BelongsToShop. Never studio_admin.
+            $user->assignRole('shop_owner');
+        }
+
+        if ($host !== null) {
+            $shop->domains()->create([
+                'host' => $host,
+                'is_primary' => true,
+                'verified_at' => now(),
+            ]);
+        }
 
         return $shop;
     }
@@ -126,7 +158,7 @@ class ShopRegistration
     /** `{slug}.{base}`, or null while STOREFRONT_BASE_DOMAIN is blank (no automatic address). */
     public static function platformHost(string $slug): ?string
     {
-        $base = ShopDomain::normalizeHost((string) config('app.storefront_base_domain'));
+        $base = ltrim(ShopDomain::normalizeHost((string) config('app.storefront_base_domain')), '.');
 
         return $base === '' ? null : ShopDomain::normalizeHost("{$slug}.{$base}");
     }

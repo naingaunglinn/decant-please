@@ -91,11 +91,22 @@ class Shop extends Model
             throw new AuthorizationException('Only this shop\'s own team can publish it.');
         }
 
-        if ($this->status !== ShopStatus::Onboarding) {
+        // One conditional UPDATE, not check-then-save: a Shop loaded before the
+        // Studio suspended it must not flip `suspended` back to `live`.
+        $published = static::query()
+            ->whereKey($this->getKey())
+            ->where('status', ShopStatus::Onboarding)
+            ->update(['status' => ShopStatus::Live, 'updated_at' => now()]);
+
+        if ($published === 0) {
             throw new \DomainException('Only a shop that is still being set up can be published.');
         }
 
-        $this->forceFill(['status' => ShopStatus::Live])->save();
+        $this->refresh();
+
+        // corsOrigins() lists only live shops' domains and no domain row changed,
+        // so bust it here — or the shop's own address is refused for up to 60s.
+        ShopDomain::forgetCorsOrigins();
     }
 
     /**
