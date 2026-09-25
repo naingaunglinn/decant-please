@@ -43,7 +43,7 @@ picker, with the API unchanged; 46b (row 13b) renders the design on the storefro
 - **Design · ဒီဇိုင်း page** (`ManageDesign`): the live design, three preset cards
   (swatches, Use this design) and the history with Use this one (undo). It stays out of
   the menu until 46b renders the design.
-- `DesignSystemTest` (68 cases, including read-only impersonation) and 2 new
+- `DesignSystemTest` (69 cases, including read-only impersonation) and 2 new
   `TenantIsolationTest` cases. 606 tests on Postgres 17 (605 + 1 skip on SQLite). `schema.dbml` updated.
 - **Found on Postgres:** jsonb doesn't keep object key order, so a stored config compares
   equal to its preset but not identical. Order that means something (sections, items)
