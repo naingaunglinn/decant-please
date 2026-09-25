@@ -1,29 +1,31 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ViewTransition } from "react";
 import { getMeta, getProduct, getProducts } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
-import { headlineOf, listsOf, pillsOf, splitList } from "@/lib/attributes";
-import { ImagePlate } from "@/components/ui/ImagePlate";
+import { fullName, headlineOf, listsOf, pillsOf, sectionsOf, splitList } from "@/lib/attributes";
 import { Pill } from "@/components/ui/Pill";
 import { PurchasePanel } from "@/components/product/PurchasePanel";
 import { FragranceCard } from "@/components/catalog/FragranceCard";
 import { RecordRecentlyViewed } from "@/components/catalog/RecentlyViewed";
-import type { Product } from "@/lib/types";
+import type { CatalogMeta, Product } from "@/lib/types";
 
-/** Same-brand siblings first; if the brand is thin, top up with products sharing its
+/** Same-brand siblings first; if the brand is thin (or there is none), top up with products sharing its
  *  first select filter (decant: gender). Only a /meta filter key is sent — the API
  *  ignores any other attribute, which would top up with unrelated products. */
-async function getRelated(shop: string, fragrance: Product): Promise<Product[]> {
+async function getRelated(shop: string, fragrance: Product, meta: CatalogMeta | null): Promise<Product[]> {
   let sameBrand: Product[] = [];
   try {
-    sameBrand = (
-      await getProducts(shop, { brand: fragrance.brand.slug, per_page: "8" })
-    ).data.filter((f) => f.id !== fragrance.id);
+    // a brandless product (step 38b) has no siblings by brand — straight to the top-up
+    if (fragrance.brand) {
+      sameBrand = (
+        await getProducts(shop, { brand: fragrance.brand.slug, per_page: "8" })
+      ).data.filter((f) => f.id !== fragrance.id);
+    }
 
     if (sameBrand.length >= 2) return sameBrand.slice(0, 4);
 
-    const shared = (await getMeta(shop)).filters
+    if (!meta) return sameBrand;
+    const shared = meta.filters
       .filter((filter) => filter.type === "select")
       .map((filter) => fragrance.attributes.find((attribute) => attribute.key === filter.key))
       .find((attribute) => attribute !== undefined);
@@ -62,10 +64,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const headline = headlineOf(fragrance);
 
   return {
-    title: `${fragrance.brand.name} ${fragrance.name}`,
+    title: fullName(fragrance),
     description:
       fragrance.description ??
-      `${fragrance.brand.name} ${fragrance.name}${headline ? ` (${headline.display})` : ""} — decants from ${fragrance.min_price_formatted ?? "—"}.`,
+      `${fullName(fragrance)}${headline ? ` (${headline.display})` : ""} — ${fragrance.prices.some((p) => p.size_ml === null) ? "" : "decants "}from ${fragrance.min_price_formatted ?? "—"}.`,
     alternates: { canonical: `/product/${slug}` },
   };
 }
@@ -80,14 +82,18 @@ export default async function ProductPage({ params }: PageProps) {
   const lists = listsOf(fragrance)
     .map((attribute) => ({ ...attribute, items: splitList(attribute.display) }))
     .filter((attribute) => attribute.items.length > 0);
-  const related = await getRelated(tenant.slug, fragrance);
+  // /meta is the shop-level context: related top-up filters, and whether brand types
+  // mean anything here (decant only, step 38b). Cached; the page stands without it.
+  const meta = await getMeta(tenant.slug).catch(() => null);
+  const related = await getRelated(tenant.slug, fragrance, meta);
+  const showBrandType = fragrance.brand !== null && (meta?.brand_types.length ?? 0) > 0;
 
   return (
     <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">
       <RecordRecentlyViewed slug={fragrance.slug} />
       {/* brand pill → name (the template's headline attribute in pine) — the reference card, rebuilt */}
       <header className="flex flex-col items-start gap-4">
-        <Pill>{fragrance.brand.name}</Pill>
+        {fragrance.brand && <Pill>{fragrance.brand.name}</Pill>}
         <div className="w-full rounded-2xl border border-rule px-6 py-5">
           <h1 className="text-[26px] font-bold uppercase leading-tight tracking-[0.1em] text-ink-strong sm:text-[30px]">
             {fragrance.name}
@@ -96,26 +102,13 @@ export default async function ProductPage({ params }: PageProps) {
         </div>
       </header>
 
-      <ViewTransition name={`fragrance-image-${fragrance.slug}`} share="morph" default="none">
-        <div className="mt-6">
-          <ImagePlate
-            src={fragrance.image_url}
-            alt={`${fragrance.brand.name} ${fragrance.name}`}
-            sizes="(max-width: 768px) 100vw, (max-width: 1023px) 480px, (max-width: 1279px) 640px, 720px"
-            priority
-          />
-        </div>
-      </ViewTransition>
-
-      <div className="mt-6">
-        <PurchasePanel fragrance={fragrance} />
-      </div>
+      <PurchasePanel fragrance={fragrance} />
 
       <div className="mt-6 flex flex-wrap gap-2">
         {pillsOf(fragrance).map((attribute) => (
           <Pill key={attribute.key}>{attribute.display}</Pill>
         ))}
-        <Pill tone="muted">{fragrance.brand.type_label}</Pill>
+        {showBrandType && <Pill tone="muted">{fragrance.brand?.type_label}</Pill>}
       </div>
 
       {lists.map((attribute, index) => (
@@ -128,6 +121,17 @@ export default async function ProductPage({ params }: PageProps) {
               <Pill key={`${index}-${item}`}>{item}</Pill>
             ))}
           </div>
+        </section>
+      ))}
+
+      {sectionsOf(fragrance).map((attribute) => (
+        <section key={attribute.key} className="mt-10">
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
+            {attribute.label}
+          </h2>
+          <p className="mt-3 whitespace-pre-line rounded-2xl border border-rule px-5 py-4 text-[15px] leading-[1.7] text-ink">
+            {attribute.display}
+          </p>
         </section>
       ))}
 

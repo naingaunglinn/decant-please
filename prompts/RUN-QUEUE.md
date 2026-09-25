@@ -25,7 +25,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | pr-open | 106-templates-attributes | #122 |
 | 5b | Step 37b: storefront renders from `/meta` `filters` and product `attributes` (FilterControls, product page, cards) | §37 "As built" (split from row 5); issue #106, don't file another | pr-open | 106-storefront-attributes | #123 |
 | 6 | Step 38a: clothing template, variant options + photos in the admin, option filters (API additive) | §38, as amended | pr-open | 107-clothing-template | #124 |
-| 6b | Step 38b: storefront option picker + variant photo, option filters UI, optional brand in the API contract, size guide, demo clothing seeder | §38 "As built" (split from row 6); issue #107, don't file another | todo | | |
+| 6b | Step 38b: storefront option picker + variant photo, option filters UI, optional brand in the API contract, size guide, demo clothing seeder | §38 "As built" (split from row 6); issue #107, don't file another | in-progress | 107-storefront-options | |
 | 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | todo | | |
 | 8 | Step 40: stock modes (pooled / per variant), Myanmar weight units | §40 + roadmap group 1 | todo | | |
 | 9 | Step 41: module toggles, template default modules | §41 + roadmap "default modules" | todo | | |

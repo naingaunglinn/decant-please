@@ -17,7 +17,7 @@ export function FragranceCard({ fragrance }: { fragrance: Product }) {
       </ViewTransition>
 
       <div className="mt-4 flex flex-col items-start gap-2">
-        <Pill tone="muted">{fragrance.brand.name}</Pill>
+        {fragrance.brand && <Pill tone="muted">{fragrance.brand.name}</Pill>}
         <h3 className="text-sm font-medium uppercase leading-snug tracking-[0.12em] text-ink group-hover:text-pine">
           {fragrance.name}
           {headline && <span className="ml-2 text-muted">{headline.display}</span>}

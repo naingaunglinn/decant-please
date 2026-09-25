@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getProducts } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
+import { fullName } from "@/lib/attributes";
 import { Hero } from "@/components/home/Hero";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
 import { FeaturedRail } from "@/components/home/FeaturedRail";
@@ -68,12 +69,12 @@ export default async function HomePage({ params }: { params: Promise<{ host: str
             <Link href={`/product/${heroFragrance.slug}`} className="group block">
               <ImagePlate
                 src={heroFragrance.image_url}
-                alt={`${heroFragrance.brand.name} ${heroFragrance.name}`}
+                alt={fullName(heroFragrance)}
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
               />
               <div className="mt-4 flex items-center gap-3">
-                <Pill tone="muted">{heroFragrance.brand.name}</Pill>
+                {heroFragrance.brand && <Pill tone="muted">{heroFragrance.brand.name}</Pill>}
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-ink group-hover:text-pine">
                   {heroFragrance.name}
                 </span>

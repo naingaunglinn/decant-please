@@ -112,8 +112,7 @@ class ProductController extends Controller
     protected function baseQuery(): Builder
     {
         return Product::query()
-            ->active()
-            ->whereHas('brand', fn (Builder $brand) => $brand->where('is_active', true))
+            ->sellable()
             ->with(['brand', 'activeVariants'])
             ->withMin(['activeVariants as min_price' => fn ($query) => $query->where('in_stock', true)], 'price_mmk');
     }

@@ -9,7 +9,7 @@ export const headlineOf = (product: Product): ProductAttribute | undefined =>
 
 /** The pill row: the headline and every `pill` attribute, in template order. */
 export const pillsOf = (product: Product): ProductAttribute[] =>
-  product.attributes.filter((attribute) => attribute.show !== "list");
+  product.attributes.filter((attribute) => attribute.show === "headline" || attribute.show === "pill");
 
 /** Attributes shown as their own section of pills ("Scent notes"). */
 export const listsOf = (product: Product): ProductAttribute[] =>
@@ -17,3 +17,14 @@ export const listsOf = (product: Product): ProductAttribute[] =>
 
 export const splitList = (value: string): string[] =>
   value.split(",").map((part) => part.trim()).filter(Boolean);
+
+/** Attributes shown as their own titled paragraph ("Size guide", step 38b). */
+export const sectionsOf = (product: Product): ProductAttribute[] =>
+  product.attributes.filter((attribute) => attribute.show === "section");
+
+/** "Chanel Bleu", or just the name when the product has no brand (step 38b). */
+export const fullName = (product: Product): string =>
+  product.brand ? `${product.brand.name} ${product.name}` : product.name;
+
+/** The /products and /shop query key for a variant option filter: `option[Size]` (step 38b). */
+export const optionKey = (name: string): string => `option[${name}]`;

@@ -29,6 +29,7 @@ keep editing. See `AGENTS.md` § 9.
 | Any frontend code | `npm run typecheck` + `npm run lint` | |
 | Anything visual or flow-level | the matching `verify-*.mjs` | a green build says nothing about a correct UI |
 | The proxy, the `[host]` tree, the tenant resolver, or robots/sitemap | `verify-tenant-hosts.mjs` — against a **production build** (`next start`; the run form is in the script header) | the step-32 response-cache leak class lives here, and `next dev` has no route cache to leak from |
+| The product page, option picker, catalog filters, or anything a non-decant template renders | `verify-clothing.mjs` against the demo clothing shop (seed + run form in the script header) | decant's scripts never exercise option variants, a brandless product or a size guide |
 | A shared primitive (`components/ui/**`, `layout/**`) | `verify-responsive.mjs` at minimum | blast radius is every surface |
 | A migration | `php artisan migrate:fresh --seed` then `composer test` | seeders feed the browser checks |
 | Money anywhere — including "just formatting" | `composer test` + the money-touching Feature tests, named individually | currency bugs hide in cosmetic changes |
@@ -76,6 +77,9 @@ Notes that will otherwise cost you an hour:
   React development-only console error and will pass vacuously against a prod build.
 - `verify-image-fallback.mjs` picks its own subjects from the live catalog and reports
   **SKIP** rather than passing when the data can't exercise a case. A SKIP is not a pass.
+- `verify-clothing.mjs` needs the demo clothing shop:
+  `php artisan db:seed --class=DemoClothingShopSeeder --force` (idempotent). It places
+  one real order in that demo shop per run.
 - `verify-print.mjs` needs a real order: `CODE=... PHONE=... node scripts/verify-print.mjs`.
 - `ENGINE=webkit` re-runs the responsive matrix in WebKit — the closest local proxy for
   iOS Safari's focus-zoom rule.

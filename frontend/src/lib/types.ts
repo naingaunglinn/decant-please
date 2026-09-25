@@ -28,20 +28,22 @@ export interface ProductVariant {
 /** One template attribute on a product (step 37): `display` is what a customer
  *  reads — a select's label ("EDP"), else the value. Empty attributes are left out.
  *  `show` (step 37b) says where it goes: `headline` beside the name and in the pill
- *  row, `pill` in the pill row, `list` as its own section of comma-split pills. */
+ *  row, `pill` in the pill row, `list` as its own section of comma-split pills,
+ *  `section` as its own titled paragraph, line breaks kept (step 38b: size guide). */
 export interface ProductAttribute {
   key: string;
   label: string;
   value: string | number;
   display: string;
-  show: "headline" | "pill" | "list";
+  show: "headline" | "pill" | "list" | "section";
 }
 
 export interface Product {
   id: number;
   name: string;
   slug: string;
-  brand: Brand;
+  /** Null when the product has no brand — optional for some templates (step 38b: clothing). */
+  brand: Brand | null;
   /** The product's template key, e.g. "decant" (step 37). */
   template: string;
   /** The template's attributes, in display order. */
@@ -253,11 +255,12 @@ export interface StorefrontHost {
  *  the server re-derives the authoritative total at checkout. */
 export interface CartLine {
   variantId: number;
-  /** The variant's label, e.g. "10ml". */
+  /** The variant's label, e.g. "10ml", "M / Blue". */
   label: string;
   quantity: number;
   name: string;
-  brandName: string;
+  /** Null for a brandless product (step 38b). */
+  brandName: string | null;
   slug: string;
   priceMmk: number;
   imageUrl: string | null;

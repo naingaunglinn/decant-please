@@ -8,6 +8,10 @@ const apiUrl = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010
 const imageUrl = process.env.NEXT_PUBLIC_IMAGE_URL;
 
 const nextConfig: NextConfig = {
+  // Dev only: a second local shop is served on its own host (verify-b / the demo
+  // clothing shop, *.decant.localhost:3001). `next dev` blocks its dev assets from
+  // any origin but localhost, so the page never hydrates. No effect in production.
+  allowedDevOrigins: ["*.decant.localhost"],
   experimental: {
     viewTransition: true,
   },

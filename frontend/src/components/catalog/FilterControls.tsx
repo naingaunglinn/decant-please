@@ -3,15 +3,18 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
+import { optionKey } from "@/lib/attributes";
 import type { Brand, CatalogMeta } from "@/lib/types";
 
 /** URL params owned by the filter UI (page resets whenever one changes): the core
- *  ones plus the shop template's filters from /meta (step 37b — decant: gender, notes). */
+ *  ones plus the shop template's filters from /meta (step 37b — decant: gender, notes)
+ *  and its variant options (step 38b — clothing: option[Size], option[Color]). */
 const CORE_KEYS = ["q", "brand", "brand_type", "size", "min_price", "max_price", "sort"];
 
 const filterKeys = (meta: CatalogMeta): string[] => [
   ...CORE_KEYS,
   ...meta.filters.map((filter) => filter.key),
+  ...meta.variant_options.map((option) => optionKey(option.name)),
 ];
 
 export function useActiveFilterCount(meta: CatalogMeta): number {
@@ -79,32 +82,38 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
         />
       ))}
 
-      <FilterGroup label="Brand">
-        <ul className="flex flex-col gap-2">
-          {brands.map((brand) => (
-            <li key={brand.slug}>
-              <label className="flex min-h-8 cursor-pointer items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedBrands.has(brand.slug)}
-                  onChange={() => toggleBrand(brand.slug)}
-                  className="size-4 accent-pine"
-                />
-                <span className="flex-1">{brand.name}</span>
-                <span className="text-xs tabular-nums text-muted">{brand.fragrances_count}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </FilterGroup>
+      {/* A group shows only when the shop has something to pick in it (step 38b):
+          no brands, no ml sizes, no brand types — no empty heading. */}
+      {brands.length > 0 && (
+        <FilterGroup label="Brand">
+          <ul className="flex flex-col gap-2">
+            {brands.map((brand) => (
+              <li key={brand.slug}>
+                <label className="flex min-h-8 cursor-pointer items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedBrands.has(brand.slug)}
+                    onChange={() => toggleBrand(brand.slug)}
+                    className="size-4 accent-pine"
+                  />
+                  <span className="flex-1">{brand.name}</span>
+                  <span className="text-xs tabular-nums text-muted">{brand.fragrances_count}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </FilterGroup>
+      )}
 
-      <FilterGroup label="Brand type">
-        <PillToggleRow
-          options={meta.brand_types}
-          selected={searchParams.get("brand_type")}
-          onToggle={(value) => toggleValue("brand_type", value)}
-        />
-      </FilterGroup>
+      {meta.brand_types.length > 0 && (
+        <FilterGroup label="Brand type">
+          <PillToggleRow
+            options={meta.brand_types}
+            selected={searchParams.get("brand_type")}
+            onToggle={(value) => toggleValue("brand_type", value)}
+          />
+        </FilterGroup>
+      )}
 
       {selectFilters.map((filter) => (
         <FilterGroup key={filter.key} label={filter.label}>
@@ -116,13 +125,27 @@ export function FilterControls({ brands, meta }: FilterControlsProps) {
         </FilterGroup>
       ))}
 
-      <FilterGroup label="Size">
-        <PillToggleRow
-          options={meta.sizes.map((size) => ({ value: String(size), label: `${size}ml` }))}
-          selected={searchParams.get("size")}
-          onToggle={(value) => toggleValue("size", value)}
-        />
-      </FilterGroup>
+      {meta.variant_options
+        .filter((option) => option.values.length > 0)
+        .map((option) => (
+          <FilterGroup key={option.name} label={option.name}>
+            <PillToggleRow
+              options={option.values.map((value) => ({ value, label: value }))}
+              selected={searchParams.get(optionKey(option.name))}
+              onToggle={(value) => toggleValue(optionKey(option.name), value)}
+            />
+          </FilterGroup>
+        ))}
+
+      {meta.sizes.length > 0 && (
+        <FilterGroup label="Size">
+          <PillToggleRow
+            options={meta.sizes.map((size) => ({ value: String(size), label: `${size}ml` }))}
+            selected={searchParams.get("size")}
+            onToggle={(value) => toggleValue("size", value)}
+          />
+        </FilterGroup>
+      )}
 
       <FilterGroup label="Price (Ks)">
         <div className="flex items-center gap-2">

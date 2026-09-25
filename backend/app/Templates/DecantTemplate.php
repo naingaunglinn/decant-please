@@ -55,6 +55,11 @@ class DecantTemplate extends Template
         return 'ml';
     }
 
+    public function brandTypes(): bool
+    {
+        return true;
+    }
+
     public function variantsHeading(): string
     {
         return 'Decant prices';

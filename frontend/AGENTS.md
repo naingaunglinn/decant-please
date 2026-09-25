@@ -120,6 +120,7 @@ change and paste its real output — not a summary of what you expect it to say.
 | `verify-home-rails.mjs` | featured vs recently-viewed `<ViewTransition>` name collisions | **dev server only** (needs React dev warnings) |
 | `verify-image-fallback.mjs` | missing image falls back to the vial glyph, not a broken icon | dev or prod |
 | `verify-print.mjs` | printed receipt is a static document, not the live view | needs `CODE=` + `PHONE=` |
+| `verify-clothing.mjs` | step 38b: a clothing shop end to end — option filters, the Size → Color picker, sold-out values, brandless product, size guide, cart label, checkout by `variant_id`; decant still on the ml list | the demo clothing shop (`DemoClothingShopSeeder`, `clothing.decant.localhost:3001`) |
 | `verify-tenant-hosts.mjs` | ADR-0004 host routing: per-tenant pages, the step-32 same-path/two-hosts cache case (both orders), fail-closed unknown hosts, secondary→primary 308, per-tenant robots/sitemap | dev proves correctness; **`next start` proves the cache** (fixture snippet in the script header) |
 
 ```bash

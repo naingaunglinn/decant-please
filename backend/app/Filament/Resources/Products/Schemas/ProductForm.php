@@ -45,7 +45,7 @@ class ProductForm
                             ->relationship('brand', 'name')
                             ->searchable()
                             ->preload()
-                            ->required()
+                            ->required($template->brandRequired())
                             ->createOptionForm([
                                 TextInput::make('name')
                                     ->required()
@@ -275,7 +275,7 @@ class ProductForm
             $field = match (true) {
                 $attribute->type === Attribute::SELECT => Select::make("attributes.{$attribute->key}")->options($attribute->options),
                 $attribute->type === Attribute::NUMBER => TextInput::make("attributes.{$attribute->key}")->numeric(),
-                $attribute->long => Textarea::make("attributes.{$attribute->key}")->rows(2),
+                $attribute->long => Textarea::make("attributes.{$attribute->key}")->rows($attribute->section ? 5 : 2),
                 default => TextInput::make("attributes.{$attribute->key}"),
             };
 
