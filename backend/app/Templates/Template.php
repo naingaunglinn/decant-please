@@ -118,6 +118,12 @@ abstract class Template
         return 'Prep date';
     }
 
+    /** The hint under that date on the order form. */
+    public function prepDateHelp(): string
+    {
+        return 'The day you get this order ready.';
+    }
+
     /** @return list<string> modules on by default (read by step 41) */
     abstract public function defaultModules(): array;
 

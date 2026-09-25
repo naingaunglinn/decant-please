@@ -79,6 +79,11 @@ class DecantTemplate extends Template
         return 'Decant date';
     }
 
+    public function prepDateHelp(): string
+    {
+        return 'The day you physically decant this order.';
+    }
+
     public function defaultModules(): array
     {
         return ['delivery_zones', 'stock', 'cost', 'production_schedule', 'promo_codes', 'expenses'];

@@ -487,7 +487,7 @@ under the size budget, so no split).
 - `Template::prepDateLabel()` (decant "Decant date", clothing "Packing date", default
   "Prep date") names the date on the order form, accept modal, orders table, upcoming
   widget and CSV header — without it the rename would have shown a decant seller
-  "Prep date".
+  "Prep date". `prepDateHelp()` does the same for the hint under it.
 - Tracking API: `status_labels` (every state, additive), `prep_date`, and a `decant_date`
   deploy alias. The storefront timeline names the third step from `status_labels.prepared`
   and accepts both `"prepared"` and `"decanted"`, so either deploy order works; the alias

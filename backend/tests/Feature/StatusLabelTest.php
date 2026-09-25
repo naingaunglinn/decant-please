@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Enums\ShopStatus;
+use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Models\Order;
 use App\Models\Shop;
@@ -103,6 +104,11 @@ class StatusLabelTest extends TestCase
             ->assertDontSee('Decanted')
             ->set('activeTab', 'prepared')
             ->assertCanSeeTableRecords(Order::where('status', OrderStatus::Prepared)->get());
+
+        Livewire::test(EditOrder::class, ['record' => Order::first()->getRouteKey()])
+            ->assertSee('Packing date')
+            ->assertSee('The day you pack this order.')
+            ->assertDontSee('physically decant');
     }
 
     public function test_the_migration_round_trips_on_seeded_rows_and_moves_only_the_status_string(): void

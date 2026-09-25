@@ -88,6 +88,11 @@ class ClothingTemplate extends Template
         return 'Packing date';
     }
 
+    public function prepDateHelp(): string
+    {
+        return 'The day you pack this order.';
+    }
+
     public function defaultModules(): array
     {
         // Read by step 41. No ml stock, cost or decant schedule.

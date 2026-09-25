@@ -89,7 +89,7 @@ class OrderForm
                             ->label(fn (): string => Templates::forShop()->prepDateLabel())
                             ->required()
                             ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value)
-                            ->helperText('The day you physically decant this order.'),
+                            ->helperText(fn (): string => Templates::forShop()->prepDateHelp()),
                         DatePicker::make('delivery_date')
                             ->afterOrEqual('prep_date')
                             ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value),

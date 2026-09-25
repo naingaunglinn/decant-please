@@ -123,7 +123,7 @@ class OrderResource extends Resource
         }
 
         if ($parts === []) {
-            return 'Sets the decant schedule and moves the order to Pending.';
+            return 'Sets the decant schedule and moves the order to '.OrderStatus::Pending->label().'.';
         }
 
         return implode(' ', $parts).' You can still accept — you know your bottles best.';
