@@ -99,6 +99,25 @@ class ProductTemplateTest extends TestCase
         $this->assertSame(['Allure Édition Blanche'], $this->search('q=%C3%A9dition')); // "édition"
     }
 
+    public function test_moving_a_product_to_another_brand_uses_the_new_brands_name(): void
+    {
+        $product = $this->allure();
+        $creed = Brand::create(['name' => 'Creed', 'type' => 'niche']);
+
+        $product->load('brand'); // a loaded relation goes stale when brand_id changes
+        $product->update(['brand_id' => $creed->id]);
+
+        $this->assertStringStartsWith('creed allure', $product->fresh()->search_text);
+        $this->assertSame([], $this->search('q=chanel'));
+    }
+
+    public function test_an_attribute_key_may_not_shadow_a_products_parameter(): void
+    {
+        $this->expectException(\LogicException::class);
+
+        Attribute::select('size', 'Size', ['s' => 'S'], filterable: true);
+    }
+
     public function test_renaming_a_brand_rebuilds_its_products_search_text(): void
     {
         $this->allure();

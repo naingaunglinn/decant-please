@@ -40,12 +40,20 @@ class ProductResource extends Resource
     // command listing resources — the generic word, never a tenant query.
     public static function getModelLabel(): string
     {
-        return app(TenantContext::class)->has() ? Templates::forShop()->productNouns()[0] : 'product';
+        return self::productNouns()[0];
     }
 
     public static function getPluralModelLabel(): string
     {
-        return app(TenantContext::class)->has() ? Templates::forShop()->productNouns()[1] : 'products';
+        return self::productNouns()[1];
+    }
+
+    /** Filament asks for the labels many times a page: one settings read per shop per request. */
+    private static function productNouns(): array
+    {
+        $shopId = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : null;
+
+        return once(fn (): array => $shopId !== null ? Templates::forShop()->productNouns() : ['product', 'products']);
     }
 
     /**

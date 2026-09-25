@@ -157,6 +157,10 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopA);
         $this->assertSame(2, Category::count());
         $this->assertSame(0, $tops->products()->count());
+
+        app(TenantContext::class)->set(null);
+        $this->expectException(TenantNotSetException::class);
+        Category::count(); // must throw, NOT return every shop's rows
     }
 
     public function test_catalog_queries_return_only_the_current_shops_rows(): void

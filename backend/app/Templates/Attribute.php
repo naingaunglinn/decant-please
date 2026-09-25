@@ -2,6 +2,8 @@
 
 namespace App\Templates;
 
+use LogicException;
+
 /**
  * One catalog attribute a template defines (step 37) — "Concentration", "Material".
  * Values live in products.attributes (jsonb), keyed by $key. Code-defined, never
@@ -11,6 +13,9 @@ namespace App\Templates;
  * - searchable: its value goes into products.search_text, so `q` finds it
  * - translatable: a flag for future Burmese values; no translated data exists yet
  * - long: a multi-line field in the admin (Textarea rather than TextInput)
+ *
+ * A key is also a /products query parameter when filterable, so it may not be one
+ * of the core parameters (RESERVED_KEYS) — a clash would replace their validation.
  */
 final readonly class Attribute
 {
@@ -19,6 +24,9 @@ final readonly class Attribute
     public const TEXT = 'text';
 
     public const NUMBER = 'number';
+
+    /** /products' own query parameters (ProductController::index). */
+    public const RESERVED_KEYS = ['q', 'brand', 'type', 'size', 'min_price', 'max_price', 'featured', 'sort', 'page', 'per_page'];
 
     /** @param  array<string, string>  $options  value => label, for select attributes */
     private function __construct(
@@ -32,7 +40,11 @@ final readonly class Attribute
         public bool $translatable = false,
         public bool $long = false,
         public ?string $help = null,
-    ) {}
+    ) {
+        if (in_array($key, self::RESERVED_KEYS, true)) {
+            throw new LogicException("\"{$key}\" is a /products parameter and can't be an attribute key.");
+        }
+    }
 
     /** @param  array<string, string>  $options  value => label */
     public static function select(string $key, string $label, array $options, bool $required = false, bool $filterable = false, ?string $help = null): self

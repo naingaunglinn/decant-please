@@ -13,8 +13,10 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 **v42** is the first half of step 37 (**#106**). Catalog attributes move into code-defined
 templates. A decant shop sees nothing new in the admin, except that the attribute fields
-share one "Details" section and the gender badge is gray. The storefront is unchanged: the
-API only gains keys. 37b, the next queue row, moves the storefront onto them.
+share one "Details" section and the gender badge is gray. The storefront code is unchanged
+and the API only gains keys, but search is wider: `q` also matches scent notes, and the
+"Scent notes" box also matches brand and name. 37b, the next queue row, moves the
+storefront onto the new keys.
 
 - **Templates** (`app/Templates/`): `Template`, `Attribute` (select / text / number, with
   `required`, `filterable`, `searchable`, `translatable`), `DecantTemplate`, and the
@@ -30,6 +32,12 @@ API only gains keys. 37b, the next queue row, moves the storefront onto them.
     `down()` restores them, NOT NULL and the gender index included.
   - On Postgres 17, up → down → up keeps an identical hash of the five values (as
     columns, then as attributes) and of the order-line money.
+- **Deploy (maintenance on, like 36b).** The second migration drops columns the running
+  36b code reads, and Heroku's release phase migrates while the old dynos still serve.
+  Turn maintenance on before the promotion and off once the release is out. To roll back,
+  run `php artisan migrate:rollback --step=2` **before** rolling back the code; a
+  code-only rollback leaves the columns gone. `/meta` may serve its cached pre-37 payload
+  (without `filters`) for up to 10 minutes; nothing reads `filters` until 37b.
 - **Product rules** (`Product::booted`):
   - A new product takes the shop's default template.
   - A template outside the shop's group is refused.
@@ -49,11 +57,13 @@ API only gains keys. 37b, the next queue row, moves the storefront onto them.
   The "Fragrance(s)" label comes from the template's product nouns. CSV import reads the
   template's attribute columns, and the file format is unchanged.
 - **Tests.**
-  - New: `ProductTemplateTest` (12 tests).
+  - New: `ProductTemplateTest` (14 tests).
   - New: a `categories` isolation test.
   - The suite's product fixtures now write `attributes`.
   - Parity changed fixtures only; every recorded value is the same.
-  - 399 tests pass on SQLite and on Postgres 17.
+  - 401 tests pass on SQLite and on Postgres 17.
+  - Both migrations were also run up → down → up on SQLite, and the five values
+    hash the same at every step.
 
 ## 0. What changed in v41
 

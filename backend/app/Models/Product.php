@@ -80,11 +80,12 @@ class Product extends Model
     /**
      * Rebuild search_text from brand, name and the searchable attributes. The
      * brand name is queried, not lazy-loaded, unless the relation is already here
-     * (a Brand rename sets it; see Brand::booted()).
+     * and current (a Brand rename sets it; see Brand::booted()).
      */
     public function refreshSearchText(): void
     {
-        $brandName = $this->relationLoaded('brand')
+        // A loaded brand is stale once brand_id changes (Laravel keeps the old one).
+        $brandName = $this->relationLoaded('brand') && ! $this->isDirty('brand_id')
             ? $this->brand?->name
             : ($this->brand_id ? Brand::query()->whereKey($this->brand_id)->value('name') : null);
 

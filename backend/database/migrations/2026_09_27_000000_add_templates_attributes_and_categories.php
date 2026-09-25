@@ -84,7 +84,7 @@ return new class extends Migration
 
     /**
      * The five columns, as they are, keyed by name — nulls kept, so the next
-     * migration's down() restores each column exactly. Public for ProductAttributesTest.
+     * migration's down() restores each column exactly. Public for ProductTemplateTest.
      *
      * @return array<string, mixed>
      */
