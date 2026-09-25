@@ -28,7 +28,9 @@ The step is well over one reviewable PR. It splits on the same seam as 36 and 38
 - **46b (row 13b): the storefront renders the published design.** The design goes into the
   API with `types.ts`. The storefront applies the colours and font as CSS variables on a
   wrapper (the `globals.css` `@theme` block is untouched) and builds the home page from
-  the section list. The Design page joins the menu.
+  the section list. The Design page joins the menu. Publishing busts only
+  `api.meta.{slug}` (`ShopSetting::booted`), so the design goes in `/meta`, or a new
+  endpoint's cache key is busted there too.
 - **46c (row 13c): the manual editor.** A phone-first form over the same config: colours
   (with the contrast rule shown in words), font, section order and on/off, section text,
   and decoration images (hero, about) uploaded to `shops/{id}/design/…`, compressed on the
