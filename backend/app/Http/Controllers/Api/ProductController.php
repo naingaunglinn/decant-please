@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\BrandType;
-use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Templates\Attribute;
+use App\Templates\Templates;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,34 +17,42 @@ class ProductController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
+        // The shop's template decides which attributes filter (step 37): ?gender=
+        // for decant. A select matches its stored value; a text attribute is a
+        // substring of search_text, never a LIKE into jsonb.
+        $attributeFilters = Templates::forShop()->filterable();
+
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:100'],
             'brand' => ['nullable', 'string', 'max:255'], // comma-separated brand slugs
             'type' => ['nullable', Rule::enum(BrandType::class)],
-            'gender' => ['nullable', Rule::enum(Gender::class)],
             'size' => ['nullable', 'integer', 'min:1'],
             'min_price' => ['nullable', 'integer', 'min:0'],
             'max_price' => ['nullable', 'integer', 'min:0'],
             'featured' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['newest', 'price_asc', 'price_desc', 'name'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            ...collect($attributeFilters)->mapWithKeys(fn (Attribute $attribute): array => [
+                $attribute->key => $attribute->type === Attribute::SELECT
+                    ? ['nullable', Rule::in(array_keys($attribute->options))]
+                    : ['nullable', 'string', 'max:100'],
+            ])->all(),
         ]);
 
         $query = $this->baseQuery()
-            // whereLike, not where(…, 'like', …): a bare LIKE is case-insensitive on
-            // MySQL but case-sensitive on Postgres, so searching "creed" would stop
-            // matching "Creed". whereLike defaults to caseSensitive: false and lets
-            // each grammar say what it means — ilike on Postgres, like everywhere else.
-            ->when($filters['q'] ?? null, fn (Builder $query, string $q) => $query->where(fn (Builder $sub) => $sub
-                ->whereLike('name', "%{$q}%")
-                ->orWhereHas('brand', fn (Builder $brand) => $brand->whereLike('name', "%{$q}%"))))
-            ->when($filters['notes'] ?? null, fn (Builder $query, string $notes) => $query->whereLike('notes', "%{$notes}%"))
+            ->when($filters['q'] ?? null, fn (Builder $query, string $q) => $query->search($q));
+
+        foreach ($attributeFilters as $attribute) {
+            $query->when($filters[$attribute->key] ?? null, fn (Builder $query, string $value) => $attribute->type === Attribute::SELECT
+                ? $query->where("products.attributes->{$attribute->key}", $value)
+                : $query->search($value));
+        }
+
+        $query
             ->when($filters['brand'] ?? null, fn (Builder $query, string $slugs) => $query
                 ->whereHas('brand', fn (Builder $brand) => $brand->whereIn('slug', explode(',', $slugs))))
             ->when($filters['type'] ?? null, fn (Builder $query, string $type) => $query
                 ->whereHas('brand', fn (Builder $brand) => $brand->where('type', $type)))
-            ->when($filters['gender'] ?? null, fn (Builder $query, string $gender) => $query->where('gender', $gender))
             ->when($filters['size'] ?? null, fn (Builder $query, int $size) => $query
                 ->whereHas('activeVariants', fn (Builder $price) => $price->where('size_ml', $size)->where('in_stock', true)))
             ->when(

@@ -20,7 +20,7 @@ Principles P1–P6) throughout.
 - [x] **Pre-35 — #67 first** (correct money before the baseline) — merged before the baseline was recorded
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
 - [x] **36** — Product + Variant model — split in two (#105): **36a built** (v40: schema, models, admin; API unchanged), **36b built** (v41: API contract + storefront)
-- [ ] **37** — Templates + attributes
+- [ ] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), 37b next (storefront renders from `attributes` / `filters`)
 - [ ] **38** — Clothing template
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [ ] **39** — Status labels (template-driven; `decanted→prepared`)
@@ -288,6 +288,43 @@ be lossless (parity guards values); template-driven Filament forms are the trick
 
 **Deliberately not built.** No DB template editor (code only); no per-attribute i18n *data*
 (flag only); brand stays normalized.
+
+**As built — split in two (#106).** Like step 36, the whole step is over one reviewable
+PR. The seam is the storefront.
+
+- **37a (v42): backend, with an additive contract.** Everything above except the
+  storefront.
+  - Templates: `app/Templates/` — `Template`, `Attribute`, `DecantTemplate`, `Templates`.
+  - Both migrations (add + backfill, then drop the five columns).
+  - `search_text`, the brand-rename rebuild, `products.template` / `shop_settings.template`,
+    and `categories` with its isolation test.
+  - The template-driven admin form, table and CSV import.
+  - `/meta` `filters`, and `attributes` + `template` on the product.
+
+  Decisions and deviations:
+  - **The API is additive, not replaced.** `/meta` keeps `genders`/`concentrations` and
+    the product keeps its flat perfume keys (now read from `attributes`), so the pre-37
+    storefront keeps working on the new API. They go with the other aliases after go-live
+    (RUN-QUEUE row 32).
+  - **`Attribute` gained `required`** (concentration and gender were NOT NULL columns) and
+    `long` (Textarea vs TextInput). It is enforced in the admin form and the CSV import,
+    not by the model — like `description`.
+  - **`notes` filters through `search_text`**, because a text filter may not LIKE into
+    jsonb. So `?notes=chanel` also matches the brand, and `q` now matches notes too, since
+    notes are searchable. `q` also matches across brand + name ("chanel bleu").
+  - **`search_text` has no index.** `%q%` can't use a btree, and a btree entry has a
+    size limit a long notes field could hit. It is lowercased in PHP (`mb_strtolower`),
+    because SQLite's `LOWER()` folds ASCII only. `%` and `_` are escaped.
+  - **Filters come from the shop's default template**, not per product. A mixed-template
+    shop (step 38 onward) filters by its default's attributes.
+  - The column is named `attributes`, as specified. Inside `Product`, `$this->attributes`
+    is Eloquent's raw array, so the model reads values through `attr()` / `attrDisplay()`.
+  - The template picker in the admin waits for step 38. Until then group 1 has one
+    template, so there is nothing to pick.
+  - No admin screen for `categories` yet: menu categories are RUN-QUEUE row 20, and P3
+    says a decant shop sees nothing new.
+- **37b: the storefront.** `FilterControls` renders from `/meta` `filters`, and the
+  product page and cards render from `attributes` instead of the flat keys.
 
 ## Step 38 — Clothing template
 

@@ -8,6 +8,8 @@ use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Filament\Resources\Products\Tables\ProductsTable;
 use App\Models\Product;
+use App\Support\TenantContext;
+use App\Templates\Templates;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
@@ -30,12 +32,21 @@ class ProductResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    // The decant shop keeps seeing "Fragrances" (P3: nothing new for it). Step 37
-    // takes the label from the shop's template.
-    protected static ?string $modelLabel = 'fragrance';
-
     // Keep the /admin/{shop}/fragrances URL a seller may have bookmarked.
     protected static ?string $slug = 'fragrances';
+
+    // The words come from the shop's template (step 37): a decant shop keeps
+    // seeing "Fragrances" (P3: nothing new for it). With no shop set — an artisan
+    // command listing resources — the generic word, never a tenant query.
+    public static function getModelLabel(): string
+    {
+        return app(TenantContext::class)->has() ? Templates::forShop()->productNouns()[0] : 'product';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return app(TenantContext::class)->has() ? Templates::forShop()->productNouns()[1] : 'products';
+    }
 
     /**
      * Products referenced by order items are FK-protected (restrictOnDelete).

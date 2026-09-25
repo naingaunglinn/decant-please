@@ -374,7 +374,7 @@ class ProductionScheduleTest extends TestCase
         $brand = Brand::firstOrCreate(['name' => $brandName], ['type' => 'designer']);
 
         return $brand->products()
-            ->firstOrCreate(['name' => $name], ['concentration' => 'cologne', 'gender' => 'male'])
+            ->firstOrCreate(['name' => $name], ['attributes' => ['concentration' => 'cologne', 'gender' => 'male']])
             ->loadMissing('brand');
     }
 

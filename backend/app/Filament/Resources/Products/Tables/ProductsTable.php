@@ -3,13 +3,13 @@
 namespace App\Filament\Resources\Products\Tables;
 
 use App\Enums\BrandType;
-use App\Enums\Concentration;
-use App\Enums\Gender;
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Support\CatalogImport;
 use App\Support\Money;
 use App\Support\TenantContext;
+use App\Templates\Attribute;
+use App\Templates\Templates;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -42,6 +42,13 @@ class ProductsTable
         $storefront = app(TenantContext::class)->get()?->storefrontUrl()
             ?? rtrim(config('app.frontend_url'), '/');
 
+        // The shop template's select attributes (step 37) — a badge column and a
+        // filter each: concentration and gender for decant.
+        $selects = array_values(array_filter(
+            Templates::forShop()->attributes(),
+            fn (Attribute $attribute): bool => $attribute->type === Attribute::SELECT,
+        ));
+
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
                 ->with('variants')
@@ -57,16 +64,11 @@ class ProductsTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('concentration')
+                ...array_map(fn (Attribute $attribute): TextColumn => TextColumn::make("attr_{$attribute->key}")
+                    ->label($attribute->label)
+                    ->state(fn (Product $record): ?string => $record->attrDisplay($attribute->key))
                     ->badge()
-                    ->color('gray'),
-                TextColumn::make('gender')
-                    ->badge()
-                    ->color(fn (Gender $state): string => match ($state) {
-                        Gender::Male => 'blue',
-                        Gender::Female => 'rose',
-                        Gender::Unisex => 'gray',
-                    }),
+                    ->color('gray'), $selects),
                 TextColumn::make('min_in_stock_price')
                     ->label('From price')
                     ->state(fn (Product $record): string => $record->min_in_stock_price !== null
@@ -116,10 +118,11 @@ class ProductsTable
                     ->options(BrandType::class)
                     ->query(fn (Builder $query, array $data) => $query->when($data['value'] ?? null,
                         fn (Builder $q, string $type) => $q->whereHas('brand', fn (Builder $b) => $b->where('type', $type)))),
-                SelectFilter::make('concentration')
-                    ->options(Concentration::class),
-                SelectFilter::make('gender')
-                    ->options(Gender::class),
+                ...array_map(fn (Attribute $attribute): SelectFilter => SelectFilter::make("attr_{$attribute->key}")
+                    ->label($attribute->label)
+                    ->options($attribute->options)
+                    ->query(fn (Builder $query, array $data) => $query->when($data['value'] ?? null,
+                        fn (Builder $q, string $value) => $q->where("products.attributes->{$attribute->key}", $value))), $selects),
                 TernaryFilter::make('is_active'),
                 TernaryFilter::make('is_featured'),
                 SelectFilter::make('has_size')

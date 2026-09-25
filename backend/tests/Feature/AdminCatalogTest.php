@@ -87,7 +87,7 @@ class AdminCatalogTest extends TestCase
     public function test_deleting_a_brand_with_fragrances_keeps_it_and_says_why(): void
     {
         $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
-        $allure = $chanel->products()->create(['name' => 'Allure', 'concentration' => 'edt', 'gender' => 'male']);
+        $allure = $chanel->products()->create(['name' => 'Allure', 'attributes' => ['concentration' => 'edt', 'gender' => 'male']]);
         $dior = Brand::create(['name' => 'Dior', 'type' => 'designer']);
 
         Livewire::test(ListBrands::class)
@@ -104,7 +104,7 @@ class AdminCatalogTest extends TestCase
     public function test_bulk_deleting_brands_keeps_the_ones_with_fragrances(): void
     {
         $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
-        $chanel->products()->create(['name' => 'Allure', 'concentration' => 'edt', 'gender' => 'male']);
+        $chanel->products()->create(['name' => 'Allure', 'attributes' => ['concentration' => 'edt', 'gender' => 'male']]);
         $dior = Brand::create(['name' => 'Dior', 'type' => 'designer']);
 
         Livewire::test(ListBrands::class)
@@ -123,8 +123,7 @@ class AdminCatalogTest extends TestCase
             ->fillForm([
                 'brand_id' => $brand->id,
                 'name' => 'Allure Homme Sport',
-                'concentration' => 'cologne',
-                'gender' => 'male',
+                'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
                 'variants' => [
                     ['size_ml' => 5, 'price_mmk' => 30000, 'in_stock' => true],
                     ['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true],
@@ -147,8 +146,7 @@ class AdminCatalogTest extends TestCase
             ->fillForm([
                 'brand_id' => $brand->id,
                 'name' => 'Bleu de Chanel',
-                'concentration' => 'edp',
-                'gender' => 'male',
+                'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
                 'variants' => [
                     ['size_ml' => 10, 'price_mmk' => 70000, 'in_stock' => true],
                     ['size_ml' => 10, 'price_mmk' => 80000, 'in_stock' => true],
@@ -166,8 +164,7 @@ class AdminCatalogTest extends TestCase
         $fragrance = Product::create([
             'brand_id' => $brand->id,
             'name' => 'Allure Homme Sport',
-            'concentration' => 'cologne',
-            'gender' => 'male',
+            'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
         ]);
         $fragrance->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000, 'in_stock' => false], // cheapest, but out of stock

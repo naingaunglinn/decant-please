@@ -19,11 +19,26 @@ export interface ProductVariant {
   in_stock: boolean;
 }
 
+/** One template attribute on a product (step 37): `display` is what a customer
+ *  reads — a select's label ("EDP"), else the value. Empty attributes are left out. */
+export interface ProductAttribute {
+  key: string;
+  label: string;
+  value: string | number;
+  display: string;
+}
+
 export interface Product {
   id: number;
   name: string;
   slug: string;
   brand: Brand;
+  /** The product's template key, e.g. "decant" (step 37). */
+  template: string;
+  /** The template's attributes, in display order. */
+  attributes: ProductAttribute[];
+  // The flat decant keys below come from `attributes` since step 37 and go after
+  // go-live (RUN-QUEUE row 32); new code reads `attributes`.
   concentration: string;
   concentration_label: string;
   gender: "male" | "female" | "unisex";
@@ -62,7 +77,17 @@ export interface PaymentInfo {
   instructions?: string;
 }
 
+/** A filter the shop's template defines (step 37): `?{key}=` on /products. A
+ *  select lists its options; a text filter is a free-text box. */
+export interface CatalogFilter {
+  key: string;
+  label: string;
+  type: "select" | "text";
+  options: { value: string; label: string }[];
+}
+
 export interface CatalogMeta {
+  filters: CatalogFilter[];
   brand_types: { value: string; label: string }[];
   genders: { value: string; label: string }[];
   concentrations: { value: string; label: string }[];

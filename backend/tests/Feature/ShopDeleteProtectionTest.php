@@ -70,7 +70,7 @@ class ShopDeleteProtectionTest extends TestCase
         $brand = Brand::create(['name' => 'Cascade Brand', 'type' => 'designer']);
         // products.brand_id restricts delete (step 36): the shop cascade must still
         // clear a brand that has products, not trip over its own restrict.
-        $product = $brand->products()->create(['name' => 'Cascade Scent', 'concentration' => 'edp', 'gender' => 'unisex']);
+        $product = $brand->products()->create(['name' => 'Cascade Scent', 'attributes' => ['concentration' => 'edp', 'gender' => 'unisex']]);
         $product->variants()->create(['size_ml' => 5, 'price_mmk' => 20000]);
 
         $shop->delete();

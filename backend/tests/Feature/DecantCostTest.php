@@ -205,8 +205,7 @@ class DecantCostTest extends TestCase
 
         $fragrance = $brandModel->products()->create([
             'name' => $name,
-            'concentration' => 'edp',
-            'gender' => 'male',
+            'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
             'bottle_cost_mmk' => $cost,
             'bottle_volume_ml' => $volume,
         ]);

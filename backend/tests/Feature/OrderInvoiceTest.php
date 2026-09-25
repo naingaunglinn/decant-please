@@ -225,8 +225,7 @@ class OrderInvoiceTest extends TestCase
             $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
             $fragrance = $brand->products()->create([
                 'name' => 'Allure Homme Sport',
-                'concentration' => 'cologne',
-                'gender' => 'male',
+                'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
             ]);
 
             return $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);

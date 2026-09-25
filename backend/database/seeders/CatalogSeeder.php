@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Brand;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 
 class CatalogSeeder extends Seeder
 {
@@ -19,7 +20,12 @@ class CatalogSeeder extends Seeder
                 $prices = $fragrance['prices'];
                 unset($fragrance['prices']);
 
-                $fragranceModel = $brandModel->products()->create($fragrance);
+                // The five perfume fields are decant-template attributes (step 37).
+                $attributeKeys = ['concentration', 'gender', 'notes', 'vibes', 'performance'];
+                $fragranceModel = $brandModel->products()->create([
+                    ...Arr::except($fragrance, $attributeKeys),
+                    'attributes' => Arr::only($fragrance, $attributeKeys),
+                ]);
 
                 foreach ($prices as $size => $price) {
                     $fragranceModel->variants()->create([

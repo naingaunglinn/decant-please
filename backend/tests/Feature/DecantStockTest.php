@@ -114,8 +114,7 @@ class DecantStockTest extends TestCase
 
         $fragrance = $brandModel->products()->create([
             'name' => $name,
-            'concentration' => 'edp',
-            'gender' => 'male',
+            'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
             'stock_ml' => $stockMl,
             'low_stock_threshold_ml' => $threshold,
         ]);

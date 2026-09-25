@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\BrandType;
-use App\Enums\Concentration;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Models\Brand;
 use App\Models\Product;
@@ -103,7 +102,7 @@ class CatalogImportTest extends TestCase
         $this->assertSame(1, Brand::count()); // "chanel" reused the existing Chanel
 
         $no5 = Product::where('name', 'No 5')->firstOrFail();
-        $this->assertSame(Concentration::Parfum, $no5->concentration);
+        $this->assertSame('parfum', $no5->attr('concentration'));
     }
 
     public function test_burmese_text_and_excel_bom_survive_the_round_trip(): void

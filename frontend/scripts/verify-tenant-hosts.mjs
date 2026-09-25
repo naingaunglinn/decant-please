@@ -25,7 +25,7 @@
 //     foreach ([['decant-please', 55000], ['verify-b', 66000]] as [\$slug, \$price]) {
 //       \$ctx->set(App\Models\Shop::where('slug', \$slug)->firstOrFail());
 //       \$brand = App\Models\Brand::firstOrCreate(['name' => 'Verify Brand'], ['type' => 'niche', 'is_active' => true]);
-//       \$frag = App\Models\Product::firstOrCreate(['name' => 'Cache Probe'], ['brand_id' => \$brand->id, 'concentration' => 'edp', 'gender' => 'unisex', 'is_active' => true]);
+//       \$frag = App\Models\Product::firstOrCreate(['name' => 'Cache Probe'], ['brand_id' => \$brand->id, 'attributes' => ['concentration' => 'edp', 'gender' => 'unisex'], 'is_active' => true]);
 //       \$frag->variants()->firstOrCreate(['size_ml' => 10], ['price_mmk' => \$price, 'in_stock' => true]);
 //     }
 //     echo 'fixtures ok';"

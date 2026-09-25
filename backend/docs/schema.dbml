@@ -117,11 +117,6 @@ Table products {
   brand_id bigint [null, note: 'optional per template; a brand with products cannot be deleted (archive it)']
   name varchar [not null]
   slug varchar [not null]
-  concentration varchar [not null, note: 'Concentration enum']
-  gender varchar [not null, note: 'Gender enum']
-  notes text [null]
-  vibes text [null]
-  performance varchar [null]
   description text [null]
   image_path varchar [null]
   is_active boolean [not null, default: true]
@@ -132,10 +127,25 @@ Table products {
   bottle_volume_ml int [null]
   created_at timestamp [null]
   updated_at timestamp [null]
+  attributes jsonb [null, note: 'the template\'s attribute values, e.g. {"concentration":"edp","gender":"male","notes":"…"}']
+  search_text text [null, note: 'lowercase brand + name + searchable attributes; what `q` searches (no index: %q% can\'t use one)']
+  template varchar [not null, default: 'decant', note: 'App\\Templates key; copied from shop_settings.template on create']
+  category_id bigint [null, note: 'FK → categories (same shop), SET NULL']
   indexes {
     (shop_id, slug) [unique]
-    gender
     is_active
+  }
+}
+
+Table categories {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  name varchar [not null, note: 'a shop\'s own grouping — menu sections, "tops / dresses"']
+  position int [not null, default: 0]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, name) [unique]
   }
 }
 
@@ -252,6 +262,7 @@ Table shop_settings {
   facebook_url varchar [null]
   created_at timestamp [null]
   updated_at timestamp [null]
+  template varchar [not null, default: 'decant', note: 'the shop\'s default template; products take it on create']
 }
 
 Table expenses {
@@ -374,6 +385,8 @@ Ref: studio_audit_events.shop_id > shops.id [delete: set null]
 Ref: brands.shop_id > shops.id [delete: cascade]
 Ref: products.shop_id > shops.id [delete: cascade]
 Ref: products.brand_id > brands.id [delete: no action]
+Ref: products.category_id > categories.id [delete: set null]
+Ref: categories.shop_id > shops.id [delete: cascade]
 Ref: product_variants.shop_id > shops.id [delete: cascade]
 Ref: product_variants.product_id > products.id [delete: cascade]
 Ref: promo_codes.shop_id > shops.id [delete: cascade]

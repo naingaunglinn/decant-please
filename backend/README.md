@@ -86,7 +86,7 @@ moves a studio user between shops**
 | `/admin/login` | The only public admin route |
 | `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
 | `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD, sizes (archived, never deleted), stock, "View on site" |
+| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD — attribute fields, columns and filters come from the shop's template — sizes (archived, never deleted), stock, "View on site" |
 | `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/{shop}/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
 | `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
@@ -157,13 +157,14 @@ backend/
 │   │   ├── Controllers/                    # OrderInvoiceController (A5 PDFs), PaymentProofViewController (streams proofs) — panel-auth'd
 │   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder, ValidatePromo, PaymentProof, StorefrontHost
 │   │   └── Resources/                      # JSON shaping for brands, fragrances, prices, storefront hosts
-│   ├── Models/                             # Brand, Product, ProductVariant, Order, OrderItem, PromoCode, Shop, ShopDomain (+ Concerns/HasSlug)
+│   ├── Models/                             # Brand, Product, ProductVariant, Category, Order, OrderItem, PromoCode, Shop, ShopDomain (+ Concerns/HasSlug)
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php          # forces HTTPS in production, N+1 guard, explicit event wiring (auto-discovery is off)
 │   │   └── Filament/AdminPanelProvider.php # /admin panel definition (auth, branding, nav groups)
-│   └── Support/                            # Money (the one Kyat formatter), CatalogImport (CSV import engine), TelegramNotifier
+│   ├── Support/                            # Money (the one Kyat formatter), CatalogImport (CSV import engine), TelegramNotifier
+│   └── Templates/                          # code-defined shop templates (step 37): Template, Attribute, DecantTemplate, the Templates registry
 ├── bootstrap/app.php                       # routing + middleware wiring; event auto-discovery disabled (#52)
 ├── config/cors.php                         # platform CORS defaults (FRONTEND_URL) — verified shop_domains merge in per request (ADR-0004)
 ├── database/

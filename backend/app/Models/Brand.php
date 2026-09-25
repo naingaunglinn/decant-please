@@ -16,6 +16,23 @@ class Brand extends Model
     use BelongsToShop;
     use HasSlug;
 
+    protected static function booted(): void
+    {
+        // A product's search_text carries its brand's name, and the product's own
+        // saving hook never sees a brand rename — so the rename rebuilds them here.
+        static::saved(function (Brand $brand): void {
+            if (! $brand->wasChanged('name')) {
+                return;
+            }
+
+            $brand->products()->get()->each(function (Product $product) use ($brand): void {
+                $product->setRelation('brand', $brand);
+                $product->refreshSearchText();
+                $product->save();
+            });
+        });
+    }
+
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);

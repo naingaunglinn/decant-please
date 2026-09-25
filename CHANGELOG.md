@@ -9,6 +9,52 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v42
+
+**v42** is the first half of step 37 (**#106**). Catalog attributes move into code-defined
+templates. A decant shop sees nothing new in the admin, except that the attribute fields
+share one "Details" section and the gender badge is gray. The storefront is unchanged: the
+API only gains keys. 37b, the next queue row, moves the storefront onto them.
+
+- **Templates** (`app/Templates/`): `Template`, `Attribute` (select / text / number, with
+  `required`, `filterable`, `searchable`, `translatable`), `DecantTemplate`, and the
+  `Templates` registry. A template names its attributes, variant options, product nouns,
+  status labels (read by step 39) and default modules (read by step 41). Templates live in
+  code only; nothing about them can be edited in the database (P4).
+- **Two migrations.**
+  - The first adds `products.attributes` (jsonb), `products.search_text`,
+    `products.template`, `products.category_id`, `shop_settings.template` (default
+    `decant`) and a per-shop `categories` table. It backfills `attributes` and
+    `search_text` from the five perfume columns.
+  - The second drops `concentration`, `gender`, `notes`, `vibes` and `performance`. Its
+    `down()` restores them, NOT NULL and the gender index included.
+  - On Postgres 17, up → down → up keeps an identical hash of the five values (as
+    columns, then as attributes) and of the order-line money.
+- **Product rules** (`Product::booted`):
+  - A new product takes the shop's default template.
+  - A template outside the shop's group is refused.
+  - A category must be this shop's own.
+  - `search_text` rebuilds when the name, brand, attributes or template change.
+  - Renaming a brand rebuilds its products' `search_text` (`Brand::booted`).
+- **API (additive).**
+  - `/products` items gain `template` and `attributes`: `[{key, label, value, display}]`
+    in template order, with empty attributes left out. The flat perfume keys are read from
+    `attributes` and are kept until go-live (queue row 32).
+  - `/meta` gains `filters`, the template's filterable attributes. `genders` and
+    `concentrations` are unchanged.
+  - `q` and the `notes` filter search `search_text` (lowercase in PHP, `%` and `_`
+    literal), never a LIKE into jsonb. `gender` is an exact match on
+    `attributes->gender`.
+- **Admin.** Product form fields, table badge columns and filters come from the template.
+  The "Fragrance(s)" label comes from the template's product nouns. CSV import reads the
+  template's attribute columns, and the file format is unchanged.
+- **Tests.**
+  - New: `ProductTemplateTest` (12 tests).
+  - New: a `categories` isolation test.
+  - The suite's product fixtures now write `attributes`.
+  - Parity changed fixtures only; every recorded value is the same.
+  - 399 tests pass on SQLite and on Postgres 17.
+
 ## 0. What changed in v41
 
 **v41** is the second half of step 36 (**#105**): the public contract catches up with the

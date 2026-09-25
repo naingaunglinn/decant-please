@@ -272,7 +272,7 @@ where applicable.
 | GET | `/products` | Filterable catalog (`/fragrances` still answers until go-live) | 120/min |
 | GET | `/products/{slug}` | Product detail (`/fragrances/{slug}` likewise) | 120/min |
 | GET | `/brands` | Active brands | 120/min |
-| GET | `/meta` | Filter options, price bounds, social links, payment details | 120/min |
+| GET | `/meta` | Filter options (the template's `filters`), price bounds, social links, payment details | 120/min |
 | GET | `/delivery-zones` | Serviceable townships + delivery fees, grouped by region | 120/min |
 | POST | `/orders` | Guest checkout (structured address; fee derived from township) | 10/min |
 | GET | `/orders/track` | Full receipt by tracking code + phone | 20/min |

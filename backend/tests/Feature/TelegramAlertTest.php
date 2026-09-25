@@ -289,8 +289,7 @@ class TelegramAlertTest extends TestCase
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer', 'is_active' => true]);
         $fragrance = $brand->products()->create([
             'name' => 'Allure Homme Sport',
-            'concentration' => 'cologne',
-            'gender' => 'male',
+            'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
             'is_active' => true,
         ]);
 
