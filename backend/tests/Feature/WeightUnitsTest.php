@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Enums\ShopStatus;
+use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Products\Pages\CreateProduct;
+use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Widgets\LowStock;
 use App\Models\Brand;
 use App\Models\Order;
@@ -75,7 +77,7 @@ class WeightUnitsTest extends TestCase
     {
         $order = Order::create([
             'customer_name' => 'Su Su', 'phone' => '09-771234561', 'address' => 'Yangon',
-            'order_from' => 'tiktok', 'status' => OrderStatus::Pending,
+            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'prep_date' => today()->addDay(),
         ]);
 
         foreach ($lines as [$variant, $quantity]) {
@@ -188,12 +190,78 @@ class WeightUnitsTest extends TestCase
         $aventus = $brand->products()->create([
             'name' => 'Aventus', 'template' => 'decant', 'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
         ]);
-        $ten = $aventus->variants()->create(['size_ml' => 10, 'price_mmk' => 40000]);
-        // an accepted order that isn't packed yet: its 10ml must not draw 10 kyatthar
-        $this->order([[$ten, 1]]);
+        // An accepted order that isn't packed yet, with a hand-typed 10ml line (no
+        // variant at that size): its 10ml must not draw 10 kyatthar.
+        $order = Order::create([
+            'customer_name' => 'Su Su', 'phone' => '09-771234561', 'address' => 'Yangon',
+            'order_from' => 'tiktok', 'status' => OrderStatus::Pending,
+        ]);
+        $order->items()->create([
+            'product_id' => $aventus->id, 'fragrance_name_snapshot' => 'Creed Aventus',
+            'size_ml' => 10, 'unit_price_mmk' => 40000, 'quantity' => 1,
+        ]);
 
         $this->assertRefused(fn () => $aventus->update(['template' => 'test-weighed']));
         $this->assertSame('ml', $aventus->fresh()->stock_unit);
+    }
+
+    public function test_a_product_with_ml_sizes_cannot_switch_to_weight(): void
+    {
+        $brand = Brand::create(['name' => 'Creed', 'type' => 'niche']);
+        $aventus = $brand->products()->create([
+            'name' => 'Aventus', 'template' => 'decant', 'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
+        ]);
+        // never sold, never counted — but its "10ml" would sell as 10 kyatthar
+        $aventus->variants()->create(['size_ml' => 10, 'price_mmk' => 40000]);
+
+        $this->assertRefused(fn () => $aventus->update(['template' => 'test-weighed']));
+    }
+
+    public function test_an_admin_edit_that_changes_a_lines_size_refreezes_its_amount(): void
+    {
+        $this->actingAs($this->studioUser());
+        $brand = Brand::create(['name' => 'Creed', 'type' => 'niche']);
+        $aventus = $brand->products()->create([
+            'name' => 'Aventus', 'template' => 'decant', 'stock_amount' => 100,
+            'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
+        ]);
+        $ten = $aventus->variants()->create(['size_ml' => 10, 'price_mmk' => 40000]);
+        $aventus->variants()->create(['size_ml' => 30, 'price_mmk' => 100000]);
+        $order = $this->order([[$ten, 1]]);
+        $item = $order->items()->firstOrFail();
+
+        Livewire::test(EditOrder::class, ['record' => $order->getRouteKey()])
+            ->set("data.items.record-{$item->id}.size_ml", 30)
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame([30, 30], [$item->fresh()->size_ml, $item->fresh()->measure]);
+        $order->fresh()->update(['status' => OrderStatus::Prepared]);
+        $this->assertSame(70, $aventus->fresh()->stock_amount);
+
+        // a weighed line switched to another pack takes that pack's weight
+        $lahpet = $this->lahpet();
+        $weighed = $this->order([[$this->pack($lahpet, 25), 1]]);
+        $line = $weighed->items()->firstOrFail();
+
+        Livewire::test(EditOrder::class, ['record' => $weighed->getRouteKey()])
+            ->set("data.items.record-{$line->id}.product_variant_id", $this->pack($lahpet, 100)->id)
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame([100, '1 viss'], [$line->fresh()->measure, $line->fresh()->variant_label_snapshot]);
+    }
+
+    public function test_duplicating_a_weighed_product_keeps_its_weights(): void
+    {
+        $this->actingAs($this->studioUser());
+        $lahpet = $this->lahpet();
+
+        Livewire::test(ListProducts::class)->callTableAction('replicate', $lahpet);
+
+        $copy = Product::query()->whereKeyNot($lahpet->id)->firstOrFail();
+        $this->assertSame([25, 100], $copy->variants()->pluck('measure')->all());
+        $this->assertSame(['25 kyatthar', '1 viss'], $copy->variants()->get()->map->label()->all());
     }
 
     // ---- API and admin ----

@@ -175,7 +175,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 454 tests: parity baseline, stock modes, weight units, domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
+├── tests/Feature/                          # 457 tests: parity baseline, stock modes, weight units, domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```

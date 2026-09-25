@@ -152,12 +152,13 @@ class ProductsTable
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 ReplicateAction::make()
-                    ->excludeAttributes(['slug'])
+                    // min_in_stock_price is the list query's withMin() alias, not a column
+                    ->excludeAttributes(['slug', 'min_in_stock_price'])
                     ->after(function (Product $record, Product $replica): void {
                         // slug was excluded, so the HasSlug hook generated a fresh one; copy the price
                         // rows with their cost — not their count: the copy starts uncounted
                         $record->variants->each(fn ($variant) => $replica->variants()->create(
-                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
+                            $variant->only(['size_ml', 'measure', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
                         ));
                     }),
                 ProductResource::safeDeleteAction(),

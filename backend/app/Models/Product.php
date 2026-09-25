@@ -158,10 +158,11 @@ class Product extends Model
     /**
      * A pooled product's numbers are in its template's unit (step 40b): a new one
      * takes it; a switch to a template in another unit is refused while anything
-     * is counted in the old one — the stock, the reference purchase, or an order
-     * line's frozen amount. Otherwise 500 ml would read as 500 kyatthar, and an
-     * accepted order's 10ml would draw 10 kyatthar. A per-variant template keeps
-     * the unit, so switching back to the same one loses nothing.
+     * is counted in the old one — the stock, the reference purchase, a variant's
+     * size, or an order line's frozen amount. Otherwise 500 ml would read as 500
+     * kyatthar, and a "10ml" variant or an accepted order's 10ml would draw 10
+     * kyatthar. A per-variant template keeps the unit, so switching back to the
+     * same one loses nothing.
      */
     protected function stampStockUnit(): void
     {
@@ -173,7 +174,7 @@ class Product extends Model
         }
 
         if ($this->exists && ($this->stock_amount !== null || $this->reference_cost_mmk !== null
-            || $this->reference_amount !== null || $this->hasMeasuredOrderLines())) {
+            || $this->reference_amount !== null || $this->hasMeasuredRows())) {
             throw new InvalidArgumentException(
                 'This product is counted in '.($this->stock_unit ?? 'another unit').'. Clear its stock and cost first — or, once it has sold, add it again as a new product.'
             );
@@ -182,18 +183,28 @@ class Product extends Model
         $this->stock_unit = $unit;
     }
 
-    private function hasMeasuredOrderLines(): bool
+    private function hasMeasuredRows(): bool
     {
-        return OrderItem::query()
-            ->where('order_items.product_id', $this->id)
-            ->whereNotNull('order_items.measure')
-            ->exists();
+        return ProductVariant::query()
+            ->where('product_variants.product_id', $this->id)
+            ->whereNotNull('product_variants.measure')
+            ->exists()
+            || OrderItem::query()
+                ->where('order_items.product_id', $this->id)
+                ->whereNotNull('order_items.measure')
+                ->exists();
+    }
+
+    /** The unit its pooled figures are in: stored, else its template's. */
+    public function stockUnit(): string
+    {
+        return (string) ($this->stock_unit ?? $this->catalogTemplate()->measure());
     }
 
     /** An amount of this product's pooled stock in words: "30ml", "1 viss 50 kyatthar". */
     public function formatAmount(int $amount): string
     {
-        return StockUnit::format($amount, $this->stock_unit ?? $this->catalogTemplate()->measure());
+        return StockUnit::format($amount, $this->stockUnit());
     }
 
     /**

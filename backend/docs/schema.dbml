@@ -162,7 +162,7 @@ Table product_variants {
   options jsonb [null, note: 'option values, e.g. {"Size":"10ml"} or {"Size":"M","Color":"Blue"}']
   measure int [null, note: 'numeric amount (10 for 10ml; a weighed variant\'s kyatthar, step 40b)']
   is_active boolean [not null, default: true, note: 'archived, never deleted, once on an order']
-  position int [not null, default: 0, note: 'display order; ties sort by size_ml']
+  position int [not null, default: 0, note: 'display order; ties sort by measure']
   image_path varchar [null, note: 'a photo per variant (colour), under shops/{id}/variants/']
   stock_qty int [null, note: 'per-variant stock in pieces (step 40); null = not tracked']
   unit_cost_mmk int [null, note: 'per-variant cost of one (step 40); null = unknown, never 0; admin-eyes only']

@@ -531,7 +531,7 @@ class Order extends Model
                 $row['name'] ??= $item->product->name;
                 $row['amount'] = ($row['amount'] ?? 0) + $item->measure * $item->quantity;
                 $row['stock'] = $item->product->stock_amount;
-                $row['unit'] = (string) $item->product->stock_unit;
+                $row['unit'] = $item->product->stockUnit();
             } elseif ($item->variant !== null) {
                 $row = &$needed["v{$item->product_variant_id}"];
                 $row['name'] ??= "{$item->product->name} {$item->variantLabel()}";

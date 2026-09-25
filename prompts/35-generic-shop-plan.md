@@ -577,7 +577,8 @@ pieces; **40b** (RUN-QUEUE row 8b) adds Myanmar weight units.
   ceiling rule. Decant's admin still says "Bottle cost" / "Bottle size".
 - **Frozen line amount: `order_items.measure`**, stamped once in `OrderItem`'s creating
   hook from `size_ml` or the variant's `measure`; draw-down, shortfall and cost read it.
-  Backfilled from `size_ml`. No unit column on the line: the guard below means a product's
+  Backfilled from `size_ml`. The admin order form re-stamps it when an edit changes the
+  line's size or pack. No unit column on the line: the guard below means a product's
   unit can't change once any line has an amount.
 - **Weighed variants reuse `product_variants.measure`** (whole kyatthar; `size_ml` null)
   and label themselves from it under the template's first option (`Weight`). The API
@@ -585,8 +586,8 @@ pieces; **40b** (RUN-QUEUE row 8b) adds Myanmar weight units.
   the 38b picker sells them unchanged; no contract change.
 - **The guard** (in `Product`'s saving hook, so admin, import and studio all hit it):
   switching to a template in another unit is refused while the product has stock, a
-  reference cost, or any order line with a frozen amount — including an untracked product
-  on an accepted, not-yet-prepared order. Clear the numbers, or add a new product.
+  reference cost, a variant with a size, or any order line with a frozen amount —
+  including an untracked product on an accepted, not-yet-prepared order. Clear the numbers, or add a new product.
   A per-variant template keeps the unit. The reorder line is a setting and carries over.
 - Not built: sub-kyatthar weights (mat, pe); grams / kilograms; converting stock between
   units; the produce template and its storefront copy (row 15).

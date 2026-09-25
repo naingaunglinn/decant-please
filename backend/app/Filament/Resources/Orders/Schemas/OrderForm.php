@@ -457,6 +457,9 @@ class OrderForm
 
             $data['product_variant_id'] = $variant?->id;
             $data['variant_label_snapshot'] = $variant?->label() ?? "{$data['size_ml']}ml";
+            // The line's frozen amount (step 40b) follows too: the hook stamps it on
+            // create only, and an edited 10ml → 30ml line must draw 30.
+            $data['measure'] = (int) $data['size_ml'];
         } elseif (isset($data['product_id'], $data['product_variant_id'])) {
             // A picked variant (clothing): only one of this product's, never a
             // stray id; it has no ml size.
@@ -466,6 +469,7 @@ class OrderForm
 
             $data['size_ml'] = $variant->size_ml;
             $data['variant_label_snapshot'] = $variant->label();
+            $data['measure'] = $variant->measure;
         }
 
         return $data;
