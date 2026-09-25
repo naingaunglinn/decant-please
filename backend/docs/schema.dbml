@@ -43,7 +43,9 @@ Table users {
   remember_token varchar(100) [null]
   created_at timestamp [null]
   updated_at timestamp [null]
-  Note: 'Platform-admin access is the `studio_admin` Spatie role alone, read via User::isStudioAdmin(). The transitional `is_studio` column was dropped (issue #110) — the role is the only source of truth.'
+  phone varchar(20) [unique, null]
+  phone_verified_at timestamp [null]
+  Note: 'Platform-admin access is the `studio_admin` Spatie role alone, read via User::isStudioAdmin(). The transitional `is_studio` column was dropped (issue #110) — the role is the only source of truth. `phone` (step 44b) is the self-serve seller\'s verified number, normalized `+959…`; unique, so one SIM is one account. Null for studio accounts and Studio-registered owners.'
 }
 
 Table shop_user {

@@ -9,6 +9,35 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v53
+
+**v53** is step 44b (**#137**, RUN-QUEUE row 11b): the seller-facing half of self-serve
+sign-up. Spec: `prompts/44-self-serve-signup.md` §44b and its "As built".
+
+- **Sign-up page** `/admin/register` (`App\Filament\Auth\SignUp`): the seller's name,
+  Myanmar mobile + 6-digit code, email + password, and their shop (name, address,
+  category) on one form, registered by `ShopRegistration::register()` — the Studio's
+  method. The shop starts `onboarding`, owned by this user alone; they are logged in and
+  land on its dashboard. English and Burmese side by side.
+- **Phone verification** (`App\Support\PhoneVerification`): a hashed code in the cache,
+  10 minutes, 5 wrong tries; sends throttled per phone and per IP (platform keys, no
+  shop); no code to a phone that already has an account. Fails closed: no working sender
+  → sign-up off (404, login hides the link). `CodeSender` interface + `LogCodeSender`,
+  which only counts in `local`/`testing`. New env `PHONE_VERIFICATION_DRIVER`
+  (`config/services.php`); the suite pins it blank. The production driver is row 11c
+  (needs-owner).
+- **Migration** `2026_10_03_000000_add_phone_to_users_table`: `users.phone` (varchar 20,
+  nullable, unique) + `phone_verified_at`. `schema.dbml` updated from the migrated
+  Postgres database; up → down → up verified.
+- **Publish**: `Shop::publish()` also requires a verified phone for a non-studio member
+  (a Studio-registered owner asks the Studio to activate). The dashboard (now
+  `App\Filament\Pages\Dashboard`) shows "Open my shop" while the shop is onboarding, to
+  a member with a verified phone only; its confirmation lists what's still missing (no
+  products, no active delivery township) without blocking.
+- `register()` accepts an already-verified `phone` on the owner. `SelfServeSignupTest`
+  (20 cases); `ShopRegistrationTest` publish cases now use verified owners, plus one for
+  an owner without a phone. `withoutTenancy()` stays at 2 of 5. 523 tests on Postgres 17.
+
 ## 0. What changed in v52
 
 **v52** is step 44a (**#137**, RUN-QUEUE row 11): the foundation for self-serve sign-up.

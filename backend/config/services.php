@@ -43,4 +43,11 @@ return [
         'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
     ],
 
+    // Step 44b: who delivers the self-serve sign-up's phone code. Blank = sign-up
+    // off (fails closed). `log` works in local/testing only. A platform value —
+    // no shop exists yet at sign-up — so never a per-shop ShopConfig read.
+    'phone_verification' => [
+        'driver' => env('PHONE_VERIFICATION_DRIVER'),
+    ],
+
 ];

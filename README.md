@@ -62,7 +62,8 @@ a shop there seeds its national delivery geography (inactive, unpriced), gives i
 automatic `{slug}.cornerarea.me` address (step 44a, when `STOREFRONT_BASE_DOMAIN` is set)
 and, by default, creates the owner's login: an account with full control of that shop and
 access to nothing else. All of that is one method, `ShopRegistration::register()`, which
-the self-serve sign-up (step 44b) reuses. Zone activation and pricing are the go-live steps. Per shop,
+the self-serve sign-up (step 44b, `/admin/register`: account, verified phone and shop on one
+page; off until a phone-code sender is configured) reuses. Zone activation and pricing are the go-live steps. Per shop,
 the panel offers:
 
 - Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a

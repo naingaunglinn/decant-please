@@ -53,6 +53,9 @@
              registered shop's domains look like. -->
         <env name="STOREFRONT_BASE_DOMAIN" value="" force="true"/>
         <server name="STOREFRONT_BASE_DOMAIN" value=""/>
+        <!-- Step 44b: sign-up is off unless a test opts in (config() → log). -->
+        <env name="PHONE_VERIFICATION_DRIVER" value="" force="true"/>
+        <server name="PHONE_VERIFICATION_DRIVER" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

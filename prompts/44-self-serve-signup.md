@@ -127,6 +127,35 @@ another shop's panel, 403 on `/studio`); publish refused without a verified phon
 design-doc §11); no custom domains self-serve (a Studio step, chargeable); no plans or
 trial clock (row 16, needs-owner).
 
+### 44b as built (row 11b)
+
+What changed from the plan above, and why:
+
+- **One page, not `->registration()` + `->tenantRegistration()`.** Filament's two-step
+  flow creates the user with a plain `User::create` (skipping `register()`) and opens
+  `/admin/new` to every owner as a way to add more shops. Instead `App\Filament\Auth\SignUp`
+  (a `Register` subclass on `/admin/register`) asks for the account, the phone + code and
+  the shop (name, address, category) on one form, and calls `register()` once. A
+  signed-up seller gets exactly one shop; more are a Studio step.
+- **The code lives in the cache, not a table** (`PhoneVerification`, `phone-otp:{sha1}`):
+  hashed, 10 minutes, 5 wrong tries, then ask again. Checked before registering and used
+  up only after the account exists, so a slug error doesn't burn the code. Sends: 3 per
+  phone per 15 min, 10 per IP per hour, and none to a phone that already has an account.
+- **Myanmar mobiles only**, one spelling `+959…` (`09…`, `959…`, `+95 9…` all collapse),
+  so one SIM is one key and one account (`users.phone` unique).
+- **The sender:** `CodeSender` interface + `LogCodeSender`. `PHONE_VERIFICATION_DRIVER`
+  blank → sign-up off (page 404, no link on the login). `log` works only in `local` and
+  `testing`, so production stays off until the owner picks a provider — the real driver
+  is queue row 11c (needs-owner), because it needs an account and a secret.
+- **Login stays email + password** (Filament's). The phone is the spam gate, not the login.
+- **Publish needs a verified phone, in `Shop::publish()`** (the one domain method). A
+  Studio-registered owner has no phone; the Studio activates their shop. The dashboard
+  button shows only to a member with a verified phone, never to a studio admin (the
+  Studio has `activate()`); its confirmation lists what the shop still lacks (products,
+  an active delivery township) without blocking.
+- **Burmese side by side with English** on the sign-up page and the Publish button — no
+  locale switch was built.
+
 ## Risks
 
 - A slug is public identity once live; the reserved list must cover every platform host.

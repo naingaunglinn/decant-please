@@ -83,12 +83,18 @@ class Shop extends Model
      * The seller's own go-live (step 44a): onboarding → live, and nothing else.
      * Not activate(): that also un-suspends, which stays a Studio power — a
      * suspended or archived shop can never publish itself back. Only a member of
-     * this shop (or a studio admin) may press it.
+     * this shop (or a studio admin) may press it, and a member only with a verified
+     * phone (step 44b) — the phone is the self-serve gate against spam shops. A
+     * Studio-registered owner without one asks the Studio, which can activate().
      */
     public function publish(User $actor): void
     {
         if (! $actor->canAccessTenant($this)) {
             throw new AuthorizationException('Only this shop\'s own team can publish it.');
+        }
+
+        if (! $actor->isStudioAdmin() && $actor->phone_verified_at === null) {
+            throw new AuthorizationException('Verify your phone number before publishing.');
         }
 
         // One conditional UPDATE, not check-then-save: a Shop loaded before the

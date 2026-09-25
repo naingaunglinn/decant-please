@@ -233,6 +233,15 @@ The address only works once, by hand, the wildcard is in place: a `*.cornerarea.
 record pointing at Vercel, and `*.cornerarea.me` added to the one storefront project
 (Vercel's wildcard-domain setup). Existing shops keep the domain rows they have.
 
+### Self-serve sign-up — phone codes (step 44b)
+
+`/admin/register` lets a seller open a shop by themselves once a phone code can reach
+them. Until then it stays off: `PHONE_VERIFICATION_DRIVER` blank (or `log`, which
+production ignores) means the page 404s and the login shows no sign-up link. Turning it
+on needs a provider driver (queue row 11c, the owner's choice of SMS or Telegram Gateway
+account) and its env values on Heroku. Nothing to do at deploy time; the migration only
+adds `users.phone` and `users.phone_verified_at`.
+
 ### Custom domain + TLS
 
 ```bash

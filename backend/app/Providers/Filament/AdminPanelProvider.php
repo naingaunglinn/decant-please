@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Login;
+use App\Filament\Auth\SignUp;
 use App\Http\Controllers\OrderInvoiceController;
 use App\Http\Controllers\PaymentProofViewController;
 use App\Models\Shop;
@@ -11,7 +13,6 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -49,7 +50,12 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)
+            // Step 44b: self-serve sign-up — account, verified phone and shop on one
+            // page, through ShopRegistration::register(). The page 404s (and the
+            // login hides its link) while no phone code can be sent. No
+            // ->tenantRegistration(): a signed-up seller gets exactly one shop.
+            ->registration(SignUp::class)
             // Multi-tenancy Step 25a: the panel is now tenant-aware. Routes become
             // /admin/{shop}/…; the shop is resolved from the slug, the switcher is
             // rendered from the user's getTenants(), and IdentifyTenant enforces
@@ -73,9 +79,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
-            ->pages([
-                Dashboard::class,
-            ])
+            // App\Filament\Pages\Dashboard (discovered above) — Filament's, plus
+            // the seller's Publish button while the shop is onboarding (step 44b)
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
