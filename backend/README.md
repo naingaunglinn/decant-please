@@ -84,7 +84,7 @@ moves a studio user between shops**
 | Route | What it is |
 |---|---|
 | `/admin/login` | The only public admin route |
-| `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
+| `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants. The top bar carries **Help · အကူအညီ** (step 45): Telegram / Viber deep links to the studio, from `SUPPORT_TELEGRAM_USERNAME` / `SUPPORT_VIBER_NUMBER`; hidden while both are blank |
 | `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
 | `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD — attribute fields, columns and filters come from the shop's template — sizes (archived, never deleted), stock (pooled ml, or pieces + cost per variant), "View on site" |
 | `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |

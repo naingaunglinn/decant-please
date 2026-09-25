@@ -7,6 +7,7 @@ use App\Filament\Auth\SignUp;
 use App\Http\Controllers\OrderInvoiceController;
 use App\Http\Controllers\PaymentProofViewController;
 use App\Models\Shop;
+use App\Support\StudioHelp;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -102,6 +103,23 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::TOPBAR_BEFORE,
                 fn (): string => Blade::render('@livewire(\'impersonation-banner\')'),
             )
+            // Step 45 — Help: deep links to the studio's Telegram / Viber
+            // (App\Support\StudioHelp). Nothing renders while no channel is set.
+            // In the top bar for shop members (the studio doesn't message itself),
+            // and under the login and sign-up forms for a seller who can't get in.
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                function (): string {
+                    $shop = Filament::getTenant();
+                    $links = StudioHelp::links($shop instanceof Shop ? $shop : null);
+
+                    return $links === [] || auth()->user()?->isStudioAdmin()
+                        ? ''
+                        : view('filament.help-button', ['links' => $links, 'shop' => $shop])->render();
+                },
+            )
+            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => self::helpLinks())
+            ->renderHook(PanelsRenderHook::AUTH_REGISTER_FORM_AFTER, fn (): string => self::helpLinks())
             // authenticatedTenantRoutes(), NOT authenticatedRoutes() or routes():
             // routes() closures register alongside login/password-reset, outside the
             // panel's auth middleware, and authenticatedRoutes() closures sit inside
@@ -133,5 +151,12 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+
+    private static function helpLinks(): string
+    {
+        $links = StudioHelp::links(null);
+
+        return $links === [] ? '' : view('filament.help-links', ['links' => $links])->render();
     }
 }

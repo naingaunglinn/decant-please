@@ -9,6 +9,28 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v54
+
+**v54** is step 45 (**#140**, RUN-QUEUE row 12): the admin's Help button. Spec:
+`prompts/45-help-button.md` (roadmap 43, shared foundation).
+
+- **Help · အကူအညီ** in the admin top bar: a dropdown of deep links that open the
+  seller's own Telegram (`https://t.me/{username}?text=…`) or Viber
+  (`viber://chat?number=…&draft=…`) on a chat with the studio. The first message is
+  pre-filled with the shop's name and slug, and the dropdown shows them too. The seller
+  sends; the platform sends, stores and receives nothing.
+- The same links sit under the **login** and **sign-up** forms (no shop named), for a
+  seller who can't get in.
+- Hidden for studio admins. Nothing renders while no channel is set.
+- `App\Support\StudioHelp::links()` is the one builder. A blank or malformed value hides
+  that channel and never throws. The Viber number goes through
+  `PhoneVerification::normalize()`.
+- New platform env `SUPPORT_TELEGRAM_USERNAME` / `SUPPORT_VIBER_NUMBER`
+  (`config/services.php` `support`, not the `telegram` order-alert block, and not a
+  ShopConfig read). The suite pins both blank.
+- No migration, no API or storefront change. `HelpButtonTest` (10 tests) covers shop
+  naming, including another shop's panel. 535 tests on Postgres 17.
+
 ## 0. What changed in v53
 
 **v53** is step 44b (**#137**, RUN-QUEUE row 11b): the seller-facing half of self-serve

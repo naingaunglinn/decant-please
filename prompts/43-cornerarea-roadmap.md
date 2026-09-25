@@ -72,7 +72,7 @@ A category is released only when all of these work (P5):
 | Generic catalog | Steps 35–38 |
 | Per-shop `categories` | Step 37 (amended) |
 | Self-serve sign-up: phone verify; shop created as `onboarding`; `slug.cornerarea.me` added automatically; publish makes it `live`; wildcard domain attached once | New |
-| Help button: admin → studio on Viber/Telegram, in Burmese | New |
+| Help button: admin → studio on Viber/Telegram, in Burmese | Built (v54, step 45, queue row 12) |
 | Design system (below) | New |
 | Plans | New; free plan undecided |
 | Letterhead bug (#116): `pdf/invoice.blade.php` and `production-schedule-day.blade.php` hard-code "Decant Please!", so a second shop's invoices would print it. Must use the shop's name. | Built (v38, queue row 2); merge before a second shop goes live |

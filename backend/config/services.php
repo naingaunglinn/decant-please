@@ -50,4 +50,13 @@ return [
         'driver' => env('PHONE_VERIFICATION_DRIVER'),
     ],
 
+    // Step 45: the studio's own chat handles for the admin's Help button. One
+    // platform value for every shop — never a ShopConfig read, and not the
+    // `telegram` block above (that is a shop's order-alert bot). Blank or
+    // malformed = that channel is hidden; both = no button.
+    'support' => [
+        'telegram_username' => env('SUPPORT_TELEGRAM_USERNAME'),
+        'viber_number' => env('SUPPORT_VIBER_NUMBER'),
+    ],
+
 ];
