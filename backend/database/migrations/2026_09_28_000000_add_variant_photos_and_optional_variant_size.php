@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Schema;
  *   like product images. Nullable — decant variants have none.
  * - product_variants.size_ml becomes nullable: a clothing variant has no ml. Every
  *   existing (decant) value is untouched; order_items.size_ml went nullable in 36a.
+ *   The (product_id, size_ml) unique index can't catch a repeated Size + Color (nulls
+ *   are distinct); the admin form's duplicate rule does.
  *
  * down() refuses while a variant without a size exists, rather than invent an ml
  * value for it or delete it — either would lose data a placed order may point at.

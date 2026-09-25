@@ -38,7 +38,7 @@ A decant shop sees nothing new; the API only gains keys.
   order list tooltip and CSV, upcoming decants and the Telegram alert print
   `OrderItem::variantLabel()` (the frozen `variant_label_snapshot`) instead of
   "{size_ml}ml" — the same text for decant. The schedule groups by it, so M / Blue and
-  L / Red are separate lines.
+  L / Red are separate lines, listed in the seller's variant order (S, M, L), not A–Z.
 - **API (additive):** `prices[].options` and `prices[].image_url`; `/products`
   `option[{name}]=` (one in-stock variant must match every picked option, exact JSON-path
   equality); `/meta` `variant_options` (empty for decant); `/orders/track`
@@ -47,9 +47,9 @@ A decant shop sees nothing new; the API only gains keys.
 - **Studio:** "Register a shop" picks the category (`Templates::assignToShop`, written
   under the new shop's context and restored after, like `NationalGeography::seed` — no
   new `withoutTenancy()`). Changing it later is not built.
-- **Tests:** `ClothingTemplateTest` (15). The parity test's `pick()` now ignores added
+- **Tests:** `ClothingTemplateTest` (16). The parity test's `pick()` now ignores added
   keys inside list elements too (the new variant keys); no expected value moved.
-  417 tests pass on SQLite and on Postgres 17.
+  418 tests pass on SQLite and on Postgres 17.
 - **Deploy:** API first, as since 36b. The old storefront ignores the new keys.
 
 ## 0. What changed in v43

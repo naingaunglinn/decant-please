@@ -79,7 +79,7 @@ class ProductController extends Controller
                     $variant->where('in_stock', true);
 
                     foreach ($picked as $name => $value) {
-                        $variant->where("product_variants.options->{$name}", $value);
+                        $variant->where("product_variants.options->{$name}", trim($value)); // stored trimmed
                     }
                 }));
 

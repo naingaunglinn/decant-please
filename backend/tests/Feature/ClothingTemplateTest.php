@@ -331,7 +331,7 @@ class ClothingTemplateTest extends TestCase
     {
         $this->actingAs($this->studioUser());
         // A DM order (no township), as AdminOrdersTest does: the checkout-order edit
-        // page has a pre-existing township TypeError, reported separately.
+        // page has a pre-existing township TypeError, noted in PR #120.
         $blue = $this->variant($this->shirt(), 'M / Blue');
         $order = Order::create([
             'customer_name' => 'Manual Customer', 'phone' => '09-700000000', 'address' => 'Yangon',
@@ -354,7 +354,7 @@ class ClothingTemplateTest extends TestCase
         $this->assertSame(25000, $item->unit_price_mmk);
     }
 
-    public function test_switching_a_clothing_lines_variant_in_the_admin_refreezes_its_label_and_price(): void
+    public function test_switching_a_clothing_lines_variant_in_the_admin_refreezes_its_label_and_autofills_its_price(): void
     {
         $this->actingAs($this->studioUser());
         $shirt = $this->shirt();
@@ -407,6 +407,7 @@ class ClothingTemplateTest extends TestCase
         $day = CarbonImmutable::parse('2026-10-01');
         $groups = Order::productionScheduleFor($day, $day)[0]['groups'];
 
-        $this->assertSame([['L / Red', 1], ['M / Blue', 2]], $groups->map(fn (array $group) => [$group['variant_label'], $group['quantity']])->all());
+        // in the seller's variant order (M before L), not alphabetical
+        $this->assertSame([['M / Blue', 2], ['L / Red', 1]], $groups->map(fn (array $group) => [$group['variant_label'], $group['quantity']])->all());
     }
 }
