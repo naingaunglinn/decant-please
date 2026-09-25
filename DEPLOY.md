@@ -242,6 +242,18 @@ on needs a provider driver (queue row 11c, the owner's choice of SMS or Telegram
 account) and its env values on Heroku. Nothing to do at deploy time; the migration only
 adds `users.phone` and `users.phone_verified_at`.
 
+### Help button — the studio's chat handles (step 45)
+
+The admin's Help button opens a chat with the studio. It stays hidden until at least one
+handle is set on the Heroku app:
+
+```bash
+heroku config:set -a decant-please-api SUPPORT_TELEGRAM_USERNAME=<studio username, no @> SUPPORT_VIBER_NUMBER=<09… Myanmar mobile>
+```
+
+Either one on its own is fine. A malformed value hides that channel; it never breaks a
+page.
+
 ### Custom domain + TLS
 
 ```bash

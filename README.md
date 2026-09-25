@@ -63,7 +63,9 @@ automatic `{slug}.cornerarea.me` address (step 44a, when `STOREFRONT_BASE_DOMAIN
 and, by default, creates the owner's login: an account with full control of that shop and
 access to nothing else. All of that is one method, `ShopRegistration::register()`, which
 the self-serve sign-up (step 44b, `/admin/register`: account, verified phone and shop on one
-page; off until a phone-code sender is configured) reuses. Zone activation and pricing are the go-live steps. Per shop,
+page; off until a phone-code sender is configured) reuses. A **Help · အကူအညီ** button in
+the admin top bar (and under the login and sign-up forms) opens the seller's Telegram or
+Viber on a chat with the studio (step 45; hidden while `SUPPORT_*` is blank). Zone activation and pricing are the go-live steps. Per shop,
 the panel offers:
 
 - Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a
@@ -254,6 +256,7 @@ npm run dev -- -p 3001
 | `SOCIAL_TIKTOK_URL` / `SOCIAL_FACEBOOK_URL` | Storefront footer links — **platform default**; a shop's own `shop_settings` links win (step 33). Blank = hidden |
 | `PAYMENT_KBZPAY_*` / `PAYMENT_WAVE_*` / `PAYMENT_QR_URL` / `PAYMENT_INSTRUCTIONS` | Offline transfer details via `/api/v1/{shop}/meta` — **platform default**; a shop's Payment settings win. Blank fields hidden |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` | New-order alerts — **platform default bot**; a shop can set its own (encrypted on `shop_settings`) or share this bot with its own chat id (step 33). Blank at both = off |
+| `SUPPORT_TELEGRAM_USERNAME` / `SUPPORT_VIBER_NUMBER` | The studio's own chat handles for the admin's Help button (step 45) — one **platform** value, not per shop. Blank or malformed = that channel hidden |
 | `MEDIA_DISK` | Disk for uploaded images — `public` locally (via `storage:link`), `s3` (Cloudflare R2) in production |
 | `PROOFS_DISK` (+ `PROOFS_AWS_*`) | **Private** disk for payment-proof screenshots — `local` (`storage/app/private`) by default, a second no-public-domain R2 bucket in production |
 

@@ -56,6 +56,11 @@
         <!-- Step 44b: sign-up is off unless a test opts in (config() → log). -->
         <env name="PHONE_VERIFICATION_DRIVER" value="" force="true"/>
         <server name="PHONE_VERIFICATION_DRIVER" value=""/>
+        <!-- Step 45: the Help button is off unless a test sets services.support.* -->
+        <env name="SUPPORT_TELEGRAM_USERNAME" value="" force="true"/>
+        <env name="SUPPORT_VIBER_NUMBER" value="" force="true"/>
+        <server name="SUPPORT_TELEGRAM_USERNAME" value=""/>
+        <server name="SUPPORT_VIBER_NUMBER" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
