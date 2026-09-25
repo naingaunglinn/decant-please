@@ -2,12 +2,12 @@
 
 namespace App\Console\Commands;
 
-use App\Models\DecantPrice;
 use App\Models\DeliveryTownship;
 use App\Models\Expense;
-use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\PromoCode;
 use App\Models\Shop;
 use App\Support\TenantContext;
@@ -58,10 +58,10 @@ class FreshStart extends Command
         $counts = DB::transaction(function (): array {
             $counts = [
                 'orders' => Order::count(),
-                'fragrances' => Fragrance::count(),
+                'fragrances' => Product::count(),
             ];
 
-            // order_items FK-protects fragrances (restrictOnDelete), so items go first
+            // order_items FK-protects products and variants (restrictOnDelete), so items go first
             OrderItem::query()->delete();
             // Bulk delete fires no model events, so the per-order deleting hook
             // that removes proof objects never runs here — delete THIS shop's
@@ -74,11 +74,11 @@ class FreshStart extends Command
             Order::query()->whereNotNull('payment_proof_path')->pluck('payment_proof_path')
                 ->each(fn (string $path) => $proofsDisk->delete($path));
             Order::query()->delete();
-            DecantPrice::query()->delete();
+            ProductVariant::query()->delete();
 
-            Fragrance::query()->whereNotNull('image_path')->pluck('image_path')
+            Product::query()->whereNotNull('image_path')->pluck('image_path')
                 ->each(fn (string $path) => Storage::disk(config('filesystems.media_disk'))->delete($path));
-            Fragrance::query()->delete();
+            Product::query()->delete();
             PromoCode::query()->delete();
             // Expenses are this shop's own ledger — a reset that keeps them while
             // wiping the orders they relate to is inconsistent (findings A6).

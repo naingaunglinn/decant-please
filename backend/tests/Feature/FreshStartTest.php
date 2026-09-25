@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
 use App\Models\DeliveryTownshipCourier;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\PromoCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,7 +32,7 @@ class FreshStartTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(0, Order::count());
-        $this->assertSame(0, Fragrance::count());
+        $this->assertSame(0, Product::count());
         $this->assertSame(0, PromoCode::count());
         $this->assertSame($brandCount, Brand::count());
         $this->assertSame(1, User::count());

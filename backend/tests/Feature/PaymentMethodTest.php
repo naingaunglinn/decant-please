@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Enums\PaymentMethod;
 use App\Filament\Pages\ManagePayment;
 use App\Models\Brand;
-use App\Models\DecantPrice;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use App\Models\ShopSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -90,14 +90,14 @@ class PaymentMethodTest extends TestCase
     public function test_stock_shortfalls_flags_tracked_fragrances_that_cannot_be_filled(): void
     {
         $price = $this->inStockPrice();
-        $price->fragrance->update(['stock_ml' => 8]); // only 8ml left; order needs 10ml
+        $price->product->update(['stock_ml' => 8]); // only 8ml left; order needs 10ml
 
         $order = Order::create([
             'customer_name' => 'Aung Kyaw', 'phone' => '09-1', 'address' => 'Yangon',
             'order_from' => 'website', 'status' => 'awaiting_confirmation',
         ]);
         $order->items()->create([
-            'fragrance_id' => $price->fragrance_id,
+            'product_id' => $price->product_id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 1,
         ]);
@@ -108,7 +108,7 @@ class PaymentMethodTest extends TestCase
         $this->assertSame(8, $short[0]['available']);
 
         // an untracked fragrance (null stock) never counts as short
-        $price->fragrance->update(['stock_ml' => null]);
+        $price->product->update(['stock_ml' => null]);
         $this->assertSame([], $order->fresh()->stockShortfalls());
     }
 
@@ -211,20 +211,20 @@ class PaymentMethodTest extends TestCase
 
     // ---- helpers ------------------------------------------------------------
 
-    private function inStockPrice(): DecantPrice
+    private function inStockPrice(): ProductVariant
     {
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer', 'is_active' => true]);
-        $fragrance = $brand->fragrances()->create([
+        $fragrance = $brand->products()->create([
             'name' => 'Allure Homme Sport',
             'concentration' => 'cologne',
             'gender' => 'male',
             'is_active' => true,
         ]);
 
-        return $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true]);
+        return $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true]);
     }
 
-    private function checkout(DecantPrice $price, ?string $method = null, ?UploadedFile $proof = null)
+    private function checkout(ProductVariant $price, ?string $method = null, ?UploadedFile $proof = null)
     {
         $payload = array_filter([
             'customer_name' => 'Aung Kyaw',
@@ -233,7 +233,7 @@ class PaymentMethodTest extends TestCase
             'address_line' => 'Sanchaung, Yangon',
             'payment_method' => $method,
             'items' => [[
-                'fragrance_id' => $price->fragrance_id,
+                'fragrance_id' => $price->product_id,
                 'size_ml' => $price->size_ml,
                 'quantity' => 1,
             ]],

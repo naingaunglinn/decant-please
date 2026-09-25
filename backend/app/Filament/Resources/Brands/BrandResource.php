@@ -15,7 +15,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Database\QueryException;
 use UnitEnum;
 
 class BrandResource extends Resource
@@ -29,25 +28,25 @@ class BrandResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     /**
-     * Deleting a brand cascades to its fragrances — which the DB blocks (FK restrict)
-     * the moment any of them appears in an order. Fail friendly, suggest deactivating.
+     * A brand with products is FK-protected (step 36: products.brand_id is
+     * NO ACTION on delete). Check first and steer the seller to deactivation — a
+     * caught violation would abort any surrounding Postgres transaction.
      */
     public static function safeDeleteAction(): DeleteAction
     {
         return DeleteAction::make()
-            ->modalDescription(fn (Brand $record): string => "Deleting \"{$record->name}\" also deletes its {$record->fragrances()->count()} fragrance(s) and their decant prices. This cannot be undone.")
             ->action(function (Brand $record, DeleteAction $action): void {
-                try {
-                    $record->delete();
-                } catch (QueryException) {
+                if ($record->products()->exists()) {
                     Notification::make()
                         ->danger()
-                        ->title('This brand has order history')
-                        ->body('One of its fragrances appears in orders, so it can\'t be deleted — deactivate the brand instead.')
+                        ->title('This brand has fragrances')
+                        ->body('Its fragrances would lose their brand, so it can\'t be deleted — deactivate it instead.')
                         ->send();
 
                     return;
                 }
+
+                $record->delete();
 
                 $action->success();
             });

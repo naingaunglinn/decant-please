@@ -16,9 +16,9 @@ class Brand extends Model
     use BelongsToShop;
     use HasSlug;
 
-    public function fragrances(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(Fragrance::class);
+        return $this->hasMany(Product::class);
     }
 
     public function scopeActive(Builder $query): Builder

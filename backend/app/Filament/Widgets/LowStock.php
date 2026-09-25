@@ -2,8 +2,8 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Resources\Fragrances\FragranceResource;
-use App\Models\Fragrance;
+use App\Filament\Resources\Products\ProductResource;
+use App\Models\Product;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -13,7 +13,7 @@ use Filament\Widgets\TableWidget;
  * Reorder panel: the fragrances whose running stock has fallen to or below
  * their threshold. Warn-only — it never stops an order, it just tells the
  * decanter what to buy next. Only tracked fragrances (non-null stock_ml)
- * can appear, so untracked catalog rows never show here (see Fragrance::scopeLowStock).
+ * can appear, so untracked catalog rows never show here (see Product::scopeLowStock).
  */
 class LowStock extends TableWidget
 {
@@ -26,7 +26,7 @@ class LowStock extends TableWidget
         return $table
             ->heading('Low stock — reorder soon')
             ->query(
-                Fragrance::query()
+                Product::query()
                     ->with('brand')
                     ->lowStock()
                     ->orderBy('stock_ml')
@@ -39,7 +39,7 @@ class LowStock extends TableWidget
                     ->label('Brand'),
                 TextColumn::make('name')
                     ->label('Fragrance')
-                    ->url(fn (Fragrance $record): string => FragranceResource::getUrl('edit', ['record' => $record])),
+                    ->url(fn (Product $record): string => ProductResource::getUrl('edit', ['record' => $record])),
                 TextColumn::make('stock_ml')
                     ->label('Remaining')
                     ->badge()

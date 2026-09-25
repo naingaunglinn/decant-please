@@ -4,9 +4,9 @@ namespace Database\Seeders;
 
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
-use App\Models\DecantPrice;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 
@@ -75,8 +75,10 @@ class OrderSeeder extends Seeder
                 $price = $this->price($fragranceName, $size);
 
                 $order->items()->create([
-                    'fragrance_id' => $price->fragrance_id,
-                    'fragrance_name_snapshot' => $price->fragrance->brand->name.' '.$price->fragrance->name,
+                    'product_id' => $price->product_id,
+                    'product_variant_id' => $price->id,
+                    'fragrance_name_snapshot' => $price->product->brand->name.' '.$price->product->name,
+                    'variant_label_snapshot' => $price->label(),
                     'size_ml' => $price->size_ml,
                     'unit_price_mmk' => $price->price_mmk,
                     'quantity' => $quantity,
@@ -100,19 +102,19 @@ class OrderSeeder extends Seeder
             'address_line' => $addressLine,
             'notes' => $note,
             'items' => collect($items)->map(fn (array $item) => [
-                'fragrance_id' => $this->price($item[0], $item[1])->fragrance_id,
+                'fragrance_id' => $this->price($item[0], $item[1])->product_id,
                 'size_ml' => $item[1],
                 'quantity' => $item[2],
             ])->all(),
         ]);
     }
 
-    private function price(string $fragranceName, int $sizeMl): DecantPrice
+    private function price(string $fragranceName, int $sizeMl): ProductVariant
     {
-        return DecantPrice::query()
-            ->whereHas('fragrance', fn ($query) => $query->where('name', $fragranceName))
+        return ProductVariant::query()
+            ->whereHas('product', fn ($query) => $query->where('name', $fragranceName))
             ->where('size_ml', $sizeMl)
-            ->with('fragrance.brand')
+            ->with('product.brand')
             ->firstOrFail();
     }
 }

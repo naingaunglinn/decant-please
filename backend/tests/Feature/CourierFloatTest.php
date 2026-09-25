@@ -105,7 +105,7 @@ class CourierFloatTest extends TestCase
 
         // balanceDue() reads line snapshots since #67 — one item worth $total.
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => $total,

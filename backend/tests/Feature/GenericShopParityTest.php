@@ -13,8 +13,8 @@ use App\Filament\Widgets\OrderStats;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
 use App\Models\Expense;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\PromoCode;
 use App\Models\Shop;
 use App\Support\MonthlyPnl;
@@ -41,7 +41,7 @@ use Tests\TestCase;
  * compared to the fixture's own models, never to literals — Postgres sequences
  * don't roll back between tests, so a literal id is not deterministic.
  *
- * Catalog (bottle cost ÷ bottle volume, CEILING — Fragrance::liquidCostMmk):
+ * Catalog (bottle cost ÷ bottle volume, CEILING — Product::liquidCostMmk):
  *   Chanel (designer) Allure Homme Sport  5ml 30,000 · 10ml 55,000 · 30ml 150,000 (out of stock)
  *                                         cost 300,000 / 100ml → 5ml 15,000 · 10ml 30,000
  *   Creed (niche)     Aventus             5ml 65,000 · 10ml 120,000
@@ -90,11 +90,11 @@ class GenericShopParityTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Fragrance $allure;
+    private Product $allure;
 
-    private Fragrance $aventus;
+    private Product $aventus;
 
-    private Fragrance $loveInWhite;
+    private Product $loveInWhite;
 
     private Brand $chanel;
 
@@ -437,40 +437,40 @@ class GenericShopParityTest extends TestCase
         $this->creed = Brand::create(['name' => 'Creed', 'type' => 'niche']);
         $oldHouse = Brand::create(['name' => 'Old House', 'type' => 'designer', 'is_active' => false]);
 
-        $this->allure = $this->chanel->fragrances()->create([
+        $this->allure = $this->chanel->products()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
             'notes' => 'Orange, Sea Notes, Musk', 'vibes' => 'Fresh, Sporty',
             'performance' => 'Around 4-6 Hours', 'description' => 'A crisp citrus-marine cologne.',
             'is_featured' => true, 'bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100,
             'stock_ml' => 100,
         ]);
-        $this->allure->decantPrices()->createMany([
+        $this->allure->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000],
             ['size_ml' => 10, 'price_mmk' => 55000],
             ['size_ml' => 30, 'price_mmk' => 150000, 'in_stock' => false],
         ]);
 
-        $this->aventus = $this->creed->fragrances()->create([
+        $this->aventus = $this->creed->products()->create([
             'name' => 'Aventus', 'concentration' => 'edp', 'gender' => 'male',
             'notes' => 'Pineapple, Birch', 'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
             'stock_ml' => 12,
         ]);
-        $this->aventus->decantPrices()->createMany([
+        $this->aventus->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 65000],
             ['size_ml' => 10, 'price_mmk' => 120000],
         ]);
 
-        $this->loveInWhite = $this->creed->fragrances()->create([
+        $this->loveInWhite = $this->creed->products()->create([
             'name' => 'Love In White', 'concentration' => 'edp', 'gender' => 'female',
         ]);
-        $this->loveInWhite->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 60000]);
+        $this->loveInWhite->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
 
-        $this->creed->fragrances()->create([
+        $this->creed->products()->create([
             'name' => 'Green Irish Tweed', 'concentration' => 'edp', 'gender' => 'male', 'is_active' => false,
-        ])->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 999000]);
-        $oldHouse->fragrances()->create([
+        ])->variants()->create(['size_ml' => 5, 'price_mmk' => 999000]);
+        $oldHouse->products()->create([
             'name' => 'Ghost', 'concentration' => 'edt', 'gender' => 'unisex',
-        ])->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 1000]);
+        ])->variants()->create(['size_ml' => 5, 'price_mmk' => 1000]);
 
         $this->sanchaung = $this->serviceableTownship(fee: 2500, name: 'Sanchaung');
 
@@ -563,11 +563,11 @@ class GenericShopParityTest extends TestCase
 
         try {
 
-            $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->fragrances()->create([
+            $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
                 'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
                 'bottle_cost_mmk' => 50000, 'bottle_volume_ml' => 100,
             ]);
-            $fragrance->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 7000]);
+            $fragrance->variants()->create(['size_ml' => 5, 'price_mmk' => 7000]);
 
             Order::newFromCheckout([
                 'customer_name' => 'Other Customer', 'phone' => '09-700000001',
@@ -581,7 +581,7 @@ class GenericShopParityTest extends TestCase
         }
     }
 
-    /** @param array<array{0: Fragrance, 1: int, 2: int}> $items */
+    /** @param array<array{0: Product, 1: int, 2: int}> $items */
     private function postCheckout(array $items, ?string $promo = null): Order
     {
         $response = $this->postJson('/api/v1/decant-please/orders', array_filter([
@@ -599,7 +599,7 @@ class GenericShopParityTest extends TestCase
         return Order::where('tracking_code', $response->json('tracking_code'))->firstOrFail();
     }
 
-    /** @param array<array{0: Fragrance, 1: int, 2: int}> $items */
+    /** @param array<array{0: Product, 1: int, 2: int}> $items */
     private function checkout(array $items, PaymentMethod $method = PaymentMethod::Cod): Order
     {
         return Order::newFromCheckout([
@@ -625,10 +625,10 @@ class GenericShopParityTest extends TestCase
 
         foreach ($items as [$fragrance, $size, $quantity]) {
             $order->items()->create([
-                'fragrance_id' => $fragrance->id,
+                'product_id' => $fragrance->id,
                 'fragrance_name_snapshot' => $fragrance->brand->name.' '.$fragrance->name,
                 'size_ml' => $size,
-                'unit_price_mmk' => $fragrance->decantPrices()->where('size_ml', $size)->value('price_mmk'),
+                'unit_price_mmk' => $fragrance->variants()->where('size_ml', $size)->value('price_mmk'),
                 'quantity' => $quantity,
             ]);
         }
@@ -638,7 +638,7 @@ class GenericShopParityTest extends TestCase
         return $order;
     }
 
-    /** @param array<array{0: Fragrance, 1: int, 2: int}> $items */
+    /** @param array<array{0: Product, 1: int, 2: int}> $items */
     private function itemPayload(array $items): array
     {
         return array_map(fn (array $item) => [

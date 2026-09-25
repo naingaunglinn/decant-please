@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Models\Brand;
-use App\Models\DecantPrice;
-use App\Models\Fragrance;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Support\Money;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,13 +23,13 @@ class DomainModelTest extends TestCase
     public function test_decant_prices_sort_by_size_and_min_price_ignores_out_of_stock(): void
     {
         $fragrance = $this->makeFragrance();
-        $fragrance->decantPrices()->createMany([
+        $fragrance->variants()->createMany([
             ['size_ml' => 30, 'price_mmk' => 150000],
             ['size_ml' => 5, 'price_mmk' => 30000, 'in_stock' => false],
             ['size_ml' => 10, 'price_mmk' => 55000],
         ]);
 
-        $this->assertSame([5, 10, 30], $fragrance->decantPrices()->pluck('size_ml')->all());
+        $this->assertSame([5, 10, 30], $fragrance->variants()->pluck('size_ml')->all());
         $this->assertSame(55000, $fragrance->minPrice());
         $this->assertSame('chanel-allure-homme-sport', $fragrance->slug);
     }
@@ -39,14 +39,14 @@ class DomainModelTest extends TestCase
         $fragrance = $this->makeFragrance();
         $order = $this->makeOrder(['delivery_fee_mmk' => 3000, 'discount_mmk' => 5000]);
         $order->items()->create([
-            'fragrance_id' => $fragrance->id,
+            'product_id' => $fragrance->id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 5,
             'unit_price_mmk' => 25000,
             'quantity' => 2,
         ]);
         $order->items()->create([
-            'fragrance_id' => $fragrance->id,
+            'product_id' => $fragrance->id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10,
             'unit_price_mmk' => 40000,
@@ -109,7 +109,7 @@ class DomainModelTest extends TestCase
             'delivery_township' => $this->serviceableTownship(),
             'address_line' => 'Sanchaung, Yangon',
             'items' => [[
-                'fragrance_id' => $price->fragrance_id,
+                'fragrance_id' => $price->product_id,
                 'size_ml' => 10,
                 'quantity' => 2,
                 'unit_price_mmk' => 1, // client-supplied price must be ignored
@@ -130,7 +130,7 @@ class DomainModelTest extends TestCase
     public function test_checkout_rejects_unavailable_items_and_rolls_everything_back(): void
     {
         $good = $this->makePrice();
-        $outOfStock = $good->fragrance->decantPrices()->create([
+        $outOfStock = $good->product->variants()->create([
             'size_ml' => 30, 'price_mmk' => 150000, 'in_stock' => false,
         ]);
 
@@ -142,8 +142,8 @@ class DomainModelTest extends TestCase
         // out-of-stock size
         try {
             Order::newFromCheckout($base + ['items' => [
-                ['fragrance_id' => $good->fragrance_id, 'size_ml' => 10, 'quantity' => 1],
-                ['fragrance_id' => $outOfStock->fragrance_id, 'size_ml' => 30, 'quantity' => 1],
+                ['fragrance_id' => $good->product_id, 'size_ml' => 10, 'quantity' => 1],
+                ['fragrance_id' => $outOfStock->product_id, 'size_ml' => 30, 'quantity' => 1],
             ]]);
             $this->fail('Expected ValidationException for out-of-stock item.');
         } catch (ValidationException $e) {
@@ -155,10 +155,10 @@ class DomainModelTest extends TestCase
         $this->assertSame(0, OrderItem::count());
 
         // inactive fragrance
-        $good->fragrance->update(['is_active' => false]);
+        $good->product->update(['is_active' => false]);
         $this->expectException(ValidationException::class);
         Order::newFromCheckout($base + ['items' => [
-            ['fragrance_id' => $good->fragrance_id, 'size_ml' => 10, 'quantity' => 1],
+            ['fragrance_id' => $good->product_id, 'size_ml' => 10, 'quantity' => 1],
         ]]);
     }
 
@@ -168,11 +168,11 @@ class DomainModelTest extends TestCase
         $this->assertSame('0 Ks', Money::kyat(0));
     }
 
-    private function makeFragrance(): Fragrance
+    private function makeFragrance(): Product
     {
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
 
-        return Fragrance::create([
+        return Product::create([
             'brand_id' => $brand->id,
             'name' => 'Allure Homme Sport',
             'concentration' => 'cologne',
@@ -180,9 +180,9 @@ class DomainModelTest extends TestCase
         ]);
     }
 
-    private function makePrice(): DecantPrice
+    private function makePrice(): ProductVariant
     {
-        return $this->makeFragrance()->decantPrices()->create([
+        return $this->makeFragrance()->variants()->create([
             'size_ml' => 10,
             'price_mmk' => 55000,
         ]);

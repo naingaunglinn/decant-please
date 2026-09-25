@@ -124,7 +124,7 @@ class PaymentReceivedTest extends TestCase
             'delivery_fee_mmk' => 0,
             'deposit_mmk' => 0,
             'items' => [[
-                'fragrance_id' => $this->itemFragrance()->id,
+                'product_id' => $this->itemFragrance()->id,
                 'size_ml' => 10,
                 'unit_price_mmk' => 20000,
                 'quantity' => 1,
@@ -345,7 +345,7 @@ class PaymentReceivedTest extends TestCase
         ]);
 
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => $itemsTotal,

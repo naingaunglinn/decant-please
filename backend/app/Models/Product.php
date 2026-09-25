@@ -13,7 +13,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['brand_id', 'name', 'slug', 'concentration', 'gender', 'notes', 'vibes', 'performance', 'description', 'image_path', 'is_active', 'is_featured', 'stock_ml', 'low_stock_threshold_ml', 'bottle_cost_mmk', 'bottle_volume_ml'])]
-class Fragrance extends Model
+/**
+ * A catalog product (step 36; was `Fragrance`). Its sellable options are
+ * ProductVariant rows. The perfume columns (concentration, notes, stock_ml, the
+ * reference bottle) stay here until step 37 moves attributes to the template and
+ * step 40 generalizes stock.
+ */
+class Product extends Model
 {
     use BelongsToShop;
     use HasSlug;
@@ -23,9 +29,21 @@ class Fragrance extends Model
         return $this->belongsTo(Brand::class);
     }
 
-    public function decantPrices(): HasMany
+    /**
+     * Every variant, archived ones included — the admin edits all of them. The
+     * storefront and checkout read activeVariants().
+     */
+    public function variants(): HasMany
     {
-        return $this->hasMany(DecantPrice::class)->orderBy('size_ml');
+        // size_ml breaks position ties, so a variant created without a position
+        // (all of them today) still lists smallest-first, as decant sizes always have.
+        return $this->hasMany(ProductVariant::class)->orderBy('position')->orderBy('size_ml')->orderBy('id');
+    }
+
+    /** What a customer can see and buy: archived variants never leave the admin. */
+    public function activeVariants(): HasMany
+    {
+        return $this->variants()->where('is_active', true);
     }
 
     public function scopeActive(Builder $query): Builder
@@ -100,11 +118,11 @@ class Fragrance extends Model
     }
 
     /**
-     * Lowest in-stock decant price, for "From 30,000 Ks" cards. Null when nothing is in stock.
+     * Lowest in-stock active variant price, for "From 30,000 Ks" cards. Null when nothing is in stock.
      */
     public function minPrice(): ?int
     {
-        $min = $this->decantPrices()->where('in_stock', true)->min('price_mmk');
+        $min = $this->activeVariants()->where('in_stock', true)->min('price_mmk');
 
         return $min === null ? null : (int) $min;
     }

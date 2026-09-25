@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Events\OrderPlaced;
 use App\Events\PaymentProofUploaded;
 use App\Models\Brand;
-use App\Models\DecantPrice;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use App\Support\TelegramNotifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -284,17 +284,17 @@ class TelegramAlertTest extends TestCase
 
     // ---- helpers -----------------------------------------------------------
 
-    private function inStockPrice(): DecantPrice
+    private function inStockPrice(): ProductVariant
     {
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer', 'is_active' => true]);
-        $fragrance = $brand->fragrances()->create([
+        $fragrance = $brand->products()->create([
             'name' => 'Allure Homme Sport',
             'concentration' => 'cologne',
             'gender' => 'male',
             'is_active' => true,
         ]);
 
-        return $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true]);
+        return $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000, 'in_stock' => true]);
     }
 
     /** Fake the private proofs disk ("local" under test) so no slip touches real storage. */
@@ -325,7 +325,7 @@ class TelegramAlertTest extends TestCase
         ])->refresh();
 
         $order->items()->create([
-            'fragrance_id' => $price->fragrance_id,
+            'product_id' => $price->product_id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => $price->size_ml,
             // One line worth $total so the item-based balanceDue() (since #67) matches
@@ -347,7 +347,7 @@ class TelegramAlertTest extends TestCase
     }
 
     private function checkout(
-        DecantPrice $price,
+        ProductVariant $price,
         int $quantity = 1,
         bool $honeypot = false,
         ?string $method = null,
@@ -360,7 +360,7 @@ class TelegramAlertTest extends TestCase
             'address_line' => 'Sanchaung, Yangon',
             'website' => $honeypot ? 'https://spam.example' : '',
             'items' => [[
-                'fragrance_id' => $price->fragrance_id,
+                'fragrance_id' => $price->product_id,
                 'size_ml' => $price->size_ml,
                 'quantity' => $quantity,
             ]],

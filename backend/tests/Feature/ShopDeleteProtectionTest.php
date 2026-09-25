@@ -39,7 +39,7 @@ class ShopDeleteProtectionTest extends TestCase
         $shop = $this->otherShop();
         $order = $this->orderIn($shop);
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => 10000,
@@ -68,11 +68,16 @@ class ShopDeleteProtectionTest extends TestCase
         $shop = $this->otherShop();
         app(TenantContext::class)->set($shop);
         $brand = Brand::create(['name' => 'Cascade Brand', 'type' => 'designer']);
+        // products.brand_id restricts delete (step 36): the shop cascade must still
+        // clear a brand that has products, not trip over its own restrict.
+        $product = $brand->products()->create(['name' => 'Cascade Scent', 'concentration' => 'edp', 'gender' => 'unisex']);
+        $product->variants()->create(['size_ml' => 5, 'price_mmk' => 20000]);
 
         $shop->delete();
 
         $this->assertDatabaseMissing('shops', ['id' => $shop->id]);
         $this->assertDatabaseMissing('brands', ['id' => $brand->id]);
+        $this->assertDatabaseMissing('products', ['id' => $product->id]);
     }
 
     private function otherShop(): Shop

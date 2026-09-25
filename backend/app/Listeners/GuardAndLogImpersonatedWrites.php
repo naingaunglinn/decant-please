@@ -38,7 +38,7 @@ use Illuminate\Support\Str;
  * write (Model::query()->update(...), ->whereKey(...)->delete(), DB::table(...), or a
  * bulk action with ->fetchSelectedRecords(false)) fires NO Eloquent events and would
  * bypass both the block and the audit. Today every write path is per-model: all ten
- * tenant-owned models (roots and sub-models — OrderItem/DecantPrice/
+ * tenant-owned models (roots and sub-models — OrderItem/ProductVariant/
  * DeliveryTownshipCourier included) use BelongsToShop, Filament's DeleteBulkAction
  * fetches records by default (per-record delete), and every custom bulk action
  * iterates (->each->update / foreach ->save). Any future mass write on a tenant-owned

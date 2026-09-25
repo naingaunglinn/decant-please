@@ -86,7 +86,7 @@ moves a studio user between shops**
 | `/admin/login` | The only public admin route |
 | `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
 | `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Fragrance CRUD, prices, stock, "View on site" |
+| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD, sizes (archived, never deleted), stock, "View on site" |
 | `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/{shop}/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
 | `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
@@ -151,13 +151,13 @@ backend/
 │   ├── Events/ + Listeners/                # OrderPlaced, PaymentProofUploaded → Telegram admin alerts (NotifyAdminOf*)
 │   ├── Filament/
 │   │   ├── Pages/                          # ProductionSchedule (month calendar), ProductionScheduleDay (printable day worklist), ManagePayment (MMQR settings)
-│   │   ├── Resources/                      # Brands/, Fragrances/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
+│   │   ├── Resources/                      # Brands/, Products/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
 │   │   ├── Controllers/                    # OrderInvoiceController (A5 PDFs), PaymentProofViewController (streams proofs) — panel-auth'd
 │   │   ├── Controllers/Api/                # Brand, Fragrance, Meta, Order (checkout), TrackOrder, CancelOrder, ValidatePromo, PaymentProof, StorefrontHost
 │   │   └── Resources/                      # JSON shaping for brands, fragrances, prices, storefront hosts
-│   ├── Models/                             # Brand, Fragrance, DecantPrice, Order, OrderItem, PromoCode, Shop, ShopDomain (+ Concerns/HasSlug)
+│   ├── Models/                             # Brand, Product, ProductVariant, Order, OrderItem, PromoCode, Shop, ShopDomain (+ Concerns/HasSlug)
 │   │                                       #   Order owns the domain rules: tracking codes, newFromCheckout, accept/reject/cancel
 │   │                                       #   PromoCode::evaluate() is the one place promo validity/discounts are decided
 │   ├── Providers/
@@ -167,7 +167,7 @@ backend/
 ├── bootstrap/app.php                       # routing + middleware wiring; event auto-discovery disabled (#52)
 ├── config/cors.php                         # platform CORS defaults (FRONTEND_URL) — verified shop_domains merge in per request (ADR-0004)
 ├── database/
-│   ├── migrations/                         # brands, fragrances, decant_prices, orders, order_items, promo_codes + additive stock/payment columns
+│   ├── migrations/                         # brands, products (was fragrances), product_variants (was decant_prices), orders, order_items, promo_codes + additive columns
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
 │   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git

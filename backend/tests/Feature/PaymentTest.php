@@ -355,7 +355,7 @@ class PaymentTest extends TestCase
         // balanceDue()/outstanding read line snapshots since #67 — give the order one
         // item worth $total (no fee/discount, so total_mmk stays $total and conforms).
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => $total,

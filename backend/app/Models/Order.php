@@ -172,8 +172,10 @@ class Order extends Model
                 }
 
                 $order->items()->create([
-                    'fragrance_id' => $price->fragrance_id,
-                    'fragrance_name_snapshot' => $price->fragrance->brand->name.' '.$price->fragrance->name,
+                    'product_id' => $price->product_id,
+                    'product_variant_id' => $price->id,
+                    'fragrance_name_snapshot' => trim(($price->product->brand?->name ?? '').' '.$price->product->name),
+                    'variant_label_snapshot' => $price->label(),
                     'size_ml' => $price->size_ml,
                     'unit_price_mmk' => $price->price_mmk,
                     'quantity' => $item['quantity'],
@@ -213,17 +215,22 @@ class Order extends Model
         $this->promo_code = $result['promo']->code;
     }
 
-    /** The current-catalog price lookup checkout and promo preview both use. */
-    public static function currentPriceFor(int $fragranceId, int $sizeMl): ?DecantPrice
+    /**
+     * The current-catalog price lookup checkout and promo preview both use. An
+     * archived variant is not for sale, so it never resolves — the server refuses
+     * it whatever the client sends.
+     */
+    public static function currentPriceFor(int $productId, int $sizeMl): ?ProductVariant
     {
-        return DecantPrice::query()
-            ->where('fragrance_id', $fragranceId)
+        return ProductVariant::query()
+            ->where('product_id', $productId)
             ->where('size_ml', $sizeMl)
             ->where('in_stock', true)
-            ->whereHas('fragrance', fn ($query) => $query
+            ->where('is_active', true)
+            ->whereHas('product', fn ($query) => $query
                 ->where('is_active', true)
                 ->whereHas('brand', fn ($q) => $q->where('is_active', true)))
-            ->with('fragrance.brand')
+            ->with('product.brand')
             ->first();
     }
 
@@ -265,32 +272,32 @@ class Order extends Model
     }
 
     /**
-     * Pour every item's volume off its fragrance's running stock total, once
-     * per fragrance (a 5ml + a 10ml of the same juice draws 15ml in one write).
-     * Untracked fragrances are skipped inside Fragrance::drawDownStock. Called
+     * Pour every item's volume off its product's running stock total, once
+     * per product (a 5ml + a 10ml of the same juice draws 15ml in one write).
+     * Untracked products are skipped inside Product::drawDownStock. Called
      * from the → Decanted transition in booted().
      */
     protected function drawDownDecantStock(): void
     {
         $this->loadMissing('items');
 
-        $mlByFragrance = [];
+        $mlByProduct = [];
         foreach ($this->items as $item) {
-            if ($item->fragrance_id === null) {
+            if ($item->product_id === null || $item->size_ml === null) {
                 continue;
             }
 
-            $mlByFragrance[$item->fragrance_id] = ($mlByFragrance[$item->fragrance_id] ?? 0)
+            $mlByProduct[$item->product_id] = ($mlByProduct[$item->product_id] ?? 0)
                 + $item->size_ml * $item->quantity;
         }
 
-        if ($mlByFragrance === []) {
+        if ($mlByProduct === []) {
             return;
         }
 
-        Fragrance::whereIn('id', array_keys($mlByFragrance))
+        Product::whereIn('id', array_keys($mlByProduct))
             ->get()
-            ->each(fn (Fragrance $fragrance) => $fragrance->drawDownStock($mlByFragrance[$fragrance->id]));
+            ->each(fn (Product $product) => $product->drawDownStock($mlByProduct[$product->id]));
     }
 
     /**
@@ -470,25 +477,25 @@ class Order extends Model
     }
 
     /**
-     * Tracked fragrances this order can't be fully poured from, given current
+     * Tracked products this order can't be fully poured from, given current
      * stock_ml — surfaced at Accept so a shortfall is caught before committing,
-     * not at the decant bench. Untracked (null stock_ml) fragrances are ignored.
+     * not at the decant bench. Untracked (null stock_ml) products are ignored.
      *
      * @return array<array{name: string, needed: int, available: int}>
      */
     public function stockShortfalls(): array
     {
-        $this->loadMissing('items.fragrance');
+        $this->loadMissing('items.product');
 
         $needed = [];
         foreach ($this->items as $item) {
-            if ($item->fragrance_id === null) {
+            if ($item->product_id === null || $item->size_ml === null) {
                 continue;
             }
 
-            $needed[$item->fragrance_id]['name'] ??= $item->fragrance?->name ?? $item->fragrance_name_snapshot;
-            $needed[$item->fragrance_id]['ml'] = ($needed[$item->fragrance_id]['ml'] ?? 0) + $item->size_ml * $item->quantity;
-            $needed[$item->fragrance_id]['stock'] = $item->fragrance?->stock_ml;
+            $needed[$item->product_id]['name'] ??= $item->product?->name ?? $item->fragrance_name_snapshot;
+            $needed[$item->product_id]['ml'] = ($needed[$item->product_id]['ml'] ?? 0) + $item->size_ml * $item->quantity;
+            $needed[$item->product_id]['stock'] = $item->product?->stock_ml;
         }
 
         $short = [];
@@ -503,7 +510,7 @@ class Order extends Model
 
     /**
      * The production schedule's one source of truth: the window's order items,
-     * grouped per day into fragrance+size production lines. Both schedule views
+     * grouped per day into product+size production lines. Both schedule views
      * (day-card list and month calendar) read this — the grouping must never
      * fork, and when multi-tenancy lands, shop scoping happens here, once
      * (a custom Filament page is outside Filament's tenancy scoping). Days
@@ -529,7 +536,7 @@ class Order extends Model
                 ->whereDate('decant_date', '>=', $from->toDateString())
                 ->whereDate('decant_date', '<=', $to->toDateString())
                 ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected]))
-            ->with(['order', 'fragrance.brand'])
+            ->with(['order', 'product.brand'])
             ->get();
 
         $byDay = $items->groupBy(fn (OrderItem $item) => $item->order->decant_date->toDateString());
@@ -538,12 +545,14 @@ class Order extends Model
 
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
             $groups = ($byDay->get($day->toDateString()) ?? collect())
-                ->groupBy(fn (OrderItem $item) => "{$item->fragrance_id}:{$item->size_ml}")
+                ->groupBy(fn (OrderItem $item) => "{$item->product_id}:{$item->size_ml}")
                 ->map(function (Collection $group): array {
                     $first = $group->first();
 
                     return [
-                        'label' => "{$first->fragrance->brand->name} — {$first->fragrance->name}",
+                        'label' => $first->product->brand
+                            ? "{$first->product->brand->name} — {$first->product->name}"
+                            : $first->product->name,
                         'size_ml' => $first->size_ml,
                         'quantity' => $group->sum('quantity'),
                         'orders' => $group->map(fn (OrderItem $item) => $item->order)->unique('id')->values(),
@@ -564,7 +573,7 @@ class Order extends Model
         return self::query()
             ->where('tracking_code', Str::upper(trim($code)))
             ->where('phone', trim($phone))
-            ->with('items.fragrance.brand')
+            ->with('items.product.brand')
             ->first();
     }
 
@@ -582,13 +591,13 @@ class Order extends Model
      */
     public static function unavailableItemMessage(array $item): string
     {
-        $fragrance = Fragrance::query()->find($item['fragrance_id'] ?? null);
+        $product = Product::query()->find($item['fragrance_id'] ?? null);
 
-        if (! $fragrance || ! $fragrance->is_active || ! $fragrance->brand?->is_active) {
+        if (! $product || ! $product->is_active || ! $product->brand?->is_active) {
             return 'That fragrance is no longer available.';
         }
 
-        return "{$item['size_ml']}ml of {$fragrance->name} just sold out — pick another size.";
+        return "{$item['size_ml']}ml of {$product->name} just sold out — pick another size.";
     }
 
     public static function generateTrackingCode(): string

@@ -2,11 +2,12 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ProductVariant;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\DecantPrice */
+/** @mixin ProductVariant */
 class DecantPriceResource extends JsonResource
 {
     public function toArray(Request $request): array

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Resources\Fragrances\Tables;
+namespace App\Filament\Resources\Products\Tables;
 
 use App\Enums\BrandType;
 use App\Enums\Concentration;
 use App\Enums\Gender;
-use App\Filament\Resources\Fragrances\FragranceResource;
-use App\Models\Fragrance;
+use App\Filament\Resources\Products\ProductResource;
+use App\Models\Product;
 use App\Support\CatalogImport;
 use App\Support\Money;
 use App\Support\TenantContext;
@@ -32,7 +32,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
 
-class FragrancesTable
+class ProductsTable
 {
     public static function configure(Table $table): Table
     {
@@ -44,8 +44,8 @@ class FragrancesTable
 
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
-                ->with('decantPrices')
-                ->withMin(['decantPrices as min_in_stock_price' => fn (Builder $q) => $q->where('in_stock', true)], 'price_mmk'))
+                ->with('variants')
+                ->withMin(['variants as min_in_stock_price' => fn (Builder $q) => $q->where('in_stock', true)->where('is_active', true)], 'price_mmk'))
             ->columns([
                 ImageColumn::make('image_path')
                     ->label('Image')
@@ -69,31 +69,32 @@ class FragrancesTable
                     }),
                 TextColumn::make('min_in_stock_price')
                     ->label('From price')
-                    ->state(fn (Fragrance $record): string => $record->min_in_stock_price !== null
+                    ->state(fn (Product $record): string => $record->min_in_stock_price !== null
                         ? 'From '.Money::kyat((int) $record->min_in_stock_price)
                         : 'Out of stock'),
                 TextColumn::make('sizes')
-                    ->state(fn (Fragrance $record): string => $record->decantPrices
-                        ->map(fn ($price) => "{$price->size_ml}ml")
+                    ->state(fn (Product $record): string => $record->variants
+                        ->where('is_active', true)
+                        ->map(fn ($variant) => $variant->label())
                         ->implode(' · ')),
                 TextColumn::make('stock_ml')
                     ->label('Stock')
                     ->badge()
-                    ->state(fn (Fragrance $record): string => $record->isStockTracked()
+                    ->state(fn (Product $record): string => $record->isStockTracked()
                         ? "{$record->stock_ml}ml"
                         : '—')
-                    ->color(fn (Fragrance $record): string => match (true) {
+                    ->color(fn (Product $record): string => match (true) {
                         ! $record->isStockTracked() => 'gray',
                         $record->isLowStock() => 'danger',
                         default => 'success',
                     })
-                    ->tooltip(fn (Fragrance $record): ?string => $record->isLowStock()
+                    ->tooltip(fn (Product $record): ?string => $record->isLowStock()
                         ? "Low — reorder at {$record->low_stock_threshold_ml}ml"
                         : null)
                     ->sortable(),
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
-                    ->state(fn (Fragrance $record): string => $record->liquidCostMmk(1) !== null
+                    ->state(fn (Product $record): string => $record->liquidCostMmk(1) !== null
                         ? Money::kyat((int) $record->liquidCostMmk(1))
                         : '—')
                     ->tooltip('Liquid only — ceiling-rounded per ml')
@@ -125,24 +126,24 @@ class FragrancesTable
                     ->label('Has size')
                     ->options([5 => '5ml', 10 => '10ml', 30 => '30ml'])
                     ->query(fn (Builder $query, array $data) => $query->when($data['value'] ?? null,
-                        fn (Builder $q, string $size) => $q->whereHas('decantPrices', fn (Builder $p) => $p->where('size_ml', $size)))),
+                        fn (Builder $q, string $size) => $q->whereHas('variants', fn (Builder $p) => $p->where('size_ml', $size)))),
             ])
             ->recordActions([
                 Action::make('viewOnSite')
                     ->label('View on site')
                     ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-                    ->url(fn (Fragrance $record): string => "{$storefront}/fragrance/{$record->slug}")
+                    ->url(fn (Product $record): string => "{$storefront}/fragrance/{$record->slug}")
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 ReplicateAction::make()
                     ->excludeAttributes(['slug'])
-                    ->after(function (Fragrance $record, Fragrance $replica): void {
+                    ->after(function (Product $record, Product $replica): void {
                         // slug was excluded, so the HasSlug hook generated a fresh one; copy the price rows
-                        $record->decantPrices->each(fn ($price) => $replica->decantPrices()->create(
-                            $price->only(['size_ml', 'price_mmk', 'in_stock'])
+                        $record->variants->each(fn ($variant) => $replica->variants()->create(
+                            $variant->only(['size_ml', 'price_mmk', 'in_stock', 'is_active', 'position'])
                         ));
                     }),
-                FragranceResource::safeDeleteAction(),
+                ProductResource::safeDeleteAction(),
             ])
             ->toolbarActions([
                 Action::make('importCsv')

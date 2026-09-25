@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Models\Brand;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,9 +14,11 @@ class PublicApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Fragrance $allure;   // Chanel (designer): 5ml 30k, 10ml 55k, 30ml 150k out-of-stock, featured
-    private Fragrance $aventus;  // Creed (niche): 10ml 120k
-    private Fragrance $loveInWhite; // Creed (niche), female: 5ml 60k
+    private Product $allure;   // Chanel (designer): 5ml 30k, 10ml 55k, 30ml 150k out-of-stock, featured
+
+    private Product $aventus;  // Creed (niche): 10ml 120k
+
+    private Product $loveInWhite; // Creed (niche), female: 5ml 60k
 
     protected function setUp(): void
     {
@@ -26,34 +28,34 @@ class PublicApiTest extends TestCase
         $creed = Brand::create(['name' => 'Creed', 'type' => 'niche']);
         $hidden = Brand::create(['name' => 'Old House', 'type' => 'designer', 'is_active' => false]);
 
-        $this->allure = $chanel->fragrances()->create([
+        $this->allure = $chanel->products()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
             'notes' => 'Orange, Grapefruit, Musk', 'is_featured' => true,
         ]);
-        $this->allure->decantPrices()->createMany([
+        $this->allure->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000],
             ['size_ml' => 10, 'price_mmk' => 55000],
             ['size_ml' => 30, 'price_mmk' => 150000, 'in_stock' => false],
         ]);
 
-        $this->aventus = $creed->fragrances()->create([
+        $this->aventus = $creed->products()->create([
             'name' => 'Aventus', 'concentration' => 'edp', 'gender' => 'male',
             'notes' => 'Pineapple, Birch',
         ]);
-        $this->aventus->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 120000]);
+        $this->aventus->variants()->create(['size_ml' => 10, 'price_mmk' => 120000]);
 
-        $this->loveInWhite = $creed->fragrances()->create([
+        $this->loveInWhite = $creed->products()->create([
             'name' => 'Love In White', 'concentration' => 'edp', 'gender' => 'female',
         ]);
-        $this->loveInWhite->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 60000]);
+        $this->loveInWhite->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
 
         // must never appear anywhere below
-        $creed->fragrances()->create([
+        $creed->products()->create([
             'name' => 'Green Irish Tweed', 'concentration' => 'edp', 'gender' => 'male', 'is_active' => false,
-        ])->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 60000]);
-        $hidden->fragrances()->create([
+        ])->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
+        $hidden->products()->create([
             'name' => 'Ghost Scent', 'concentration' => 'edt', 'gender' => 'unisex',
-        ])->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 10000]);
+        ])->variants()->create(['size_ml' => 5, 'price_mmk' => 10000]);
     }
 
     public function test_brands_lists_active_brands_with_active_fragrance_counts_and_caches(): void
@@ -158,7 +160,7 @@ class PublicApiTest extends TestCase
         $this->assertSame('30ml of Allure Homme Sport just sold out — pick another size.', $errors['items.1'][0]);
 
         // inactive fragrance
-        $git = Fragrance::where('name', 'Green Irish Tweed')->firstOrFail();
+        $git = Product::where('name', 'Green Irish Tweed')->firstOrFail();
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => $git->id, 'size_ml' => 5, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');

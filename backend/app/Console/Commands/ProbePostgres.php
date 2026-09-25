@@ -38,7 +38,7 @@ class ProbePostgres extends Command
     private const UNIQUE_INDEXES = [
         ['brands', ['shop_id', 'name']],
         ['brands', ['shop_id', 'slug']],
-        ['fragrances', ['shop_id', 'slug']],
+        ['products', ['shop_id', 'slug']],
         ['promo_codes', ['shop_id', 'code']],
         ['delivery_townships', ['shop_id', 'region', 'name']],
         ['shop_settings', ['shop_id']],

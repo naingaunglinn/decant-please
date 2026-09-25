@@ -15,7 +15,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\QueryException;
 
 class BrandsTable
 {
@@ -32,13 +31,10 @@ class BrandsTable
                     ->sortable(),
                 TextColumn::make('type')
                     ->badge()
-                    ->color(fn (BrandType $state): string => match ($state) {
-                        BrandType::Designer => 'gray',
-                        BrandType::Niche => 'info',
-                    }),
-                TextColumn::make('fragrances_count')
+                    ->color(fn (?BrandType $state): string => $state === BrandType::Niche ? 'info' : 'gray'),
+                TextColumn::make('products_count')
                     ->label('Fragrances')
-                    ->counts('fragrances'),
+                    ->counts('products'),
                 ToggleColumn::make('is_active'),
                 TextColumn::make('updated_at')
                     ->dateTime()
@@ -56,24 +52,26 @@ class BrandsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    // A brand with products is FK-protected (NO ACTION on delete): keep it.
                     DeleteBulkAction::make()
-                        ->modalDescription('Deleting brands also deletes all of their fragrances and decant prices. This cannot be undone.')
                         ->action(function (Collection $records, DeleteBulkAction $action): void {
                             $kept = 0;
 
                             foreach ($records as $record) {
-                                try {
-                                    $record->delete();
-                                } catch (QueryException) {
+                                if ($record->products()->exists()) {
                                     $kept++;
+
+                                    continue;
                                 }
+
+                                $record->delete();
                             }
 
                             if ($kept > 0) {
                                 Notification::make()
                                     ->warning()
                                     ->title("{$kept} brand(s) kept")
-                                    ->body('Their fragrances appear in orders — deactivate those brands instead.')
+                                    ->body('They have fragrances — deactivate them instead.')
                                     ->send();
                             }
 

@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Filament\Widgets\LowStock;
 use App\Models\Brand;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -39,7 +39,7 @@ class DecantStockTest extends TestCase
     public function test_multiple_sizes_of_the_same_fragrance_draw_from_one_total(): void
     {
         $fragrance = $this->trackedFragrance(stockMl: 100);
-        $fragrance->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 50000, 'in_stock' => true]);
+        $fragrance->variants()->create(['size_ml' => 5, 'price_mmk' => 50000, 'in_stock' => true]);
 
         $order = Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
@@ -67,7 +67,7 @@ class DecantStockTest extends TestCase
 
         $fragrance->refresh();
         $this->assertSame(0, $fragrance->stock_ml);                       // clamped, not -5
-        $this->assertTrue($fragrance->decantPrices->first()->in_stock);   // manual toggle untouched
+        $this->assertTrue($fragrance->variants->first()->in_stock);   // manual toggle untouched
         $this->assertSame(OrderStatus::Decanted, $order->refresh()->status); // transition not blocked
     }
 
@@ -109,10 +109,10 @@ class DecantStockTest extends TestCase
         int $threshold = 30,
         string $brand = 'Creed',
         string $name = 'Aventus',
-    ): Fragrance {
+    ): Product {
         $brandModel = Brand::create(['name' => $brand, 'type' => 'niche']);
 
-        $fragrance = $brandModel->fragrances()->create([
+        $fragrance = $brandModel->products()->create([
             'name' => $name,
             'concentration' => 'edp',
             'gender' => 'male',
@@ -120,12 +120,12 @@ class DecantStockTest extends TestCase
             'low_stock_threshold_ml' => $threshold,
         ]);
 
-        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);
+        $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);
 
         return $fragrance;
     }
 
-    private function checkout(Fragrance $fragrance, int $sizeMl, int $quantity): Order
+    private function checkout(Product $fragrance, int $sizeMl, int $quantity): Order
     {
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',

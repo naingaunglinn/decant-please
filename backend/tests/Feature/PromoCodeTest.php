@@ -6,8 +6,8 @@ use App\Enums\PromoType;
 use App\Filament\Resources\PromoCodes\Pages\CreatePromoCode;
 use App\Filament\Resources\PromoCodes\Pages\ListPromoCodes;
 use App\Models\Brand;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\PromoCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,17 +18,17 @@ class PromoCodeTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Fragrance $allure; // 10ml = 55,000 Ks
+    private Product $allure; // 10ml = 55,000 Ks
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
-        $this->allure = $chanel->fragrances()->create([
+        $this->allure = $chanel->products()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
         ]);
-        $this->allure->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+        $this->allure->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
     }
 
     public function test_preview_validates_and_persists_nothing(): void

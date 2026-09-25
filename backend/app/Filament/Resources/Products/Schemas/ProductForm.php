@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Fragrances\Schemas;
+namespace App\Filament\Resources\Products\Schemas;
 
 use App\Enums\BrandType;
 use App\Enums\Concentration;
@@ -21,7 +21,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Support\RawJs;
 
-class FragranceForm
+class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
@@ -149,11 +149,18 @@ class FragranceForm
                 Section::make('Decant prices')
                     ->columnSpanFull()
                     ->schema([
-                        Repeater::make('decantPrices')
+                        // Saved sizes are archived, never removed: a size on a placed
+                        // order can't be deleted (order_items restricts it), so only a
+                        // row that isn't saved yet ("record-{id}" keys are saved rows)
+                        // gets a delete button — "Selling" off hides a size from the shop.
+                        Repeater::make('variants')
                             ->relationship()
                             ->hiddenLabel()
-                            ->columns(3)
+                            ->columns(4)
                             ->minItems(1)
+                            ->deleteAction(fn (Action $action): Action => $action
+                                ->visible(fn (array $arguments, Repeater $component): bool => $component->isDeletable()
+                                    && ! str_starts_with((string) ($arguments['item'] ?? ''), 'record-')))
                             ->addActionLabel('Add size')
                             ->default([
                                 ['size_ml' => 5, 'in_stock' => true],
@@ -179,6 +186,11 @@ class FragranceForm
                                     ->suffix('Ks')
                                     ->required(),
                                 Toggle::make('in_stock')
+                                    ->default(true)
+                                    ->inline(false),
+                                Toggle::make('is_active')
+                                    ->label('Selling')
+                                    ->helperText('Off hides this size from the shop. Past orders keep it.')
                                     ->default(true)
                                     ->inline(false),
                             ]),
