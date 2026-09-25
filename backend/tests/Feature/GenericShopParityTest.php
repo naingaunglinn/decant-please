@@ -42,10 +42,12 @@ use Tests\TestCase;
  *   Creed (niche)     Aventus             5ml 65,000 · 10ml 120,000
  *                                         cost 100,000 / 30ml → 5ml ⌈16,666.7⌉ = 16,667 · 10ml ⌈33,333.3⌉ = 33,334
  *   Creed (niche)     Love In White       5ml 60,000 — no cost pair, so uncosted
+ *   stock: Allure 100ml, Aventus 12ml tracked; Love In White untracked
  *   hidden: Creed Green Irish Tweed (inactive, 5ml 999,000); Old House Ghost (inactive brand, 5ml 1,000)
  *
  * Orders (Sanchaung fee 2,500; promo PARITY10 = 10% capped at 15,000):
- *   A  POST /orders, March · Allure 10ml ×2 + Aventus 5ml ×1 · PARITY10 · accepted (pending)
+ *   A  POST /orders, March · Allure 10ml ×2 + Aventus 5ml ×1 · PARITY10 · accepted, then decanted
+ *      (draws Allure 100 − 20 = 80ml, Aventus 12 − 5 = 7ml; a smuggled client price is ignored)
  *      items 110,000 + 65,000 = 175,000; discount min(17,500, 15,000) = 15,000
  *      total 175,000 + 2,500 − 15,000 = 162,500; cost 60,000 + 16,667 = 76,667
  *      margin 175,000 − 15,000 − 76,667 = 83,333; balance 162,500
@@ -116,6 +118,29 @@ class GenericShopParityTest extends TestCase
         $this->assertSame($this->allureObject(), $this->pick($byName['Allure Homme Sport'], $this->allureObject()));
         $this->assertSame($this->aventusObject(), $this->pick($byName['Aventus'], $this->aventusObject()));
         $this->assertSame($this->loveInWhiteObject(), $this->pick($byName['Love In White'], $this->loveInWhiteObject()));
+    }
+
+    public function test_fragrance_filters_and_sorts(): void
+    {
+        $names = fn (string $query): array => array_column(
+            $this->getJson("/api/v1/decant-please/fragrances?{$query}")->assertOk()->json('data'), 'name');
+
+        // unsorted filters keep the default newest-first (id desc) order
+        $this->assertSame(['Love In White'], $names('gender=female'));
+        $this->assertSame(['Love In White', 'Aventus'], $names('type=niche'));
+        $this->assertSame(['Allure Homme Sport'], $names('brand=chanel'));
+        $this->assertSame(['Aventus', 'Allure Homme Sport'], $names('size=10'));
+        $this->assertSame([], $names('size=30'));                        // only out of stock
+        $this->assertSame(['Aventus'], $names('min_price=62000'));        // 65,000 / 120,000
+        $this->assertSame(['Allure Homme Sport'], $names('max_price=40000')); // 30,000
+        $this->assertSame(['Love In White', 'Aventus'], $names('q=creed'));
+        $this->assertSame(['Allure Homme Sport'], $names('notes=musk'));
+        $this->assertSame(['Allure Homme Sport'], $names('featured=1'));
+
+        // by in-stock min price: 30,000 · 60,000 · 65,000
+        $this->assertSame(['Allure Homme Sport', 'Love In White', 'Aventus'], $names('sort=price_asc'));
+        $this->assertSame(['Aventus', 'Love In White', 'Allure Homme Sport'], $names('sort=price_desc'));
+        $this->assertSame(['Allure Homme Sport', 'Aventus', 'Love In White'], $names('sort=name'));
     }
 
     public function test_fragrance_detail_object(): void
@@ -199,9 +224,40 @@ class GenericShopParityTest extends TestCase
         ])->all());
 
         $this->assertSame('PARITY10', $this->orders['A']->promo_code);
-        $this->assertSame(['yangon', 'Sanchaung'], [
-            $this->orders['A']->deliveryTownship->region->value, $this->orders['A']->township_snapshot,
+        $this->assertSame(['Yangon Region', 'Sanchaung'], [
+            $this->orders['A']->region_snapshot, $this->orders['A']->township_snapshot,
         ]);
+    }
+
+    public function test_public_tracking_receipt_money(): void
+    {
+        $receipt = $this->getJson('/api/v1/decant-please/orders/track?'.http_build_query([
+            'tracking_code' => $this->orders['A']->tracking_code, 'phone' => '09-771234561',
+        ]))->assertOk()->json();
+
+        $this->assertSame(
+            [175000, 2500, 15000, 'PARITY10', 0, 162500, '162,500 Ks', 162500],
+            [$receipt['subtotal_mmk'], $receipt['delivery_fee_mmk'], $receipt['discount_mmk'], $receipt['promo_code'],
+                $receipt['deposit_mmk'], $receipt['total_mmk'], $receipt['total_formatted'], $receipt['balance_due_mmk']],
+        );
+        $this->assertSame([[10, 2, 55000, 110000], [5, 1, 65000, 65000]], array_map(
+            fn (array $item) => [$item['size_ml'], $item['quantity'], $item['unit_price_mmk'], $item['line_total_mmk']],
+            $receipt['items'],
+        ));
+
+        // D: marked paid with 35,000 against 30,000 — the signed balance reaches the storefront
+        $this->assertSame(-5000, $this->getJson('/api/v1/decant-please/orders/track?'.http_build_query([
+            'tracking_code' => $this->orders['D']->tracking_code, 'phone' => '09-773216549',
+        ]))->assertOk()->json('balance_due_mmk'));
+    }
+
+    public function test_decanting_draws_down_tracked_stock(): void
+    {
+        // A → decanted pours 2 × 10ml Allure and 5ml Aventus; untracked stays untracked
+        $this->assertSame(
+            [80, 7, null],
+            [$this->allure->fresh()->stock_ml, $this->aventus->fresh()->stock_ml, $this->loveInWhite->fresh()->stock_ml],
+        );
     }
 
     // ---- the dashboard ----
@@ -289,6 +345,7 @@ class GenericShopParityTest extends TestCase
             'notes' => 'Orange, Sea Notes, Musk', 'vibes' => 'Fresh, Sporty',
             'performance' => 'Around 4-6 Hours', 'description' => 'A crisp citrus-marine cologne.',
             'is_featured' => true, 'bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100,
+            'stock_ml' => 100,
         ]);
         $this->allure->decantPrices()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000],
@@ -299,6 +356,7 @@ class GenericShopParityTest extends TestCase
         $this->aventus = $this->creed->fragrances()->create([
             'name' => 'Aventus', 'concentration' => 'edp', 'gender' => 'male',
             'notes' => 'Pineapple, Birch', 'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
+            'stock_ml' => 12,
         ]);
         $this->aventus->decantPrices()->createMany([
             ['size_ml' => 5, 'price_mmk' => 65000],
@@ -332,6 +390,7 @@ class GenericShopParityTest extends TestCase
 
         $this->orders['A'] = $this->postCheckout([[$this->allure, 10, 2], [$this->aventus, 5, 1]], promo: 'PARITY10');
         $this->orders['A']->accept(CarbonImmutable::parse('2026-03-16'), CarbonImmutable::parse('2026-03-18'));
+        $this->orders['A']->update(['status' => OrderStatus::Decanted]);
 
         $this->orders['B'] = $this->postCheckout([[$this->loveInWhite, 5, 1], [$this->allure, 5, 1]]);
 
@@ -372,21 +431,24 @@ class GenericShopParityTest extends TestCase
 
         $context->set(Shop::create(['slug' => 'other-shop', 'name' => 'Other Shop', 'status' => ShopStatus::Live]));
 
-        $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->fragrances()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
-            'bottle_cost_mmk' => 50000, 'bottle_volume_ml' => 100,
-        ]);
-        $fragrance->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 7000]);
+        try {
 
-        Order::newFromCheckout([
-            'customer_name' => 'Other Customer', 'phone' => '09-700000001',
-            'delivery_township' => $this->serviceableTownship(fee: 1000, name: 'Sanchaung'),
-            'address_line' => '1 Other Road',
-            'items' => [['fragrance_id' => $fragrance->id, 'size_ml' => 5, 'quantity' => 3]],
-        ]);
-        Expense::create(['spent_on' => '2026-03-15', 'category' => 'marketing', 'amount_mmk' => 77000]);
+            $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->fragrances()->create([
+                'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+                'bottle_cost_mmk' => 50000, 'bottle_volume_ml' => 100,
+            ]);
+            $fragrance->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 7000]);
 
-        $context->set($home);
+            Order::newFromCheckout([
+                'customer_name' => 'Other Customer', 'phone' => '09-700000001',
+                'delivery_township' => $this->serviceableTownship(fee: 1000, name: 'Sanchaung'),
+                'address_line' => '1 Other Road',
+                'items' => [['fragrance_id' => $fragrance->id, 'size_ml' => 5, 'quantity' => 3]],
+            ]);
+            Expense::create(['spent_on' => '2026-03-15', 'category' => 'marketing', 'amount_mmk' => 77000]);
+        } finally {
+            $context->set($home);
+        }
     }
 
     /** @param array<array{0: Fragrance, 1: int, 2: int}> $items */
@@ -398,7 +460,10 @@ class GenericShopParityTest extends TestCase
             'delivery_township_id' => $this->sanchaung->id,
             'address_line' => 'No. 12, Baho Road',
             'promo_code' => $promo,
-            'items' => $this->itemPayload($items),
+            // smuggled client money — the server derives every figure and must ignore these
+            'total_mmk' => 1,
+            'delivery_fee_mmk' => 0,
+            'items' => array_map(fn (array $item) => $item + ['unit_price_mmk' => 1], $this->itemPayload($items)),
         ]))->assertCreated();
 
         return Order::where('tracking_code', $response->json('tracking_code'))->firstOrFail();

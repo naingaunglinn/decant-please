@@ -114,7 +114,10 @@ tracking codes. The clock is frozen at 2026-03-15 10:00 (`travelTo`); ids are co
 fixture's own models, never literals (Postgres sequences don't roll back). `/meta`'s
 `social`/`payment` blocks are left out (they resolve through env). Beyond the spec, it also
 pins each order's derived money (items, discount, fee, total, deposit, cost, signed balance)
-and the "Balance outstanding" stat, since #67 had landed.
+and the "Balance outstanding" stat (since #67 had landed), the `/fragrances` filters and sorts,
+the public tracking receipt's money, a smuggled client price being ignored, and the `stock_ml`
+draw-down on → Decanted (step 40 rewrites it). `delivery_courier` is not pinned: it is set when
+an order is handed to a courier, not when it is placed.
 
 **Risks.** Determinism (freeze seed data + dates). Must assert money as values so a later
 rename can't silently move a figure. **The fixture is created after migrations run**, so
@@ -305,7 +308,10 @@ int null (per-variant COGS). `pooled`: product `stock_amount` int + `stock_unit`
 `measure × quantity`; per_variant draws `stock_qty` by quantity.
 
 **COGS.** Pooled keeps the **ceiling division** (`Fragrance::liquidCostMmk` generalized:
-`ceil(stock_cost/stock_amount) × measure`); per_variant uses variant `unit_cost_mmk`.
+`ceil(stock_cost × measure / stock_amount)` — multiply first, round once. **(corrected #104)**
+The earlier `ceil(stock_cost/stock_amount) × measure` rounds per unit and would move money:
+100,000 Ks / 30ml at 5ml is 16,667 today, 16,670 under that formula; the parity test pins
+16,667); per_variant uses variant `unit_cost_mmk`.
 `order_items.unit_cost_mmk`/`line_cost_mmk` snapshots are unchanged. **Fold in #41's atomic
 design** — `lockForUpdate` + all-or-nothing shortfall check before any decrement — into the
 pooled path.

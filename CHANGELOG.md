@@ -19,7 +19,9 @@ test file. No migration, no API change, no app code, no dependency.
   `min_price_mmk` and every price, `/meta`'s filter options, sizes and price bounds, each
   order's server-derived money (items, discount, fee, total, deposit, liquid cost, signed
   balance), the dashboard's revenue, gross margin ("on 3 of 4"), order count and balance
-  outstanding, and `MonthlyPnl` for March and February, every field.
+  outstanding, and `MonthlyPnl` for March and February, every field. It also pins the
+  `/fragrances` filters and sorts, the public tracking receipt's money, and the `stock_ml`
+  draw-down when an order is decanted.
 - The fixture covers each money rule: the ceiling cost division, a capped percent promo
   through `POST /orders`, a township fee, fully-, partially- and un-costed orders, a
   cancelled and a rejected order, an overpaid order, last month's order, expenses in every
@@ -27,8 +29,11 @@ test file. No migration, no API change, no app code, no dependency.
 - Steps 36–42 keep it green. A step may rename a field it deliberately renames, never a
   value. It can't guard a *data* migration (the fixture is built after migrations), so the
   step plan now asks each backfilling step to test its own migration.
-- Checked by mutation: switching the cost rounding from ceiling to floor fails 4 of its 7
+- Checked by mutation: switching the cost rounding from ceiling to floor fails 4 of its 10
   tests.
+- **Spec fix (step 40):** the plan's pooled-COGS formula `ceil(cost/amount) × measure`
+  rounded per unit and would have moved money (16,667 → 16,670 Ks for a 5ml pour of a
+  100,000 Ks / 30ml bottle). It now reads `ceil(cost × measure / amount)`, today's rule.
 
 ## 0. What changed in v38
 
