@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Filament\Pages\ProductionScheduleDay;
 use App\Filament\Resources\Orders\Pages\CreateOrder;
+use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Widgets\OrderStats;
 use App\Filament\Widgets\RevenueChart;
@@ -164,6 +165,35 @@ class AdminOrdersTest extends TestCase
         $order->refresh()->load('items');
         $this->assertSame(55000, $order->items->first()->unit_price_mmk);
         $this->assertSame(55000, $order->total_mmk);
+    }
+
+    /** Rule 3: saving an order for an unrelated edit must not re-snapshot its lines. */
+    public function test_editing_an_order_never_rewrites_its_line_snapshots(): void
+    {
+        // A DM order (no township): its edit page is the admin's to fix up.
+        $order = $this->manualOrder(OrderStatus::Pending, decantDate: today()->addDay());
+        $variant = $this->price();
+        $item = $order->items()->create([
+            'product_id' => $variant->product_id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 1,
+        ]);
+
+        $variant->product->update(['name' => 'Renamed Later']);
+        $variant->product->brand->delete(); // products outlive a brand since step 36
+        $variant->update(['size_ml' => 12]);
+
+        Livewire::test(EditOrder::class, ['record' => $order->getRouteKey()])
+            ->fillForm(['customer_name' => 'Aung Kyaw Oo'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $item->refresh();
+        $this->assertSame('Aung Kyaw Oo', $order->fresh()->customer_name);
+        $this->assertSame('Chanel Allure Homme Sport', $item->fragrance_name_snapshot);
+        $this->assertSame($variant->id, $item->product_variant_id);
+        $this->assertSame('10ml', $item->variant_label_snapshot);
+        $this->assertSame(10, $item->size_ml);
+        $this->assertSame(55000, $item->unit_price_mmk);
     }
 
     public function test_todays_decants_tab_excludes_cancelled_and_rejected(): void

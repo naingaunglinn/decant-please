@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\Region;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Money;
@@ -124,7 +125,12 @@ class OrderForm
                             ->defaultItems(1)
                             ->addActionLabel('Add item')
                             ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::withSnapshot($data))
-                            ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::withSnapshot($data))
+                            // An existing line keeps its snapshots unless the admin changed
+                            // what it sells: a later catalog edit (a renamed product, a
+                            // deleted brand) must never rewrite a placed order (rule 3).
+                            ->mutateRelationshipDataBeforeSaveUsing(fn (array $data, OrderItem $record): array => self::sellsSomethingElse($data, $record)
+                                ? self::withSnapshot($data)
+                                : $data)
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Fragrance')
@@ -372,6 +378,13 @@ class OrderForm
                     : "{$township->optionLabel()} — {$township->region->label()}",
             ])
             ->all();
+    }
+
+    /** Whether an edited line now sells a different product or size than it was saved with. */
+    protected static function sellsSomethingElse(array $data, OrderItem $record): bool
+    {
+        return (int) ($data['product_id'] ?? 0) !== (int) $record->product_id
+            || (int) ($data['size_ml'] ?? 0) !== (int) $record->size_ml;
     }
 
     /**

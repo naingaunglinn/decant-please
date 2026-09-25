@@ -86,7 +86,7 @@ moves a studio user between shops**
 | `/admin/login` | The only public admin route |
 | `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
 | `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/{shop}/products` + `/create`, `/{id}/edit` | Product (fragrance) CRUD, sizes (archived, never deleted), stock, "View on site" |
+| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD, sizes (archived, never deleted), stock, "View on site" |
 | `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/{shop}/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
 | `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |

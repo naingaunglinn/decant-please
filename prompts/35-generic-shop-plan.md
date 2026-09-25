@@ -200,6 +200,11 @@ spec's contract rule (a Resource change lands with `types.ts`) gives the seam:
   catalog). Postgres keeps constraint/index/sequence names through a rename, so the
   migration renames them to match (both ways). Every order line created from now on stamps
   `product_variant_id` + `variant_label_snapshot` once, in `OrderItem`'s creating hook.
+  **Deviation:** `position` is backfilled as 0, not by size. Ties sort by `size_ml`, which
+  gives the same order today. Numbering by size would list any size added later
+  (position 0) first. Step 38's drag-to-reorder writes real positions. The admin URL stays
+  `/admin/{shop}/fragrances` and the label stays "Fragrances" until step 37's template
+  supplies them.
 - **36b (queued): the contract.** `/products` routes, `ProductController`,
   `ProductResource`/`ProductVariantResource`, checkout by `items[].variant_id`, `types.ts`,
   the storefront `/product/[slug]` route with the redirect, and the `api.md` fixes.

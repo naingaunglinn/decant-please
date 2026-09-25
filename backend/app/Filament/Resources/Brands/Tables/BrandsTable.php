@@ -29,10 +29,7 @@ class BrandsTable
                     ->sortable(),
                 TextColumn::make('type')
                     ->badge()
-                    ->color(fn (BrandType $state): string => match ($state) {
-                        BrandType::Designer => 'gray',
-                        BrandType::Niche => 'info',
-                    }),
+                    ->color(fn (?BrandType $state): string => $state === BrandType::Niche ? 'info' : 'gray'),
                 TextColumn::make('products_count')
                     ->label('Fragrances')
                     ->counts('products'),

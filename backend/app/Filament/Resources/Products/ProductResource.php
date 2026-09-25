@@ -34,6 +34,9 @@ class ProductResource extends Resource
     // takes the label from the shop's template.
     protected static ?string $modelLabel = 'fragrance';
 
+    // Keep the /admin/{shop}/fragrances URL a seller may have bookmarked.
+    protected static ?string $slug = 'fragrances';
+
     /**
      * Products referenced by order items are FK-protected (restrictOnDelete).
      * Catch the violation and steer the decanter to deactivation instead.
@@ -65,7 +68,7 @@ class ProductResource extends Resource
 
     public static function getGlobalSearchResultDetails(Model $record): array
     {
-        return ['Brand' => $record->brand->name];
+        return $record->brand ? ['Brand' => $record->brand->name] : [];
     }
 
     public static function getGlobalSearchEloquentQuery(): Builder

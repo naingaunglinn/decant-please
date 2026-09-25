@@ -145,11 +145,15 @@ class ProductVariantTest extends TestCase
 
     public function test_variants_list_by_position_then_size(): void
     {
+        // A size added later still lists in size order, as decant sizes always have.
+        $this->allure->variants()->create(['size_ml' => 30, 'price_mmk' => 150000]);
         $this->allure->variants()->create(['size_ml' => 3, 'price_mmk' => 20000]);
-        $this->assertSame([3, 5, 10], $this->allure->variants()->pluck('size_ml')->all());
+        $this->assertSame([3, 5, 10, 30], $this->allure->variants()->pluck('size_ml')->all());
+        $this->getJson('/api/v1/decant-please/fragrances/'.$this->allure->slug)
+            ->assertJsonPath('data.prices.*.size_ml', [3, 5, 10, 30]);
 
         $this->fiveMl->update(['position' => 2]);
-        $this->assertSame([3, 10, 5], $this->allure->variants()->pluck('size_ml')->all());
+        $this->assertSame([3, 10, 30, 5], $this->allure->variants()->pluck('size_ml')->all());
     }
 
     private function order(): Order

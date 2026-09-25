@@ -17,9 +17,11 @@ storefront are unchanged; that half (36b) is the next queue row.
 
 - **Two migrations.** `fragrances → products`, `decant_prices → product_variants`
   (`fragrance_id → product_id`), `order_items.fragrance_id → product_id`. IDs are stable.
-  - New `product_variants` columns, backfilled from `size_ml`: `options`
-    (`{"Size":"10ml"}`), `measure`, `is_active` (all true), and `position` (0, 1, 2… by
-    size per product).
+  - New `product_variants` columns: `options` (`{"Size":"10ml"}`) and `measure`, both
+    backfilled from `size_ml`, plus `is_active` (true for every row) and `position`.
+    `position` is 0 for every existing row, and ties sort by size. Numbering existing
+    rows by size would have listed any size added later first, which the storefront
+    shows as-is.
   - New `order_items` columns: `product_variant_id` (FK, **restrict**) and
     `variant_label_snapshot`. Backfill matches each line on shop + product + size; a
     size with no variant keeps a null id and a synthesized `"7ml"` label.
@@ -29,7 +31,8 @@ storefront are unchanged; that half (36b) is the next queue row.
   - Postgres keeps constraint, index and sequence names through a rename, so the migration
     renames them to the new table and column names, and back on rollback.
   - The Shield permissions `{Ability}:Fragrance` are renamed to `{Ability}:Product` in
-    place, so every role keeps its grants.
+    place, so every role keeps its grants. If a `:Product` row already exists, the
+    grants move onto it.
   - Money and snapshots are untouched. A hash of every order line's price, cost, quantity,
     size and name snapshot is identical before `up`, after `up`, after `down`, and after
     `up` again on Postgres 17.
@@ -40,13 +43,19 @@ storefront are unchanged; that half (36b) is the next queue row.
   catalog, the min price, the size filter and `/meta`. Checkout and the promo preview
   refuse it on the server. Placed orders still show it. The admin's size repeater only
   offers delete on unsaved rows, and a "Selling" toggle archives a size.
-- **Admin.** `Resources/Fragrances/` is now `Resources/Products/`, at the URL
-  `/admin/{shop}/products`. The label still reads "Fragrances". Deleting a brand now says
-  its fragrances stay, hidden from the shop until they get a brand again.
+- **Admin.** `Resources/Fragrances/` is now `Resources/Products/`. The URL
+  (`/admin/{shop}/fragrances`) and the "Fragrances" label are unchanged. Deleting a brand
+  now says its fragrances stay, hidden from the shop until they get a brand again.
+- **Fix: editing an order no longer re-snapshots its lines.** The order form's save used to
+  rewrite every line's name snapshot on any edit, even an address fix. Deleting a brand
+  would then have changed the name printed on old invoices. A line is now re-snapshotted
+  only when the admin changes its product or size (rule 3).
 - **Tests.** New `ProductVariantTest` (9) and `ProductMigrationTest` (the backfill on
-  seeded rows of two shops). A permission-rename test is added to `RoleAuthorizationTest`.
+  seeded rows of two shops). `RoleAuthorizationTest` gains a permission-rename test,
+  including the case where the target row already exists. `AdminOrdersTest` gains a test
+  that an order edit keeps its line snapshots.
   The suite is updated for the new names. The parity test changed class and relation names
-  only, never a value. 375 tests.
+  only, never a value. 376 tests.
 - `phpunit.xml` raises the test `memory_limit` to 512M. The suite was already peaking at
   125 of PHP's 128 MB, and the new tests tipped it over.
 

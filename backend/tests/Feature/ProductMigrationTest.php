@@ -37,7 +37,7 @@ class ProductMigrationTest extends TestCase
         // Back to what the migration finds on a legacy row: none of the new
         // columns filled in (the model hooks filled them when the fixture was made).
         DB::table('order_items')->update(['product_variant_id' => null, 'variant_label_snapshot' => null]);
-        DB::table('product_variants')->update(['options' => null, 'measure' => null, 'position' => 0]);
+        DB::table('product_variants')->update(['options' => null, 'measure' => null]);
 
         $migration = require database_path('migrations/2026_09_26_000000_rename_catalog_to_products_and_variants.php');
         $migration->backfillVariants();
@@ -59,9 +59,9 @@ class ProductMigrationTest extends TestCase
             $this->assertSame(['10ml', '5ml', '7ml'], $items->pluck('variant_label_snapshot')->all());
 
             $variants = DB::table('product_variants')->where('product_variants.shop_id', $seeded['shop']->id)
-                ->orderBy('position')->get();
+                ->orderBy('size_ml')->get();
             $this->assertSame([5, 10, 30], $variants->pluck('size_ml')->map(fn ($v) => (int) $v)->all());
-            $this->assertSame([0, 1, 2], $variants->pluck('position')->map(fn ($v) => (int) $v)->all());
+            $this->assertSame([0, 0, 0], $variants->pluck('position')->map(fn ($v) => (int) $v)->all());
             $this->assertSame([5, 10, 30], $variants->pluck('measure')->map(fn ($v) => (int) $v)->all());
             $this->assertSame(['Size' => '10ml'], json_decode($variants[1]->options, true));
             $this->assertTrue((bool) $variants[1]->is_active);
@@ -69,8 +69,7 @@ class ProductMigrationTest extends TestCase
     }
 
     /**
-     * One product with 30ml/5ml/10ml variants (created out of size order, so the
-     * position backfill has to sort), and three lines: 10ml, 5ml, and a 7ml that
+     * One product with 30ml/5ml/10ml variants (created out of size order), and three lines: 10ml, 5ml, and a 7ml that
      * has no variant.
      *
      * @return array{shop: Shop, ten: int, five: int}

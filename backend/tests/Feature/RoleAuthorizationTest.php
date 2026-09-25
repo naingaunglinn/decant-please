@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -181,6 +182,10 @@ class RoleAuthorizationTest extends TestCase
         $staff = Role::findByName('shop_staff');
         $this->assertTrue($owner->hasPermissionTo('Update:Product'));
         $this->assertTrue($staff->hasPermissionTo('ViewAny:Product'));
+
+        // A name that already exists on the other side (a dev `shield:generate`)
+        // takes over the grants instead of tripping the unique index.
+        Permission::findOrCreate('ViewAny:Fragrance', 'web');
 
         $migration = require database_path('migrations/2026_09_26_000001_rename_fragrance_permissions_to_product.php');
         $migration->down();

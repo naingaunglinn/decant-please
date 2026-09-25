@@ -159,7 +159,8 @@ class ProductForm
                             ->columns(4)
                             ->minItems(1)
                             ->deleteAction(fn (Action $action): Action => $action
-                                ->visible(fn (array $arguments): bool => ! str_starts_with((string) ($arguments['item'] ?? ''), 'record-')))
+                                ->visible(fn (array $arguments, Repeater $component): bool => $component->isDeletable()
+                                    && ! str_starts_with((string) ($arguments['item'] ?? ''), 'record-')))
                             ->addActionLabel('Add size')
                             ->default([
                                 ['size_ml' => 5, 'in_stock' => true],

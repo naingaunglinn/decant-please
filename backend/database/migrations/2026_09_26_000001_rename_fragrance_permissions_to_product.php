@@ -11,7 +11,8 @@ use Spatie\Permission\PermissionRegistrar;
  * member would lose the catalog the moment the code deploys.
  *
  * A rename, not new rows: role grants point at the permission's id, so every
- * role keeps exactly the access it had. Idempotent both ways.
+ * role keeps exactly the access it had. Where the new name already exists, the
+ * grants are moved onto it instead. Idempotent both ways.
  */
 return new class extends Migration
 {
@@ -27,19 +28,30 @@ return new class extends Migration
 
     private function rename(string $from, string $to): void
     {
-        $table = config('permission.table_names.permissions', 'permissions');
+        $tables = config('permission.table_names');
+        $pivot = config('permission.column_names.permission_pivot_key') ?? 'permission_id';
 
-        DB::table($table)->where('name', 'like', "%{$from}")->get(['id', 'name', 'guard_name'])
-            ->each(function (object $permission) use ($table, $from, $to) {
+        DB::table($tables['permissions'])->where('name', 'like', "%{$from}")->get(['id', 'name', 'guard_name'])
+            ->each(function (object $permission) use ($tables, $pivot, $from, $to) {
                 $name = substr($permission->name, 0, -strlen($from)).$to;
+                $target = DB::table($tables['permissions'])
+                    ->where('name', $name)->where('guard_name', $permission->guard_name)->value('id');
 
-                // A target row that already exists (a dev `shield:generate`) is
-                // left alone rather than tripping the unique (name, guard) index.
-                if (DB::table($table)->where('name', $name)->where('guard_name', $permission->guard_name)->exists()) {
+                if ($target === null) {
+                    DB::table($tables['permissions'])->where('id', $permission->id)->update(['name' => $name]);
+
                     return;
                 }
 
-                DB::table($table)->where('id', $permission->id)->update(['name' => $name]);
+                // The target already exists (a dev `shield:generate` made it): move
+                // every grant onto it, then drop the old row, so no role loses access.
+                foreach (DB::table($tables['role_has_permissions'])->where($pivot, $permission->id)->get() as $grant) {
+                    DB::table($tables['role_has_permissions'])->insertOrIgnore([$pivot => $target] + array_diff_key((array) $grant, [$pivot => true]));
+                }
+                foreach (DB::table($tables['model_has_permissions'])->where($pivot, $permission->id)->get() as $grant) {
+                    DB::table($tables['model_has_permissions'])->insertOrIgnore([$pivot => $target] + array_diff_key((array) $grant, [$pivot => true]));
+                }
+                DB::table($tables['permissions'])->where('id', $permission->id)->delete();
             });
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

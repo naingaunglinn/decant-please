@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\Schema;
  *   product_variants.options   {"Size":"10ml"}
  *   product_variants.measure   10
  *   product_variants.is_active archive, never delete (true for every existing row)
- *   product_variants.position  display order, by size_ml per product
+ *   product_variants.position  display order; 0 for every existing row, so ties keep
+ *                              sorting by size exactly as before (a new size lands in
+ *                              size order too, until a seller reorders — step 38)
  *   order_items.product_variant_id + variant_label_snapshot — which variant a line
  *     sold, matched on (shop, product, size). A line whose size no longer has a
  *     variant keeps a null id and a synthesized "10ml" label.
@@ -122,22 +124,17 @@ return new class extends Migration
     }
 
     /**
-     * options / measure from size_ml; position 0, 1, 2… by size within each product.
+     * options / measure from size_ml. position stays at its default 0: numbering
+     * existing rows 0, 1, 2… would put every size added later (position 0) first.
      * Public, like backfillOrderItems(), so ProductMigrationTest can run it on seeded rows.
      */
     public function backfillVariants(): void
     {
-        $position = [];
-
-        DB::table('product_variants')->orderBy('product_id')->orderBy('size_ml')->orderBy('id')
-            ->get(['id', 'product_id', 'size_ml'])
-            ->each(function (object $variant) use (&$position) {
-                DB::table('product_variants')->where('id', $variant->id)->update([
-                    'options' => json_encode(['Size' => "{$variant->size_ml}ml"]),
-                    'measure' => $variant->size_ml,
-                    'position' => $position[$variant->product_id] = ($position[$variant->product_id] ?? -1) + 1,
-                ]);
-            });
+        DB::table('product_variants')->orderBy('id')->get(['id', 'size_ml'])
+            ->each(fn (object $variant) => DB::table('product_variants')->where('id', $variant->id)->update([
+                'options' => json_encode(['Size' => "{$variant->size_ml}ml"]),
+                'measure' => $variant->size_ml,
+            ]));
     }
 
     /**
