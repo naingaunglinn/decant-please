@@ -7,8 +7,8 @@ use App\Filament\Resources\DeliveryZones\Pages\ManageDeliveryZones;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Support\DeliveryZoneImport;
 use Database\Seeders\DeliveryZoneSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,17 +19,17 @@ class DeliveryZoneTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Fragrance $allure; // 10ml @ 55,000
+    private Product $allure; // 10ml @ 55,000
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
-        $this->allure = $chanel->fragrances()->create([
+        $this->allure = $chanel->products()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
         ]);
-        $this->allure->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+        $this->allure->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
     }
 
     // ---- The fee is server data ---------------------------------------------
@@ -276,7 +276,7 @@ class DeliveryZoneTest extends TestCase
             'order_from' => 'tiktok', 'status' => 'pending', 'total_mmk' => 55000,
         ])->refresh();
         $legacy->items()->create([
-            'fragrance_id' => $this->allure->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'product_id' => $this->allure->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 1,
         ]);
 

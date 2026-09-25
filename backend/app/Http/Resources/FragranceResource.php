@@ -2,12 +2,13 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Product;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 
-/** @mixin \App\Models\Fragrance */
+/** @mixin Product */
 class FragranceResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -32,7 +33,7 @@ class FragranceResource extends JsonResource
             'is_featured' => $this->is_featured,
             'min_price_mmk' => $minPrice,
             'min_price_formatted' => $minPrice !== null ? Money::kyat($minPrice) : null,
-            'prices' => DecantPriceResource::collection($this->whenLoaded('decantPrices')),
+            'prices' => DecantPriceResource::collection($this->whenLoaded('activeVariants')),
         ];
     }
 }

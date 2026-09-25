@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\Fragrances\Pages\EditFragrance;
+use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Widgets\OrderStats;
 use App\Http\Controllers\Api\TrackOrderController;
 use App\Http\Resources\FragranceResource;
 use App\Models\Brand;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -50,7 +50,7 @@ class DecantCostTest extends TestCase
     {
         $fragrance = $this->fragrance(cost: null, volume: null);
 
-        Livewire::test(EditFragrance::class, ['record' => $fragrance->getRouteKey()])
+        Livewire::test(EditProduct::class, ['record' => $fragrance->getRouteKey()])
             ->fillForm(['bottle_cost_mmk' => 300000])
             ->call('save')
             ->assertHasFormErrors(['bottle_volume_ml']);
@@ -75,7 +75,7 @@ class DecantCostTest extends TestCase
 
         // The admin repeater path is a relationship create — the same model hook.
         $item = $order->items()->create([
-            'fragrance_id' => $fragrance->id,
+            'product_id' => $fragrance->id,
             'fragrance_name_snapshot' => 'Creed Aventus',
             'size_ml' => 5,
             'unit_price_mmk' => 50000,
@@ -182,10 +182,10 @@ class DecantCostTest extends TestCase
         $order = $this->checkout($fragrance, sizeMl: 10, quantity: 1);
         $order->accept(today()->addDay(), today()->addDays(2));
 
-        $receipt = json_encode(TrackOrderController::receipt($order->fresh()->load('items.fragrance.brand')));
+        $receipt = json_encode(TrackOrderController::receipt($order->fresh()->load('items.product.brand')));
         $this->assertStringNotContainsString('cost', strtolower($receipt));
 
-        $resource = json_encode(FragranceResource::make($fragrance->load('brand', 'decantPrices'))->resolve());
+        $resource = json_encode(FragranceResource::make($fragrance->load('brand', 'activeVariants'))->resolve());
         $this->assertStringNotContainsString('cost', strtolower($resource));
         $this->assertStringNotContainsString('bottle', strtolower($resource));
 
@@ -200,10 +200,10 @@ class DecantCostTest extends TestCase
         ?int $volume,
         string $brand = 'Creed',
         string $name = 'Aventus',
-    ): Fragrance {
+    ): Product {
         $brandModel = Brand::firstOrCreate(['name' => $brand], ['type' => 'niche']);
 
-        $fragrance = $brandModel->fragrances()->create([
+        $fragrance = $brandModel->products()->create([
             'name' => $name,
             'concentration' => 'edp',
             'gender' => 'male',
@@ -211,13 +211,13 @@ class DecantCostTest extends TestCase
             'bottle_volume_ml' => $volume,
         ]);
 
-        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);
-        $fragrance->decantPrices()->create(['size_ml' => 5, 'price_mmk' => 50000, 'in_stock' => true]);
+        $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);
+        $fragrance->variants()->create(['size_ml' => 5, 'price_mmk' => 50000, 'in_stock' => true]);
 
         return $fragrance;
     }
 
-    private function checkout(Fragrance $fragrance, int $sizeMl, int $quantity): Order
+    private function checkout(Product $fragrance, int $sizeMl, int $quantity): Order
     {
         return Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',

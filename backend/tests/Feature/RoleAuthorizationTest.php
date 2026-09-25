@@ -12,6 +12,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -58,7 +60,7 @@ class RoleAuthorizationTest extends TestCase
         // No explicit permissions on the role — every ability resolves via the
         // Gate::before bypass.
         $this->assertTrue($studio->can('Create:Order'));
-        $this->assertTrue($studio->can('DeleteAny:Fragrance'));
+        $this->assertTrue($studio->can('DeleteAny:Product'));
         $this->assertTrue($studio->can('Create:Shop'));
     }
 
@@ -170,5 +172,29 @@ class RoleAuthorizationTest extends TestCase
         // Re-applying the drop is clean.
         $migration->up();
         $this->assertFalse(Schema::hasColumn('users', 'is_studio'));
+    }
+
+    /** Step 36 renamed Fragrance → Product; the shipped `*:Fragrance` grants must follow. */
+    public function test_catalog_permissions_are_renamed_without_touching_role_grants(): void
+    {
+        $owner = Role::findByName('shop_owner');
+        $staff = Role::findByName('shop_staff');
+        $this->assertTrue($owner->hasPermissionTo('Update:Product'));
+        $this->assertTrue($staff->hasPermissionTo('ViewAny:Product'));
+
+        $migration = require database_path('migrations/2026_09_26_000001_rename_fragrance_permissions_to_product.php');
+        $migration->down();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->assertTrue($owner->fresh()->hasPermissionTo('Update:Fragrance'));
+        $this->assertTrue($staff->fresh()->hasPermissionTo('ViewAny:Fragrance'));
+        $this->assertFalse($staff->fresh()->hasPermissionTo('Update:Fragrance'));
+
+        $migration->up();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->assertTrue($owner->fresh()->hasPermissionTo('Update:Product'));
+        $this->assertTrue($staff->fresh()->hasPermissionTo('ViewAny:Product'));
+        $this->assertSame(0, DB::table('permissions')->where('name', 'like', '%:Fragrance')->count());
     }
 }

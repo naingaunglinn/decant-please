@@ -6,7 +6,7 @@ use App\Enums\BrandType;
 use App\Enums\Concentration;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
-use App\Models\DecantPrice;
+use App\Models\ProductVariant;
 use App\Models\ShopSetting;
 use App\Support\ShopConfig;
 use App\Support\TenantContext;
@@ -23,9 +23,10 @@ class MetaController extends Controller
         $key = 'api.meta.'.app(TenantContext::class)->slug();
 
         return response()->json(Cache::remember($key, 600, function (): array {
-            $available = DecantPrice::query()
+            $available = ProductVariant::query()
                 ->where('in_stock', true)
-                ->whereHas('fragrance', fn (Builder $query) => $query
+                ->where('is_active', true)
+                ->whereHas('product', fn (Builder $query) => $query
                     ->where('is_active', true)
                     ->whereHas('brand', fn (Builder $brand) => $brand->where('is_active', true)));
 

@@ -6,7 +6,7 @@ use App\Enums\Courier;
 use App\Enums\ShopStatus;
 use App\Models\Brand;
 use App\Models\DeliveryTownship;
-use App\Models\Fragrance;
+use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -99,11 +99,11 @@ abstract class TestCase extends BaseTestCase
      * callers add one with unit_price_mmk = the intended line total. firstOrCreate keeps
      * it to one per shop, idempotent across repeated helper calls in a test.
      */
-    protected function itemFragrance(): Fragrance
+    protected function itemFragrance(): Product
     {
         $brand = Brand::firstOrCreate(['name' => 'Fixture Brand'], ['type' => 'designer']);
 
-        return $brand->fragrances()->firstOrCreate(
+        return $brand->products()->firstOrCreate(
             ['name' => 'Fixture'],
             ['concentration' => 'edp', 'gender' => 'unisex'],
         );

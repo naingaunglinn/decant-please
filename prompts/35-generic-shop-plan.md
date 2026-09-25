@@ -19,7 +19,7 @@ Principles P1–P6) throughout.
 
 - [x] **Pre-35 — #67 first** (correct money before the baseline) — merged before the baseline was recorded
 - [x] **35** — Baseline parity test (#104, `GenericShopParityTest`)
-- [ ] **36** — Product + Variant model
+- [ ] **36** — Product + Variant model — split in two (#105): **36a built** (schema, models, admin; API unchanged), **36b** queued (API contract + storefront)
 - [ ] **37** — Templates + attributes
 - [ ] **38** — Clothing template
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
@@ -187,6 +187,26 @@ note applies).
 
 **Deliberately not built.** Multi-option variants (that's step 38); `options` holds a single
 `{"Size":"10ml"}` for decant.
+
+**As built — split in two (#105).** The whole step is well over one reviewable PR, and the
+spec's contract rule (a Resource change lands with `types.ts`) gives the seam:
+
+- **36a (v40): schema, models, admin — the public API is byte-identical.** Both migrations,
+  `Product`/`ProductVariant` (relations `variants()`, `activeVariants()`, `product()`,
+  `OrderItem::variant()`), the Filament `Resources/Products/` rename, archived variants, the
+  brand `nullOnDelete`. Also renamed, beyond the spec: `product_variants.fragrance_id →
+  product_id` (the variant's own FK), and the Shield permissions `{Ability}:Fragrance →
+  {Ability}:Product` (a data migration; role grants follow the row, so nobody loses the
+  catalog). Postgres keeps constraint/index/sequence names through a rename, so the
+  migration renames them to match (both ways). Every order line created from now on stamps
+  `product_variant_id` + `variant_label_snapshot` once, in `OrderItem`'s creating hook.
+- **36b (queued): the contract.** `/products` routes, `ProductController`,
+  `ProductResource`/`ProductVariantResource`, checkout by `items[].variant_id`, `types.ts`,
+  the storefront `/product/[slug]` route with the redirect, and the `api.md` fixes.
+
+Brandless products (possible once a brand is deleted) are hidden from the storefront and
+refused at checkout until 36b/37 make brand optional in the API contract; the admin still
+lists them.
 
 ## Step 37 — Templates + attributes
 

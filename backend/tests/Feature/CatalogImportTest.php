@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\BrandType;
 use App\Enums\Concentration;
-use App\Filament\Resources\Fragrances\Pages\ListFragrances;
+use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Models\Brand;
-use App\Models\Fragrance;
+use App\Models\Product;
 use App\Support\CatalogImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -39,16 +39,16 @@ class CatalogImportTest extends TestCase
         $this->assertSame(2, Brand::count());
         $this->assertSame(BrandType::Niche, Brand::where('name', 'Creed')->firstOrFail()->type);
 
-        $allure = Fragrance::where('name', 'Allure Homme Sport')->firstOrFail();
+        $allure = Product::where('name', 'Allure Homme Sport')->firstOrFail();
         $this->assertSame('Chanel', $allure->brand->name);
         $this->assertSame('chanel-allure-homme-sport', $allure->slug);
         $this->assertSame([5 => 30000, 10 => 55000, 30 => 120000],
-            $allure->decantPrices->pluck('price_mmk', 'size_ml')->all());
-        $this->assertTrue($allure->decantPrices->every->in_stock);
+            $allure->variants->pluck('price_mmk', 'size_ml')->all());
+        $this->assertTrue($allure->variants->every->in_stock);
 
         // blank price cell = size not offered; "60,000" digit-grouping tolerated
-        $bleu = Fragrance::where('name', 'Bleu de Chanel')->firstOrFail();
-        $this->assertSame([10 => 60000], $bleu->decantPrices->pluck('price_mmk', 'size_ml')->all());
+        $bleu = Product::where('name', 'Bleu de Chanel')->firstOrFail();
+        $this->assertSame([10 => 60000], $bleu->variants->pluck('price_mmk', 'size_ml')->all());
     }
 
     public function test_reimport_skips_existing_instead_of_duplicating(): void
@@ -61,7 +61,7 @@ class CatalogImportTest extends TestCase
 
         $this->assertSame(0, $again->created);
         $this->assertSame(1, $again->skipped);
-        $this->assertSame(1, Fragrance::count());
+        $this->assertSame(1, Product::count());
         $this->assertSame(1, Brand::count());
     }
 
@@ -102,7 +102,7 @@ class CatalogImportTest extends TestCase
         $this->assertSame(1, $import->created);
         $this->assertSame(1, Brand::count()); // "chanel" reused the existing Chanel
 
-        $no5 = Fragrance::where('name', 'No 5')->firstOrFail();
+        $no5 = Product::where('name', 'No 5')->firstOrFail();
         $this->assertSame(Concentration::Parfum, $no5->concentration);
     }
 
@@ -114,7 +114,7 @@ class CatalogImportTest extends TestCase
         $import = CatalogImport::run($csv);
 
         $this->assertSame(1, $import->created);
-        $this->assertSame('နာမည်ကြီး niche ရနံ့။', Fragrance::firstOrFail()->description);
+        $this->assertSame('နာမည်ကြီး niche ရနံ့။', Product::firstOrFail()->description);
     }
 
     public function test_update_mode_updates_prices_but_blank_cells_keep_hand_written_fields(): void
@@ -128,11 +128,11 @@ class CatalogImportTest extends TestCase
         $this->assertSame(1, $update->updated);
         $this->assertSame(0, $update->created + $update->skipped);
 
-        $allure = Fragrance::firstOrFail();
+        $allure = Product::firstOrFail();
         $this->assertSame('Hand-written notes.', $allure->description); // blank cell didn't erase it
         $this->assertSame(
             [5 => 35000, 10 => 55000, 30 => 140000], // 5ml updated, 10ml untouched, 30ml added
-            $allure->decantPrices->pluck('price_mmk', 'size_ml')->all(),
+            $allure->variants->pluck('price_mmk', 'size_ml')->all(),
         );
     }
 
@@ -160,14 +160,14 @@ class CatalogImportTest extends TestCase
         $file = UploadedFile::fake()->createWithContent('catalog.csv',
             self::HEADER."\n".self::ALLURE_ROW);
 
-        Livewire::test(ListFragrances::class)
+        Livewire::test(ListProducts::class)
             ->callTableAction('importCsv', data: ['file' => $file])
             ->assertNotified()
             ->assertOk();
 
-        $this->assertSame(1, Fragrance::count());
+        $this->assertSame(1, Product::count());
 
-        Livewire::test(ListFragrances::class)
+        Livewire::test(ListProducts::class)
             ->callTableAction('downloadCsvTemplate')
             ->assertFileDownloaded('catalog-template.csv')
             ->assertOk();

@@ -6,8 +6,8 @@ use App\Enums\OrderStatus;
 use App\Filament\Pages\ProductionSchedule;
 use App\Filament\Pages\ProductionScheduleDay;
 use App\Models\Brand;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Shop;
 use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
@@ -369,16 +369,16 @@ class ProductionScheduleTest extends TestCase
         return $page;
     }
 
-    private function fragrance(string $brandName = 'Chanel', string $name = 'Allure Homme Sport'): Fragrance
+    private function fragrance(string $brandName = 'Chanel', string $name = 'Allure Homme Sport'): Product
     {
         $brand = Brand::firstOrCreate(['name' => $brandName], ['type' => 'designer']);
 
-        return $brand->fragrances()
+        return $brand->products()
             ->firstOrCreate(['name' => $name], ['concentration' => 'cologne', 'gender' => 'male'])
             ->loadMissing('brand');
     }
 
-    /** @param  array<array{0: Fragrance, 1: int, 2: int}>  $lines  [fragrance, size_ml, quantity] */
+    /** @param  array<array{0: Product, 1: int, 2: int}>  $lines  [fragrance, size_ml, quantity] */
     private function orderOn(?string $decantDate, array $lines, OrderStatus $status = OrderStatus::Pending): Order
     {
         $order = Order::create([
@@ -392,7 +392,7 @@ class ProductionScheduleTest extends TestCase
 
         foreach ($lines as [$fragrance, $sizeMl, $quantity]) {
             $order->items()->create([
-                'fragrance_id' => $fragrance->id,
+                'product_id' => $fragrance->id,
                 'fragrance_name_snapshot' => $fragrance->brand->name.' '.$fragrance->name,
                 'size_ml' => $sizeMl,
                 'unit_price_mmk' => 55000,

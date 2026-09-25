@@ -22,8 +22,8 @@ use App\Models\Brand;
 use App\Models\DeliveryTownship;
 use App\Models\DeliveryTownshipCourier;
 use App\Models\Expense;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\PromoCode;
 use App\Models\Shop;
 use App\Models\ShopSetting;
@@ -90,7 +90,7 @@ class TenantIsolationTest extends TestCase
         $order = $this->makeOrder(OrderStatus::Pending, totalMmk: $itemsTotal);
 
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => $itemsTotal,
@@ -101,27 +101,27 @@ class TenantIsolationTest extends TestCase
     }
 
     /** One priced 10ml fragrance in the CURRENT shop's catalog (55,000 Ks). */
-    private function makeFragrance(): Fragrance
+    private function makeFragrance(): Product
     {
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
 
-        $fragrance = $brand->fragrances()->create([
+        $fragrance = $brand->products()->create([
             'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
         ]);
-        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+        $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
         return $fragrance;
     }
 
     /** A priced 10ml fragrance under a NAMED brand, in the CURRENT shop's catalog. */
-    private function makeNamedFragrance(string $brandName, string $fragranceName): Fragrance
+    private function makeNamedFragrance(string $brandName, string $fragranceName): Product
     {
         $brand = Brand::firstOrCreate(['name' => $brandName], ['type' => 'designer']);
 
-        $fragrance = $brand->fragrances()->create([
+        $fragrance = $brand->products()->create([
             'name' => $fragranceName, 'concentration' => 'edp', 'gender' => 'unisex',
         ]);
-        $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+        $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
         return $fragrance;
     }
@@ -358,7 +358,7 @@ class TenantIsolationTest extends TestCase
         // §8 "Two shops, catalog" — over the real /api/v1/{shop} paths.
         $this->forShop($this->shopA);
         $this->makeFragrance();
-        Brand::firstOrFail()->fragrances()->create([
+        Brand::firstOrFail()->products()->create([
             'name' => 'Bleu de Chanel', 'concentration' => 'edp', 'gender' => 'male',
         ]);
 
@@ -694,7 +694,7 @@ class TenantIsolationTest extends TestCase
         Brand::create(['name' => 'Dior', 'type' => 'designer']);
 
         $this->forShop($this->shopB);
-        $this->makeFragrance()->decantPrices()->create(['size_ml' => 30, 'price_mmk' => 99000]);
+        $this->makeFragrance()->variants()->create(['size_ml' => 30, 'price_mmk' => 99000]);
 
         $a = $this->getJson("/api/v1/{$this->shopA->slug}/brands")->assertOk();
         $this->assertEqualsCanonicalizing(['Chanel', 'Dior'], array_column($a->json('data'), 'name'));
@@ -842,7 +842,7 @@ class TenantIsolationTest extends TestCase
         $aFragrance = $this->makeNamedFragrance('Chanel', 'Allure Homme Sport');
         $aFragrance->update(['stock_ml' => 2, 'low_stock_threshold_ml' => 5]);
         $this->makeOrder(OrderStatus::Pending)->items()->create([
-            'fragrance_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'product_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 3,
         ]);
 
@@ -850,7 +850,7 @@ class TenantIsolationTest extends TestCase
         $bFragrance = $this->makeNamedFragrance('Dior', 'Sauvage');
         $bFragrance->update(['stock_ml' => 1, 'low_stock_threshold_ml' => 5]);
         $this->makeOrder(OrderStatus::Pending)->items()->create([
-            'fragrance_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
+            'product_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 9,
         ]);
 
@@ -927,7 +927,7 @@ class TenantIsolationTest extends TestCase
         $aOrder = $this->makeOrder(OrderStatus::Pending);
         $aOrder->update(['decant_date' => $date]);
         $aOrder->items()->create([
-            'fragrance_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
+            'product_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 2,
         ]);
 
@@ -936,7 +936,7 @@ class TenantIsolationTest extends TestCase
         $bOrder = $this->makeOrder(OrderStatus::Pending);
         $bOrder->update(['decant_date' => $date]);
         $bOrder->items()->create([
-            'fragrance_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
+            'product_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 5,
         ]);
 
@@ -1007,12 +1007,12 @@ class TenantIsolationTest extends TestCase
 
         $this->forShop($this->shopA);
         $this->assertSame(0, Order::count());
-        $this->assertSame(0, Fragrance::count());
+        $this->assertSame(0, Product::count());
         $disk->assertMissing($aPath);
 
         $this->forShop($this->shopB);
         $this->assertSame(1, Order::count());
-        $this->assertSame(1, Fragrance::count());
+        $this->assertSame(1, Product::count());
         $disk->assertExists($bPath);
     }
 

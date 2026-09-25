@@ -6,7 +6,7 @@ use App\Enums\BrandType;
 use App\Enums\Gender;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FragranceResource;
-use App\Models\Fragrance;
+use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -45,10 +45,10 @@ class FragranceController extends Controller
                 ->whereHas('brand', fn (Builder $brand) => $brand->where('type', $type)))
             ->when($filters['gender'] ?? null, fn (Builder $query, string $gender) => $query->where('gender', $gender))
             ->when($filters['size'] ?? null, fn (Builder $query, int $size) => $query
-                ->whereHas('decantPrices', fn (Builder $price) => $price->where('size_ml', $size)->where('in_stock', true)))
+                ->whereHas('activeVariants', fn (Builder $price) => $price->where('size_ml', $size)->where('in_stock', true)))
             ->when(
                 isset($filters['min_price']) || isset($filters['max_price']),
-                fn (Builder $query) => $query->whereHas('decantPrices', fn (Builder $price) => $price
+                fn (Builder $query) => $query->whereHas('activeVariants', fn (Builder $price) => $price
                     ->where('in_stock', true)
                     ->when($filters['min_price'] ?? null, fn (Builder $q, int $min) => $q->where('price_mmk', '>=', $min))
                     ->when($filters['max_price'] ?? null, fn (Builder $q, int $max) => $q->where('price_mmk', '<=', $max)))
@@ -83,10 +83,10 @@ class FragranceController extends Controller
 
     protected function baseQuery(): Builder
     {
-        return Fragrance::query()
+        return Product::query()
             ->active()
             ->whereHas('brand', fn (Builder $brand) => $brand->where('is_active', true))
-            ->with(['brand', 'decantPrices'])
-            ->withMin(['decantPrices as min_price' => fn ($query) => $query->where('in_stock', true)], 'price_mmk');
+            ->with(['brand', 'activeVariants'])
+            ->withMin(['activeVariants as min_price' => fn ($query) => $query->where('in_stock', true)], 'price_mmk');
     }
 }

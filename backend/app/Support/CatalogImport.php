@@ -182,7 +182,7 @@ class CatalogImport
             $brand = Brand::query()->whereLike('name', self::likeLiteral($brandName))->first()
                 ?? Brand::create(['name' => $brandName, 'type' => $brandType, 'is_active' => true]);
 
-            $existing = $brand->fragrances()->whereLike('name', self::likeLiteral($name))->first();
+            $existing = $brand->products()->whereLike('name', self::likeLiteral($name))->first();
 
             if ($existing && ! $this->updateExisting) {
                 $this->skipped++;
@@ -204,11 +204,11 @@ class CatalogImport
                 ]);
 
                 foreach ($prices as $sizeMl => $priceMmk) {
-                    $price = $existing->decantPrices()->where('size_ml', $sizeMl)->first();
+                    $price = $existing->variants()->where('size_ml', $sizeMl)->first();
 
                     $price
                         ? $price->update(['price_mmk' => $priceMmk])
-                        : $existing->decantPrices()->create(['size_ml' => $sizeMl, 'price_mmk' => $priceMmk, 'in_stock' => true]);
+                        : $existing->variants()->create(['size_ml' => $sizeMl, 'price_mmk' => $priceMmk, 'in_stock' => true]);
                 }
 
                 $this->updated++;
@@ -216,7 +216,7 @@ class CatalogImport
                 return;
             }
 
-            $fragrance = $brand->fragrances()->create([
+            $fragrance = $brand->products()->create([
                 'name' => $name,
                 'concentration' => $concentration,
                 'gender' => $gender,
@@ -228,7 +228,7 @@ class CatalogImport
             ]);
 
             foreach ($prices as $sizeMl => $priceMmk) {
-                $fragrance->decantPrices()->create(['size_ml' => $sizeMl, 'price_mmk' => $priceMmk, 'in_stock' => true]);
+                $fragrance->variants()->create(['size_ml' => $sizeMl, 'price_mmk' => $priceMmk, 'in_stock' => true]);
             }
 
             $this->created++;

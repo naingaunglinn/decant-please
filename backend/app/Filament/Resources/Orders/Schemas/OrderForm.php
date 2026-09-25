@@ -7,10 +7,10 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\Region;
-use App\Models\DecantPrice;
 use App\Models\DeliveryTownship;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Support\Money;
 use App\Support\TenantContext;
 use Filament\Actions\Action;
@@ -126,13 +126,13 @@ class OrderForm
                             ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::withSnapshot($data))
                             ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::withSnapshot($data))
                             ->schema([
-                                Select::make('fragrance_id')
+                                Select::make('product_id')
                                     ->label('Fragrance')
-                                    ->options(fn (): array => Fragrance::query()
+                                    ->options(fn (): array => Product::query()
                                         ->with('brand')
                                         ->get()
-                                        ->mapWithKeys(fn (Fragrance $fragrance) => [
-                                            $fragrance->id => "{$fragrance->brand->name} — {$fragrance->name}",
+                                        ->mapWithKeys(fn (Product $product) => [
+                                            $product->id => $product->brand ? "{$product->brand->name} — {$product->name}" : $product->name,
                                         ])
                                         ->sort(SORT_NATURAL | SORT_FLAG_CASE)
                                         ->all())
@@ -146,8 +146,9 @@ class OrderForm
                                     ->minValue(1)
                                     ->suffix('ml')
                                     ->required()
-                                    ->datalist(fn (Get $get): array => DecantPrice::query()
-                                        ->where('fragrance_id', $get('fragrance_id'))
+                                    ->datalist(fn (Get $get): array => ProductVariant::query()
+                                        ->where('product_id', $get('product_id'))
+                                        ->where('is_active', true)
                                         ->orderBy('size_ml')
                                         ->pluck('size_ml')
                                         ->all())
@@ -333,8 +334,8 @@ class OrderForm
 
     protected static function autofillUnitPrice(Get $get, Set $set): void
     {
-        $price = DecantPrice::query()
-            ->where('fragrance_id', $get('fragrance_id'))
+        $price = ProductVariant::query()
+            ->where('product_id', $get('product_id'))
             ->where('size_ml', $get('size_ml'))
             ->value('price_mmk');
 
@@ -344,7 +345,7 @@ class OrderForm
 
         // Cost mirrors price: pre-filled from the live reference, hand-correctable.
         // Only a real value overwrites — an uncosted fragrance keeps whatever's typed.
-        $cost = Fragrance::query()->find($get('fragrance_id'))
+        $cost = Product::query()->find($get('product_id'))
             ?->liquidCostMmk((int) $get('size_ml'));
 
         if ($cost !== null) {
@@ -378,10 +379,22 @@ class OrderForm
      */
     protected static function withSnapshot(array $data): array
     {
-        $fragrance = Fragrance::with('brand')->find($data['fragrance_id'] ?? null);
+        $product = Product::with('brand')->find($data['product_id'] ?? null);
 
-        if ($fragrance) {
-            $data['fragrance_name_snapshot'] = "{$fragrance->brand->name} {$fragrance->name}";
+        if ($product) {
+            $data['fragrance_name_snapshot'] = trim(($product->brand?->name ?? '').' '.$product->name);
+        }
+
+        // The line's variant follows the product + size the admin picked, like the
+        // name above. No variant at that size (a hand-typed size) keeps a null id.
+        if (isset($data['product_id'], $data['size_ml'])) {
+            $variant = ProductVariant::query()
+                ->where('product_id', $data['product_id'])
+                ->where('size_ml', $data['size_ml'])
+                ->first();
+
+            $data['product_variant_id'] = $variant?->id;
+            $data['variant_label_snapshot'] = $variant?->label() ?? "{$data['size_ml']}ml";
         }
 
         return $data;

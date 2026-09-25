@@ -100,7 +100,7 @@ Table brands {
   shop_id bigint [not null]
   name varchar [not null]
   slug varchar [not null]
-  type varchar [not null, default: 'designer', note: 'BrandType enum']
+  type varchar [null, default: 'designer', note: 'BrandType enum; null = no brand type (step 36)']
   logo_path varchar [null]
   is_active boolean [not null, default: true]
   created_at timestamp [null]
@@ -111,10 +111,10 @@ Table brands {
   }
 }
 
-Table fragrances {
+Table products {
   id bigint [pk, increment]
   shop_id bigint [not null]
-  brand_id bigint [not null]
+  brand_id bigint [null, note: 'optional per template; SET NULL when the brand is deleted']
   name varchar [not null]
   slug varchar [not null]
   concentration varchar [not null, note: 'Concentration enum']
@@ -139,17 +139,21 @@ Table fragrances {
   }
 }
 
-Table decant_prices {
+Table product_variants {
   id bigint [pk, increment]
   shop_id bigint [not null]
-  fragrance_id bigint [not null]
+  product_id bigint [not null]
   size_ml smallint [not null]
   price_mmk int [not null]
   in_stock boolean [not null, default: true]
   created_at timestamp [null]
   updated_at timestamp [null]
+  options jsonb [null, note: 'option values, e.g. {"Size":"10ml"}']
+  measure int [null, note: 'numeric amount (10 for 10ml)']
+  is_active boolean [not null, default: true, note: 'archived, never deleted, once on an order']
+  position int [not null, default: 0, note: 'display order; ties sort by size_ml']
   indexes {
-    (fragrance_id, size_ml) [unique]
+    (product_id, size_ml) [unique]
   }
 }
 
@@ -219,9 +223,9 @@ Table order_items {
   id bigint [pk, increment]
   shop_id bigint [not null]
   order_id bigint [not null]
-  fragrance_id bigint [not null, note: 'FK → fragrances, RESTRICT — a fragrance on any order line cannot be deleted']
+  product_id bigint [not null, note: 'FK → products, RESTRICT — a product on any order line cannot be deleted']
   fragrance_name_snapshot varchar [not null, note: 'frozen at write']
-  size_ml smallint [not null]
+  size_ml smallint [null, note: 'frozen at write; null for a line with no ml']
   unit_price_mmk int [not null, note: 'frozen at write']
   unit_cost_mmk int [null, note: 'immutable cost snapshot; null = unknown, never coalesced to 0']
   quantity smallint [not null, default: 1]
@@ -229,6 +233,8 @@ Table order_items {
   line_cost_mmk int [null, note: 'immutable cost snapshot; null = unknown']
   created_at timestamp [null]
   updated_at timestamp [null]
+  product_variant_id bigint [null, note: 'FK → product_variants, RESTRICT; null = a legacy size with no variant']
+  variant_label_snapshot varchar [null, note: 'frozen at write, e.g. "10ml"']
 }
 
 Table shop_settings {
@@ -366,16 +372,17 @@ Ref: studio_audit_events.shop_id > shops.id [delete: set null]
 
 // Tenant
 Ref: brands.shop_id > shops.id [delete: cascade]
-Ref: fragrances.shop_id > shops.id [delete: cascade]
-Ref: fragrances.brand_id > brands.id [delete: cascade]
-Ref: decant_prices.shop_id > shops.id [delete: cascade]
-Ref: decant_prices.fragrance_id > fragrances.id [delete: cascade]
+Ref: products.shop_id > shops.id [delete: cascade]
+Ref: products.brand_id > brands.id [delete: set null]
+Ref: product_variants.shop_id > shops.id [delete: cascade]
+Ref: product_variants.product_id > products.id [delete: cascade]
 Ref: promo_codes.shop_id > shops.id [delete: cascade]
 Ref: orders.shop_id > shops.id [delete: restrict]
 Ref: orders.delivery_township_id > delivery_townships.id [delete: set null]
 Ref: order_items.shop_id > shops.id [delete: restrict]
 Ref: order_items.order_id > orders.id [delete: cascade]
-Ref: order_items.fragrance_id > fragrances.id [delete: restrict]
+Ref: order_items.product_id > products.id [delete: restrict]
+Ref: order_items.product_variant_id > product_variants.id [delete: restrict]
 Ref: shop_settings.shop_id > shops.id [delete: cascade]
 Ref: expenses.shop_id > shops.id [delete: restrict]
 Ref: delivery_townships.shop_id > shops.id [delete: cascade]
@@ -407,8 +414,8 @@ TableGroup platform {
 
 TableGroup catalog {
   brands
-  fragrances
-  decant_prices
+  products
+  product_variants
   promo_codes
 }
 

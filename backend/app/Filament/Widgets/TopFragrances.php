@@ -3,8 +3,8 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\OrderStatus;
-use App\Models\Fragrance;
 use App\Models\OrderItem;
+use App\Models\Product;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -23,11 +23,11 @@ class TopFragrances extends TableWidget
      */
     public static function rankingQuery(): Builder
     {
-        return Fragrance::query()
+        return Product::query()
             ->addSelect(['ordered_qty' => OrderItem::query()
                 ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
                 ->join('orders', 'orders.id', '=', 'order_items.order_id')
-                ->whereColumn('order_items.fragrance_id', 'fragrances.id')
+                ->whereColumn('order_items.product_id', 'products.id')
                 ->where('orders.created_at', '>=', now()->subDays(30))
                 ->whereNotIn('orders.status', [OrderStatus::Cancelled->value, OrderStatus::Rejected->value]),
             ])
@@ -44,7 +44,7 @@ class TopFragrances extends TableWidget
             ->columns([
                 TextColumn::make('name')
                     ->label('Fragrance')
-                    ->state(fn (Fragrance $record): string => "{$record->brand->name} — {$record->name}"),
+                    ->state(fn (Product $record): string => $record->brand ? "{$record->brand->name} — {$record->name}" : $record->name),
                 TextColumn::make('ordered_qty')
                     ->label('Vials ordered')
                     ->alignEnd(),

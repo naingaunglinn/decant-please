@@ -39,7 +39,7 @@ class ShopDeleteProtectionTest extends TestCase
         $shop = $this->otherShop();
         $order = $this->orderIn($shop);
         $order->items()->create([
-            'fragrance_id' => $this->itemFragrance()->id,
+            'product_id' => $this->itemFragrance()->id,
             'fragrance_name_snapshot' => 'Fixture Brand Fixture',
             'size_ml' => 10,
             'unit_price_mmk' => 10000,

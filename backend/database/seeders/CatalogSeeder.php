@@ -19,10 +19,10 @@ class CatalogSeeder extends Seeder
                 $prices = $fragrance['prices'];
                 unset($fragrance['prices']);
 
-                $fragranceModel = $brandModel->fragrances()->create($fragrance);
+                $fragranceModel = $brandModel->products()->create($fragrance);
 
                 foreach ($prices as $size => $price) {
-                    $fragranceModel->decantPrices()->create([
+                    $fragranceModel->variants()->create([
                         'size_ml' => $size,
                         'price_mmk' => $price,
                     ]);

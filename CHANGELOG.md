@@ -9,6 +9,47 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v40
+
+**v40** is the first half of step 36 (**#105**): the catalog becomes products + variants
+underneath, and a decant shop sees nothing new. The public API, the checkout payload and the
+storefront are unchanged; that half (36b) is the next queue row.
+
+- **Two migrations.** `fragrances → products`, `decant_prices → product_variants`
+  (`fragrance_id → product_id`), `order_items.fragrance_id → product_id`. IDs are stable.
+  - New `product_variants` columns, backfilled from `size_ml`: `options`
+    (`{"Size":"10ml"}`), `measure`, `is_active` (all true), and `position` (0, 1, 2… by
+    size per product).
+  - New `order_items` columns: `product_variant_id` (FK, **restrict**) and
+    `variant_label_snapshot`. Backfill matches each line on shop + product + size; a
+    size with no variant keeps a null id and a synthesized `"7ml"` label.
+  - `order_items.size_ml`, `products.brand_id` and `brands.type` are now nullable.
+    `products.brand_id` is **`nullOnDelete`**: deleting a brand clears it on its products
+    and never deletes them.
+  - Postgres keeps constraint, index and sequence names through a rename, so the migration
+    renames them to the new table and column names, and back on rollback.
+  - The Shield permissions `{Ability}:Fragrance` are renamed to `{Ability}:Product` in
+    place, so every role keeps its grants.
+  - Money and snapshots are untouched. A hash of every order line's price, cost, quantity,
+    size and name snapshot is identical before `up`, after `up`, after `down`, and after
+    `up` again on Postgres 17.
+- **Models.** `Product` (`variants()`, `activeVariants()`), `ProductVariant` (`label()`),
+  and `OrderItem::product()`/`variant()`. Every new order line records its variant and
+  label once, when it is created, through checkout, the admin form or a seeder.
+- **Archived, never deleted.** An archived variant (`is_active` off) disappears from the
+  catalog, the min price, the size filter and `/meta`. Checkout and the promo preview
+  refuse it on the server. Placed orders still show it. The admin's size repeater only
+  offers delete on unsaved rows, and a "Selling" toggle archives a size.
+- **Admin.** `Resources/Fragrances/` is now `Resources/Products/`, at the URL
+  `/admin/{shop}/products`. The label still reads "Fragrances". Deleting a brand now says
+  its fragrances stay, hidden from the shop until they get a brand again.
+- **Tests.** New `ProductVariantTest` (9) and `ProductMigrationTest` (the backfill on
+  seeded rows of two shops). A permission-rename test is added to `RoleAuthorizationTest`.
+  The suite is updated for the new names. The parity test changed class and relation names
+  only, never a value. 375 tests.
+- `phpunit.xml` raises the test `memory_limit` to 512M. The suite was already peaking at
+  125 of PHP's 128 MB, and the new tests tipped it over.
+
 ## 0. What changed in v39
 
 **v39** records the generic-shop refactor's parity baseline (**#104**, step 35). One new

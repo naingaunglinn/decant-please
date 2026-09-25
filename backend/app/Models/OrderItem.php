@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['order_id', 'fragrance_id', 'fragrance_name_snapshot', 'size_ml', 'unit_price_mmk', 'unit_cost_mmk', 'quantity', 'line_total_mmk', 'line_cost_mmk'])]
+#[Fillable(['order_id', 'product_id', 'product_variant_id', 'fragrance_name_snapshot', 'variant_label_snapshot', 'size_ml', 'unit_price_mmk', 'unit_cost_mmk', 'quantity', 'line_total_mmk', 'line_cost_mmk'])]
 class OrderItem extends Model
 {
     use BelongsToShop;
@@ -22,12 +22,30 @@ class OrderItem extends Model
             // cache; this one prices the pour this order actually gets. find(),
             // not the relation, so an unloaded relation can't trip the dev/test
             // lazy-loading guard.
-            if (! $item->exists && $item->unit_cost_mmk === null && $item->fragrance_id !== null) {
-                $fragrance = $item->relationLoaded('fragrance')
-                    ? $item->fragrance
-                    : Fragrance::query()->find($item->fragrance_id);
+            if (! $item->exists && $item->unit_cost_mmk === null && $item->product_id !== null) {
+                $product = $item->relationLoaded('product')
+                    ? $item->product
+                    : Product::query()->find($item->product_id);
 
-                $item->unit_cost_mmk = $fragrance?->liquidCostMmk((int) $item->size_ml);
+                $item->unit_cost_mmk = $product?->liquidCostMmk((int) $item->size_ml);
+            }
+
+            // Variant snapshot, creating-only, like the name snapshot: which
+            // variant this line sold and how it read at the time ("10ml"). A line
+            // entered by product + size (the admin form, the decant checkout) is
+            // matched to its variant here, so every write path stamps it once.
+            if (! $item->exists && $item->product_variant_id === null && $item->product_id !== null && $item->size_ml !== null) {
+                $item->product_variant_id = ProductVariant::query()
+                    ->where('product_id', $item->product_id)
+                    ->where('size_ml', $item->size_ml)
+                    ->value('id');
+            }
+
+            if (! $item->exists && $item->variant_label_snapshot === null) {
+                $item->variant_label_snapshot = $item->product_variant_id !== null
+                    ? ProductVariant::query()->find($item->product_variant_id)?->label()
+                    : null;
+                $item->variant_label_snapshot ??= $item->size_ml !== null ? "{$item->size_ml}ml" : null;
             }
 
             $item->line_total_mmk = $item->unit_price_mmk * $item->quantity;
@@ -46,9 +64,14 @@ class OrderItem extends Model
         return $this->belongsTo(Order::class);
     }
 
-    public function fragrance(): BelongsTo
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(Fragrance::class);
+        return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     protected function casts(): array

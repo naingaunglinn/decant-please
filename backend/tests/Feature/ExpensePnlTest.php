@@ -8,8 +8,9 @@ use App\Filament\Pages\ProfitAndLoss;
 use App\Filament\Resources\Expenses\Pages\ManageExpenses;
 use App\Models\Brand;
 use App\Models\Expense;
-use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Product;
+use App\Support\MonthlyPnl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -52,7 +53,7 @@ class ExpensePnlTest extends TestCase
         Expense::create(['spent_on' => today(), 'category' => 'stock_purchase', 'amount_mmk' => 300000]);
         Expense::create(['spent_on' => today()->addMonthNoOverflow()->startOfMonth(), 'category' => 'fees', 'amount_mmk' => 7000]);
 
-        $pnl = \App\Support\MonthlyPnl::for(today()->year, today()->month);
+        $pnl = MonthlyPnl::for(today()->year, today()->month);
 
         $this->assertSame(130000, $pnl->salesIncomeMmk);        // (90k−10k) + 50k — cancelled absent
         $this->assertSame(10000, $pnl->discountsGivenMmk);      // not 10,999 — §4 holds
@@ -74,8 +75,8 @@ class ExpensePnlTest extends TestCase
         // a recorded courier reference cost must NOT become the P&L's courier-paid
         $township->couriers()->first()->update(['cost_mmk' => 1500]);
 
-        \App\Models\Fragrance::findOrFail($this->fragranceId())
-            ->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 50000]);
+        Product::findOrFail($this->fragranceId())
+            ->variants()->create(['size_ml' => 10, 'price_mmk' => 50000]);
 
         Order::newFromCheckout([
             'customer_name' => 'Aung Kyaw',
@@ -87,7 +88,7 @@ class ExpensePnlTest extends TestCase
 
         Expense::create(['spent_on' => today(), 'category' => 'delivery', 'amount_mmk' => 400]);
 
-        $pnl = \App\Support\MonthlyPnl::for(today()->year, today()->month);
+        $pnl = MonthlyPnl::for(today()->year, today()->month);
 
         $this->assertSame(2000, $pnl->deliveryFeesCollectedMmk); // the derived fee
         $this->assertSame(400, $pnl->courierPaidMmk);            // the expense — never the 1,500 reference
@@ -108,7 +109,7 @@ class ExpensePnlTest extends TestCase
         $nextMonth->created_at = today()->addMonthNoOverflow()->startOfMonth()->setTime(0, 0, 1);
         $nextMonth->save();
 
-        $pnl = \App\Support\MonthlyPnl::for(today()->year, today()->month);
+        $pnl = MonthlyPnl::for(today()->year, today()->month);
 
         $this->assertSame(3000, $pnl->operatingTotalMmk);  // 1k + 2k; next month's 4k excluded
         $this->assertSame(10000, $pnl->salesIncomeMmk);    // the 23:59:59 order counts; next month's doesn't
@@ -156,7 +157,7 @@ class ExpensePnlTest extends TestCase
         ]);
 
         $order->items()->create([
-            'fragrance_id' => $this->fragranceId(),
+            'product_id' => $this->fragranceId(),
             'fragrance_name_snapshot' => 'Creed Aventus',
             'size_ml' => 10,
             'unit_price_mmk' => $items,
@@ -173,7 +174,7 @@ class ExpensePnlTest extends TestCase
     {
         $brand = Brand::firstOrCreate(['name' => 'Creed'], ['type' => 'niche']);
 
-        return Fragrance::firstOrCreate(
+        return Product::firstOrCreate(
             ['brand_id' => $brand->id, 'name' => 'Aventus'],
             ['concentration' => 'edp', 'gender' => 'male'],
         )->id;

@@ -7,15 +7,12 @@ use App\Filament\Resources\Brands\BrandResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Notifications\Notification;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\QueryException;
 
 class BrandsTable
 {
@@ -36,9 +33,9 @@ class BrandsTable
                         BrandType::Designer => 'gray',
                         BrandType::Niche => 'info',
                     }),
-                TextColumn::make('fragrances_count')
+                TextColumn::make('products_count')
                     ->label('Fragrances')
-                    ->counts('fragrances'),
+                    ->counts('products'),
                 ToggleColumn::make('is_active'),
                 TextColumn::make('updated_at')
                     ->dateTime()
@@ -56,29 +53,9 @@ class BrandsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    // Products outlive their brand (nullOnDelete), so nothing blocks this.
                     DeleteBulkAction::make()
-                        ->modalDescription('Deleting brands also deletes all of their fragrances and decant prices. This cannot be undone.')
-                        ->action(function (Collection $records, DeleteBulkAction $action): void {
-                            $kept = 0;
-
-                            foreach ($records as $record) {
-                                try {
-                                    $record->delete();
-                                } catch (QueryException) {
-                                    $kept++;
-                                }
-                            }
-
-                            if ($kept > 0) {
-                                Notification::make()
-                                    ->warning()
-                                    ->title("{$kept} brand(s) kept")
-                                    ->body('Their fragrances appear in orders — deactivate those brands instead.')
-                                    ->send();
-                            }
-
-                            $action->success();
-                        }),
+                        ->modalDescription('Their fragrances stay in your catalog without a brand, hidden from the shop until you give them one again.'),
                 ]),
             ]);
     }

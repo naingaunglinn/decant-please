@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Models\Brand;
-use App\Models\DecantPrice;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -219,17 +219,17 @@ class OrderInvoiceTest extends TestCase
         return $this->studioUser();
     }
 
-    private function catalogPrice(): DecantPrice
+    private function catalogPrice(): ProductVariant
     {
-        return DecantPrice::firstOr(function () {
+        return ProductVariant::firstOr(function () {
             $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
-            $fragrance = $brand->fragrances()->create([
+            $fragrance = $brand->products()->create([
                 'name' => 'Allure Homme Sport',
                 'concentration' => 'cologne',
                 'gender' => 'male',
             ]);
 
-            return $fragrance->decantPrices()->create(['size_ml' => 10, 'price_mmk' => 55000]);
+            return $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
         });
     }
 
@@ -250,7 +250,7 @@ class OrderInvoiceTest extends TestCase
         ]);
 
         $order->items()->create([
-            'fragrance_id' => $price->fragrance_id,
+            'product_id' => $price->product_id,
             'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => $price->size_ml,
             'unit_price_mmk' => $price->price_mmk,

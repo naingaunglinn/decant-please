@@ -55,7 +55,7 @@ class TrackOrderController extends Controller
             'phone' => $order->phone,
             'address' => $order->address,
             'items' => $order->items->map(fn (OrderItem $item): array => [
-                'fragrance_name' => "{$item->fragrance->brand->name} — {$item->fragrance->name} ({$item->fragrance->concentration->label()})",
+                'fragrance_name' => ($item->product->brand ? "{$item->product->brand->name} — " : '')."{$item->product->name} ({$item->product->concentration->label()})",
                 'size_ml' => $item->size_ml,
                 'quantity' => $item->quantity,
                 'unit_price_mmk' => $item->unit_price_mmk,

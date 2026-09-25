@@ -10,12 +10,10 @@ use App\Filament\Resources\Brands\Tables\BrandsTable;
 use App\Models\Brand;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Database\QueryException;
 use UnitEnum;
 
 class BrandResource extends Resource
@@ -29,28 +27,13 @@ class BrandResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     /**
-     * Deleting a brand cascades to its fragrances — which the DB blocks (FK restrict)
-     * the moment any of them appears in an order. Fail friendly, suggest deactivating.
+     * Deleting a brand never deletes its products (step 36: products.brand_id is
+     * nullOnDelete) — it clears the brand on them. Say so before the click.
      */
     public static function safeDeleteAction(): DeleteAction
     {
         return DeleteAction::make()
-            ->modalDescription(fn (Brand $record): string => "Deleting \"{$record->name}\" also deletes its {$record->fragrances()->count()} fragrance(s) and their decant prices. This cannot be undone.")
-            ->action(function (Brand $record, DeleteAction $action): void {
-                try {
-                    $record->delete();
-                } catch (QueryException) {
-                    Notification::make()
-                        ->danger()
-                        ->title('This brand has order history')
-                        ->body('One of its fragrances appears in orders, so it can\'t be deleted — deactivate the brand instead.')
-                        ->send();
-
-                    return;
-                }
-
-                $action->success();
-            });
+            ->modalDescription(fn (Brand $record): string => "Deleting \"{$record->name}\" removes it from its {$record->products()->count()} fragrance(s). They stay in your catalog, hidden from the shop until you give them a brand again.");
     }
 
     public static function form(Schema $schema): Schema
