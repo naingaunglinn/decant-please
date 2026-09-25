@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: fullName(fragrance),
     description:
       fragrance.description ??
-      `${fullName(fragrance)}${headline ? ` (${headline.display})` : ""} — ${fragrance.prices.some((p) => p.size_ml === null) ? "" : "decants "}from ${fragrance.min_price_formatted ?? "—"}.`,
+      `${fullName(fragrance)}${headline ? ` (${headline.display})` : ""} — ${fragrance.template === "decant" ? "decants " : ""}from ${fragrance.min_price_formatted ?? "—"}.`,
     alternates: { canonical: `/product/${slug}` },
   };
 }
@@ -86,7 +86,8 @@ export default async function ProductPage({ params }: PageProps) {
   // mean anything here (decant only, step 38b). Cached; the page stands without it.
   const meta = await getMeta(tenant.slug).catch(() => null);
   const related = await getRelated(tenant.slug, fragrance, meta);
-  const showBrandType = fragrance.brand !== null && (meta?.brand_types.length ?? 0) > 0;
+  // if /meta is unreachable, a typed brand keeps its pill — decant's page as it always was
+  const showBrandType = Boolean(fragrance.brand?.type_label) && (meta?.brand_types.length ?? 1) > 0;
 
   return (
     <article className="mx-auto max-w-[480px] px-4 py-12 sm:px-6 md:py-16 lg:max-w-[640px] xl:max-w-[720px]">

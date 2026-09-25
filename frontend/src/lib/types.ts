@@ -2,8 +2,9 @@ export interface Brand {
   id: number;
   name: string;
   slug: string;
-  type: "designer" | "niche";
-  type_label: string;
+  /** Null when the brand has no type — only decant asks for one (step 38b). */
+  type: "designer" | "niche" | null;
+  type_label: string | null;
   logo_url: string | null;
   fragrances_count?: number;
 }

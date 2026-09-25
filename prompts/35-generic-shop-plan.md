@@ -411,7 +411,11 @@ shows it on the storefront.
     shared by `/products`, `/meta` and checkout. Before, all four sites used
     `whereHas('brand')` and hid brandless products.
   - **Brand types are decant's** (`Template::brandTypes()`). `/meta` `brand_types` is
-    empty otherwise, so no Designer/Niche filter or pill for clothing.
+    empty otherwise, so clothing gets no Designer/Niche filter, pill or home tile. The
+    admin hides the brand's type there too. A new brand still stores the column's
+    default (`designer`), but no clothing surface shows it.
+  - **The CSV import still requires a brand.** It only runs for ml (decant) shops since
+    38a, where a brand is required anyway.
   - **The size guide is a per-product text attribute** (`size_guide`, `Attribute`
     `section: true` → `show: "section"`), not a shop setting. It needs no migration, and
     fit differs by garment. A shop-wide size chart can come with the design system's

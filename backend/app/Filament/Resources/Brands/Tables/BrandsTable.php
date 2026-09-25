@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Brands\Tables;
 
 use App\Enums\BrandType;
 use App\Filament\Resources\Brands\BrandResource;
+use App\Templates\Templates;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -30,6 +31,7 @@ class BrandsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('type')
+                    ->visible(fn (): bool => Templates::forShop()->brandTypes()) // designer / niche: decant only (step 38b)
                     ->badge()
                     ->color(fn (?BrandType $state): string => $state === BrandType::Niche ? 'info' : 'gray'),
                 TextColumn::make('products_count')
@@ -43,6 +45,7 @@ class BrandsTable
             ->defaultSort('name')
             ->filters([
                 SelectFilter::make('type')
+                    ->visible(fn (): bool => Templates::forShop()->brandTypes())
                     ->options(BrandType::class),
                 TernaryFilter::make('is_active'),
             ])

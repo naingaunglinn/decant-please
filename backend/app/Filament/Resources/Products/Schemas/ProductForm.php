@@ -57,7 +57,8 @@ class ProductForm
                                 Select::make('type')
                                     ->options(BrandType::class)
                                     ->default(BrandType::Designer->value)
-                                    ->required(),
+                                    ->visible($template->brandTypes())
+                                    ->required($template->brandTypes()),
                             ]),
                         TextInput::make('name')
                             ->required()

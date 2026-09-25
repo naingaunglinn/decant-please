@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getProducts } from "@/lib/api";
+import { getMeta, getProducts } from "@/lib/api";
 import { tenantPage } from "@/lib/tenant";
 import { fullName } from "@/lib/attributes";
 import { Hero } from "@/components/home/Hero";
@@ -60,6 +60,12 @@ export default async function HomePage({ params }: { params: Promise<{ host: str
   }
 
   const heroFragrance = featured[0] ?? null;
+  // Designer / Niche tiles only where the template has brand types (step 38b: decant);
+  // if /meta is unreachable, keep them — the page looks as it always did.
+  const brandTyped = await getMeta(tenant.slug)
+    .then((meta) => meta.brand_types.length > 0)
+    .catch(() => true);
+  const tiles = brandTyped ? TILES : TILES.filter((tile) => !tile.href.includes("brand_type"));
 
   return (
     <>
@@ -127,7 +133,7 @@ export default async function HomePage({ params }: { params: Promise<{ host: str
       <ScrollReveal>
         <section className="mx-auto max-w-[1280px] px-4 py-12 pb-20 sm:px-6 md:py-20 md:pb-28">
           <div className="grid gap-4 md:grid-cols-3 md:gap-6">
-            {TILES.map((tile) => (
+            {tiles.map((tile) => (
               <Link
                 key={tile.label}
                 href={tile.href}

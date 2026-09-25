@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\Brands\Pages\CreateBrand;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Models\Brand;
 use App\Models\Order;
@@ -99,6 +100,28 @@ class ClothingStorefrontTest extends TestCase
             ->assertJsonPath('items.0.variant_label', 'M / Blue');
     }
 
+    public function test_an_inactive_or_sold_out_brandless_product_is_not_sold_and_the_message_names_the_variant(): void
+    {
+        $shirt = $this->shirt();
+        $variant = $shirt->variants()->firstOrFail();
+        $order = fn (): array => $this->postJson('/api/v1/decant-please/orders', [
+            'customer_name' => 'Su Su',
+            'phone' => '09-771234561',
+            'delivery_township_id' => $this->serviceableTownship()->id,
+            'address_line' => 'No. 12, Baho Road',
+            'items' => [['variant_id' => $variant->id, 'quantity' => 1]],
+        ])->assertUnprocessable()->json('errors');
+
+        $variant->update(['in_stock' => false]);
+        $this->assertSame('M / Blue of Linen Shirt just sold out — pick another size.', $order()['items.0'][0]);
+
+        $variant->update(['in_stock' => true]);
+        $shirt->update(['is_active' => false]);
+        $this->assertSame('That fragrance is no longer available.', $order()['items.0'][0]);
+        $this->assertSame([], $this->getJson('/api/v1/decant-please/products')->json('data'));
+        $this->getJson("/api/v1/decant-please/products/{$shirt->slug}")->assertNotFound();
+    }
+
     public function test_another_shops_brandless_product_never_crosses_over(): void
     {
         $context = app(TenantContext::class);
@@ -145,6 +168,25 @@ class ClothingStorefrontTest extends TestCase
             ->fillForm(['name' => 'Aventus', 'attributes' => ['concentration' => 'edp', 'gender' => 'male']])
             ->call('create')
             ->assertHasFormErrors(['brand_id' => 'required']);
+    }
+
+    public function test_a_clothing_shops_brand_form_asks_no_designer_or_niche_type(): void
+    {
+        $this->actingAs($this->studioUser());
+
+        Livewire::test(CreateBrand::class)
+            ->assertFormFieldHidden('type')
+            ->fillForm(['name' => 'Shwe Thread'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        // the column's default type is stored, but no clothing surface shows it
+        $this->assertTrue(Brand::where('name', 'Shwe Thread')->exists());
+        $this->assertSame([], $this->getJson('/api/v1/decant-please/meta')->json('brand_types'));
+
+        ShopSetting::current()->update(['template' => 'decant']);
+
+        Livewire::test(CreateBrand::class)->assertFormFieldVisible('type');
     }
 
     // ---- size guide ----

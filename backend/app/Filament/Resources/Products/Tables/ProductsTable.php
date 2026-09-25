@@ -121,6 +121,7 @@ class ProductsTable
                     ->preload(),
                 SelectFilter::make('brand_type')
                     ->label('Brand type')
+                    ->visible(fn (): bool => Templates::forShop()->brandTypes()) // decant only (step 38b)
                     ->options(BrandType::class)
                     ->query(fn (Builder $query, array $data) => $query->when($data['value'] ?? null,
                         fn (Builder $q, string $type) => $q->whereHas('brand', fn (Builder $b) => $b->where('type', $type)))),

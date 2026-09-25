@@ -70,7 +70,8 @@ async function ShopResults({ shop, flat }: { shop: string; flat: Filters }) {
   const filters: ProductFilters = {
     q: flat.q,
     brand: flat.brand,
-    type: flat.brand_type,
+    // brand_type only where the template has brand types (step 38b) — no hidden filter
+    type: meta.brand_types.length > 0 ? flat.brand_type : undefined,
     size: flat.size,
     min_price: flat.min_price,
     max_price: flat.max_price,

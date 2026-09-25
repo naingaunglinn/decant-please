@@ -10,6 +10,7 @@ use App\Support\TenantContext;
 use App\Templates\Templates;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 
 /**
  * A demo clothing shop for local browser checks (step 38b) — the second category
@@ -30,6 +31,11 @@ class DemoClothingShopSeeder extends Seeder
 
     public function run(): void
     {
+        // A live demo tenant has no place on a real server.
+        if (app()->isProduction()) {
+            throw new RuntimeException('DemoClothingShopSeeder is for local browser checks only — refusing in production.');
+        }
+
         $shop = Shop::firstOrCreate(
             ['slug' => self::SLUG],
             ['name' => 'Thida Closet', 'status' => ShopStatus::Live],

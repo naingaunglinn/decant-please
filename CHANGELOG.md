@@ -23,8 +23,9 @@ out. A product may now have no brand. A decant shop's pages are unchanged.
   this, all four used `whereHas('brand')`, which hid every brandless product and refused
   to sell it. The order snapshot of a brandless line is the bare name ("Linen Shirt").
 - **Brand types are a decant concept**: `Template::brandTypes()` (decant only). `/meta`
-  `brand_types` is empty for other templates, so the storefront shows no "Brand type"
-  filter or Designer/Niche pill there.
+  `brand_types` is empty for other templates. The storefront then shows no "Brand type"
+  filter, Designer/Niche pill or Designer/Niche home tiles, and drops a stray
+  `?brand_type=`. The admin hides the brand's type field, column and filters as well.
 - **Size guide**: a clothing `size_guide` text attribute with the new `Attribute`
   `section: true` → `show: "section"`: a titled paragraph on the product page, line
   breaks kept. Per product, no migration. Not filterable, not searched.
@@ -41,16 +42,16 @@ out. A product may now have no brand. A decant shop's pages are unchanged.
   - Brandless products render with no brand pill (card, hero, product page, cart).
     `fullName()` gives "Brand Name" or just the name.
 - **Demo clothing shop**: `DemoClothingShopSeeder` (not in `DatabaseSeeder`; run with
-  `--class`). It seeds "Thida Closet" at `clothing.decant.localhost:3001` with 3 products
+  `--class`; it refuses to run in production). It seeds "Thida Closet" at `clothing.decant.localhost:3001` with 3 products
   (brandless and branded), Size + Color variants, one sold-out combination and a size
   guide. It is idempotent and writes under the demo shop's own context.
 - **`next.config.ts`**: `allowedDevOrigins: ["*.decant.localhost"]`. Under `next dev`,
   a second local shop's pages never hydrated. This setting has no effect in production.
 - **Browser evidence**: `scripts/verify-clothing.mjs` (16 checks), added to `VERIFY.md`
   and `frontend/AGENTS.md`.
-- **Tests**: `ClothingStorefrontTest` (8), which includes a two-shop test for a brandless
-  product (not listed, 404, checkout refused). 426 tests pass on SQLite and on
-  Postgres 17. The parity test is unchanged and green.
+- **Tests**: `ClothingStorefrontTest` (10). It includes a two-shop test for a brandless
+  product (not listed, 404, checkout refused) and the sold-out and inactive messages.
+  428 tests pass on SQLite and on Postgres 17. The parity test is unchanged and green.
 - **Deploy**: API first, as usual. The old storefront still reads `brand.name`, so a
   brandless product would break its cards. Only a clothing shop can have one, and no
   clothing shop is live, so the order is safe.

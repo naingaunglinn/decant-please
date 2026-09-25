@@ -12,7 +12,7 @@ import type { Brand, CatalogMeta } from "@/lib/types";
 const CORE_KEYS = ["q", "brand", "brand_type", "size", "min_price", "max_price", "sort"];
 
 const filterKeys = (meta: CatalogMeta): string[] => [
-  ...CORE_KEYS,
+  ...CORE_KEYS.filter((key) => key !== "brand_type" || meta.brand_types.length > 0),
   ...meta.filters.map((filter) => filter.key),
   ...meta.variant_options.map((option) => optionKey(option.name)),
 ];
