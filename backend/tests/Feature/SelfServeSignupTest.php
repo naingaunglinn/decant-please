@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ShopStatus;
 use App\Filament\Auth\SignUp;
 use App\Filament\Pages\Dashboard;
+use App\Models\DeliveryTownship;
 use App\Models\Shop;
 use App\Models\ShopSetting;
 use App\Models\User;
@@ -86,6 +87,9 @@ class SelfServeSignupTest extends TestCase
         $this->assertSame(ShopStatus::Onboarding, $shop->status);
         app(TenantContext::class)->set($shop);
         $this->assertSame('clothing', ShopSetting::query()->value('template'));
+        // the geography seeds after register()'s own commit (the page adds no outer transaction)
+        $this->assertGreaterThan(0, DeliveryTownship::query()->count());
+        $this->assertSame(0, DeliveryTownship::query()->where('is_active', true)->count());
         $this->assertSame('thida-closet.cornerarea.me', $shop->domains()->value('host'));
         $this->assertSame('+959791234567', $user->phone);
         $this->assertNotNull($user->phone_verified_at);

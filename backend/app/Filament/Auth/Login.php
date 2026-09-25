@@ -9,6 +9,7 @@ use Illuminate\Contracts\Support\Htmlable;
 /**
  * Filament's login, with the "sign up" link shown only while sign-up is on
  * (step 44b) — the route always exists, but 404s when no code can be sent.
+ * Scoping: platform-level, before any tenant — it reads no shop data.
  */
 class Login extends BaseLogin
 {
