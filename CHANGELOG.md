@@ -9,6 +9,39 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v39
+
+**v39** records the generic-shop refactor's parity baseline (**#104**, step 35). One new
+test file. No migration, no API change, no app code, no dependency.
+
+- **`tests/Feature/GenericShopParityTest.php`** freezes a decant shop at 2026-03-15 and
+  asserts, as hand-worked literal Kyat: the `/fragrances` list and detail objects with
+  `min_price_mmk` and every price, `/meta`'s filter options, sizes and price bounds, each
+  order's server-derived money (items, discount, fee, total, deposit, liquid cost, signed
+  balance), the dashboard's revenue, gross margin ("on 3 of 4"), order count and balance
+  outstanding, and `MonthlyPnl` for March and February, every field. It also pins the
+  `/fragrances` filters and sorts, the public tracking receipt's money, and the `stock_ml`
+  draw-down when an order is decanted.
+- The fixture covers each money rule: the ceiling cost division, a capped percent promo
+  through `POST /orders`, a township fee, fully-, partially- and un-costed orders, a
+  cancelled and a rejected order, an overpaid order, last month's order, expenses in every
+  category across three months, and a second shop whose sale must move nothing.
+- **Payments and couriers (#67/#109, owner review):** four more tests add January orders
+  and run the panel's own actions with their defaults. They cover the Mark-paid default
+  (online 55,000, COD 112,500), an online order marked paid and then settled with the fee
+  the courier collected (balance 0, Paid, not in "Balance outstanding"), and a COD order
+  settled short (12,500 left, still Unpaid). They also check "Cash with couriers" with two
+  orders out (175,000) and then one (62,500), and "Balance outstanding" rising to 560,500.
+  Every March and February figure above is unchanged.
+- Steps 36–42 keep it green. A step may rename a field it deliberately renames, never a
+  value. It can't guard a *data* migration (the fixture is built after migrations), so the
+  step plan now asks each backfilling step to test its own migration.
+- Checked by mutation: switching the cost rounding from ceiling to floor fails 4 of its 10
+  tests.
+- **Spec fix (step 40):** the plan's pooled-COGS formula `ceil(cost/amount) × measure`
+  rounded per unit and would have moved money (16,667 → 16,670 Ks for a 5ml pour of a
+  100,000 Ks / 30ml bottle). It now reads `ceil(cost × measure / amount)`, today's rule.
+
 ## 0. What changed in v38
 
 **v38** fixes the letterhead bug (**#116**): the admin's printed documents named the

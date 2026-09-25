@@ -174,7 +174,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 324 tests: domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
+├── tests/Feature/                          # 364 tests: parity baseline, domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```
@@ -219,9 +219,11 @@ backend/
 php artisan test
 ```
 
-324 tests / 1,337 assertions on an in-memory SQLite database — 40 of them in
-`TenantIsolationTest`, the two-shop isolation suite, and 22 in
-`StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004) — and
+364 tests / 1,626 assertions on an in-memory SQLite database — 43 of them in
+`TenantIsolationTest`, the two-shop isolation suite, 22 in
+`StorefrontHostResolutionTest` (host → shop mapping + dynamic CORS, ADR-0004), and 10 in
+`GenericShopParityTest`, the generic-shop refactor's golden master (step 35: catalog, `/meta`,
+dashboard and P&L figures as literal Kyat; steps 36–42 may rename fields, never move a value) — and
 your dev Postgres data is never touched. N+1 queries throw outside production
 (`Model::preventLazyLoading`).
 
