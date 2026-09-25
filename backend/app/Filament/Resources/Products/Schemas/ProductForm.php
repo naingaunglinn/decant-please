@@ -15,6 +15,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -153,6 +154,10 @@ class ProductForm
                                 ->helperText('Flag an option on the dashboard once its count falls to this.'),
                         ]),
                 ] : []),
+                // Stock off: the reorder line still gets its mode's default on
+                // create (the column's 30 would flag every size once counting starts),
+                // and an edit writes the stored value back unchanged.
+                ...(! $stock ? [Hidden::make('low_stock_threshold')->default($pooled ? 30 : 2)] : []),
                 Section::make('Cost')
                     ->visible($pooled && Modules::on(Modules::COST_MARGIN))
                     ->description($bottle

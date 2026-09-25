@@ -11,8 +11,10 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ## 0. What changed in v49
 
-**v49** is step 41 (**#131**). Each shop turns optional features on and off. A shop that
-never touches it sees exactly what it saw before.
+**v49** is step 41 (**#131**). Each shop turns optional features on and off. A decant
+shop that never touches it sees exactly what it saw before. A clothing shop loses the
+production schedule page and the "Upcoming" panel by default (roadmap: decant only). The
+only clothing shop today is the demo seeder's.
 
 - **Five modules**, keys in `App\Support\Modules`: `stock`, `cost_margin`,
   `production_schedule`, `promo_codes`, `expenses`. Delivery zones stay core (checkout
@@ -21,6 +23,12 @@ never touches it sees exactly what it saw before.
   `shop_settings.modules` (jsonb, null). Null means the shop template's defaults
   (`Template::defaultModules()`), so no backfill. Up → down → up on Postgres 17.
 - **Defaults**: decant, all five. Clothing, all but the production schedule.
+- **Profit & loss follows `expenses` only.** Its COGS and gross-margin rows stay with cost
+  off: net profit subtracts COGS, and hiding a line the total includes would leave numbers
+  that don't add up.
+- **Stock off still sets the reorder line** on a new product (hidden field, the mode's
+  default: 30 pooled, 2 pieces per variant), so turning stock on later doesn't flag every
+  size at once.
 - **Features page** (admin → Settings) with plain-word descriptions. Saving stores the full
   enabled set and reloads, so the menu changes at once.
 - **Off hides, never writes.** Pages and resources refuse their URL, widgets drop off the
@@ -30,14 +38,17 @@ never touches it sees exactly what it saw before.
 - **Promo codes off is enforced on the server**: `PromoCode::evaluate()` answers every
   code as not found. Checkout still places the order, at full price. `/meta` gains
   `modules`, and the storefront checkout hides the promo box without `promo_codes`.
-- Tests: `ModuleTogglesTest` (10). It covers defaults, two shops in one request, the
-  Features page, the exact admin menu before and after, typed URLs refused, fields
-  hidden but numbers kept, `/meta`, promo refusal with a full-price checkout, and the
-  core order loop with every module off. The weighed test template gets group 1's
+- Tests: `ModuleTogglesTest` (12). It covers defaults, two shops in one request, the
+  Features page, the exact admin menu before and after, and typed URLs refused. It checks
+  that hidden fields keep their numbers in both stock modes, and that a new product still
+  gets its reorder line. It also covers `/meta`, promo refusal with a full-price checkout,
+  and the core order loop with every module off. The weighed test template gets group 1's
   defaults.
 
 **Deploy:** migration first (additive, nullable). The API change is additive, and the
-storefront treats a missing `modules` as all on, so either half can go first. Rollback:
+storefront treats a missing `modules` as all on, so either half can go first. The
+storefront's `/meta` fetch revalidates every 60 seconds, so the promo box can lag a toggle by up
+to a minute; the server refuses codes regardless. Rollback:
 the migration's `down()` drops the column; existing shops were on template defaults
 anyway.
 

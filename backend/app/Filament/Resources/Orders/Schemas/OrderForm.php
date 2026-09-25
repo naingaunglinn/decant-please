@@ -196,8 +196,8 @@ class OrderForm
                                     ->helperText('Auto-filled from the catalog — edit freely.'),
                                 TextInput::make('unit_cost_mmk')
                                     ->label('Unit cost')
-                                    // Cost off (step 41): hidden but still saved, so the
-                                    // line freezes its cost exactly as before.
+                                    // Cost off (step 41): hidden but still saved, so a line
+                                    // whose size changes re-freezes the matching cost as before.
                                     ->visible(fn (): bool => Modules::on(Modules::COST_MARGIN))
                                     ->dehydratedWhenHidden()
                                     ->numeric()

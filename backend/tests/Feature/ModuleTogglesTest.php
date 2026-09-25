@@ -10,6 +10,7 @@ use App\Filament\Pages\ProductionSchedule;
 use App\Filament\Pages\ProductionScheduleDay;
 use App\Filament\Pages\ProfitAndLoss;
 use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\PromoCodes\PromoCodeResource;
@@ -86,6 +87,7 @@ class ModuleTogglesTest extends TestCase
         // decant: every module, so today's shop sees exactly what it saw before
         $this->assertNull(ShopSetting::currentOrNull());
         $this->assertSame(self::ALL, Modules::enabled());
+        $this->assertNull(ShopSetting::currentOrNull()); // a read never creates the row
 
         // clothing: no production schedule (roadmap: decant only)
         ShopSetting::current()->update(['template' => 'clothing']);
@@ -199,6 +201,50 @@ class ModuleTogglesTest extends TestCase
         Livewire::test(OrderStats::class)->assertDontSee('Gross margin');
     }
 
+    public function test_per_variant_stock_and_cost_off_keep_each_variants_numbers(): void
+    {
+        $this->actingAs($this->studioUser());
+        ShopSetting::current()->update(['template' => 'clothing', 'modules' => [Modules::PROMO_CODES]]);
+        $shirt = Product::create([
+            'name' => 'Linen Shirt', 'template' => 'clothing', 'low_stock_threshold' => 3,
+            'attributes' => ['material' => 'linen', 'gender' => 'unisex'],
+        ]);
+        $shirt->variants()->create([
+            'options' => ['Size' => 'M', 'Color' => 'Blue'], 'price_mmk' => 25000, 'stock_qty' => 5, 'unit_cost_mmk' => 12000,
+        ]);
+
+        Livewire::test(EditProduct::class, ['record' => $shirt->getRouteKey()])
+            ->assertOk()
+            ->assertFormFieldHidden('variants.record-'.$shirt->variants()->value('id').'.stock_qty')
+            ->fillForm(['name' => 'Linen Shirt II'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $variant = $shirt->variants()->firstOrFail();
+        $this->assertSame([5, 12000, 25000], [$variant->stock_qty, $variant->unit_cost_mmk, $variant->price_mmk]);
+        $this->assertSame(3, $shirt->fresh()->low_stock_threshold); // the reorder line survives the save
+    }
+
+    public function test_a_product_created_with_stock_off_gets_its_modes_reorder_line(): void
+    {
+        $this->actingAs($this->studioUser());
+        ShopSetting::current()->update(['template' => 'clothing', 'modules' => []]);
+
+        Livewire::test(CreateProduct::class)
+            ->fillForm([
+                'name' => 'Linen Shirt',
+                'attributes' => ['material' => 'linen', 'gender' => 'women'],
+                'variants' => [
+                    ['options' => ['Size' => 'M', 'Color' => 'Blue'], 'price_mmk' => 25000, 'in_stock' => true, 'is_active' => true],
+                ],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        // per variant: 2 pieces, as with stock on — not the column's ml-era 30
+        $this->assertSame(2, Product::where('name', 'Linen Shirt')->firstOrFail()->low_stock_threshold);
+    }
+
     // ---- API ----
 
     public function test_meta_lists_the_enabled_modules(): void
@@ -227,7 +273,8 @@ class ModuleTogglesTest extends TestCase
 
         $response = $this->postJson('/api/v1/decant-please/orders', $this->payload($product, ['promo_code' => 'SAVE10']))
             ->assertCreated()
-            ->assertJsonPath('total_mmk', 60000); // full price: 2 × 30,000
+            ->assertJsonPath('total_mmk', 60000) // full price: 2 × 30,000
+            ->assertJsonPath('promo_note', "That code was no longer valid, so it wasn't applied — you can still place this order without it.");
 
         $order = Order::where('tracking_code', $response->json('tracking_code'))->firstOrFail();
         $this->assertSame(0, $order->discount_mmk);

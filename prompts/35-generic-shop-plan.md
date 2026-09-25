@@ -620,7 +620,8 @@ per-shop.
   `stock`, `cost_margin`, `production_schedule`, `promo_codes`, `expenses`. Stored keys,
   never renamed. `DecantTemplate`'s unread `cost` became `cost_margin`.
 - **`shop_settings.modules` jsonb, null = the shop template's defaults.** No backfill:
-  every existing shop keeps exactly today's screens. The Features page (Settings) saves
+  every decant shop keeps exactly today's screens; a clothing shop (today only the demo
+  seeder's) loses the production schedule by default. The Features page (Settings) saves
   the full enabled set; a saved set doesn't pick up a module a template later turns on
   by default. Unknown keys are dropped on read and write.
 - **One resolver**, `Modules::on()` / `enabled()`, memoised per shop id with `once()`;
@@ -633,7 +634,8 @@ per-shop.
   (`canAccess`, Shield still applies), widgets drop (`canView`), and form fields and
   columns are left out. Draw-down still runs on any counted product, and each order line
   still freezes its cost (the admin line's cost field is hidden but still saved), so
-  turning a module back on shows true numbers.
+  turning a module back on shows true numbers. With stock off a new product still takes
+  its mode's reorder line (a hidden field: 30 pooled, 2 per variant).
 - **Surfaces**: production schedule → both schedule pages, "Upcoming decants";
   stock → low-stock panel, product stock sections and column, the Accept shortfall
   warning; cost & margin → product cost section, variant cost, Cost/ml column, the
@@ -645,7 +647,9 @@ per-shop.
   checkout hides the promo box without `promo_codes`, and shows it when the list is
   missing.
 - Not built: delivery zones as a module (checkout needs a township — off would break
-  the order path; groups 3/4 add the no-delivery path); hiding `prep_date` (Accept and
+  the order path; groups 3/4 add the no-delivery path); hiding P&L's COGS and margin rows with cost off (net
+  subtracts COGS — a hidden line would leave a total that doesn't add up; P&L follows
+  `expenses` only); hiding `prep_date` (Accept and
   the order form need it; only the calendar is the module); the orders CSV keeps its
   cost/margin columns (a fixed export shape); Burmese labels on the Features page (the
   admin is English-only today).
