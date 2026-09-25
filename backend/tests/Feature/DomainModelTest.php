@@ -174,8 +174,7 @@ class DomainModelTest extends TestCase
         return Product::create([
             'brand_id' => $brand->id,
             'name' => 'Allure Homme Sport',
-            'concentration' => 'cologne',
-            'gender' => 'male',
+            'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
         ]);
     }
 

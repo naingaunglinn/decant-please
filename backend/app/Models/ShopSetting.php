@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Per-shop settings row: payment details (MMQR + KBZPay/Wave), Telegram alert
- * credentials (step 33), and storefront social links. One row per shop —
+ * credentials (step 33), storefront social links, and the shop's default
+ * template (step 37; App\Templates\Templates). One row per shop —
  * BelongsToShop scopes it and `unique(shop_id)` enforces it — so
  * ShopSetting::current() returns *this shop's* row, not a global singleton.
  * Managed from the admin's Payment settings page; surfaced to the storefront via
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
  */
 #[Fillable([
     'kbzpay_name', 'kbzpay_number', 'wave_name', 'wave_number', 'payment_qr_path', 'payment_instructions',
-    'bot_token', 'admin_chat_id', 'tiktok_url', 'facebook_url',
+    'bot_token', 'admin_chat_id', 'tiktok_url', 'facebook_url', 'template',
 ])]
 class ShopSetting extends Model
 {

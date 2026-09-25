@@ -10,6 +10,8 @@ use App\Models\ProductVariant;
 use App\Models\ShopSetting;
 use App\Support\ShopConfig;
 use App\Support\TenantContext;
+use App\Templates\Attribute;
+use App\Templates\Templates;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -34,6 +36,20 @@ class MetaController extends Controller
             $max = $available->clone()->max('price_mmk');
 
             return [
+                // The shop template's filterable attributes (step 37), what a
+                // storefront renders its filters from. A select lists its options;
+                // a text filter is a free-text box (?{key}= on /products).
+                'filters' => array_map(fn (Attribute $attribute): array => [
+                    'key' => $attribute->key,
+                    'label' => $attribute->label,
+                    'type' => $attribute->type,
+                    'options' => array_map(
+                        fn (string $value, string $label): array => ['value' => $value, 'label' => $label],
+                        array_keys($attribute->options),
+                        $attribute->options,
+                    ),
+                ], Templates::forShop()->filterable()),
+                // The pre-37 storefront's hardcoded lists — same values as before.
                 'brand_types' => $this->options(BrandType::cases()),
                 'genders' => $this->options(Gender::cases()),
                 'concentrations' => $this->options(Concentration::cases()),

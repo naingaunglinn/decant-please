@@ -176,7 +176,7 @@ class ExpensePnlTest extends TestCase
 
         return Product::firstOrCreate(
             ['brand_id' => $brand->id, 'name' => 'Aventus'],
-            ['concentration' => 'edp', 'gender' => 'male'],
+            ['attributes' => ['concentration' => 'edp', 'gender' => 'male']],
         )->id;
     }
 }

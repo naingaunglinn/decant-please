@@ -105,14 +105,13 @@ abstract class TestCase extends BaseTestCase
      * callers add one with unit_price_mmk = the intended line total. firstOrCreate keeps
      * it to one per shop, idempotent across repeated helper calls in a test.
      */
-
     protected function itemFragrance(): Product
     {
         $brand = Brand::firstOrCreate(['name' => 'Fixture Brand'], ['type' => 'designer']);
 
         return $brand->products()->firstOrCreate(
             ['name' => 'Fixture'],
-            ['concentration' => 'edp', 'gender' => 'unisex'],
+            ['attributes' => ['concentration' => 'edp', 'gender' => 'unisex']],
         );
     }
 }

@@ -22,7 +22,8 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 3 | Step 35: baseline parity test | `35-generic-shop-plan.md` §35 (stack from here, not from the #67 branch; #67 is merged) | pr-open | 104-parity-baseline | #119 |
 | 4 | Step 36a: product + variant schema, models, admin (API contract unchanged) | §36, as amended by item 1 | pr-open | 105-product-variant-model | #120 |
 | 4b | Step 36b: `/products` API, checkout by `variant_id`, storefront `/product/[slug]` + redirect, `types.ts`, `api.md` | §36 "As built" (split from row 4); issue #105, don't file another | pr-open | 105-products-api | #121 |
-| 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | todo | | |
+| 5 | Step 37: templates, attributes, `products.template`, per-shop categories | §37, as amended | pr-open | 106-templates-attributes | #122 |
+| 5b | Step 37b: storefront renders from `/meta` `filters` and product `attributes` (FilterControls, product page, cards) | §37 "As built" (split from row 5); issue #106, don't file another | todo | | |
 | 6 | Step 38: clothing template, variant photos | §38, as amended | todo | | |
 | 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | todo | | |
 | 8 | Step 40: stock modes (pooled / per variant), Myanmar weight units | §40 + roadmap group 1 | todo | | |
@@ -49,7 +50,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 29 | Group 4d: per-provider day calendar | roadmap: group 4 | todo | | |
 | 30 | Group 4e: group 4 templates + presets | roadmap: group 4 | todo | | |
 | 31 | CornerArea brand rename in code | roadmap: build order 1 | after-go-live | | |
-| 32 | Remove the step-36b deploy aliases: `/fragrances` routes, the legacy `fragrance_id` + `size_ml` checkout line, and the admin "View on site" `/fragrance/` link (→ `/product/`) | §36 "As built" (36b) | after-go-live | | |
+| 32 | Remove the step-36b deploy aliases: `/fragrances` routes, the legacy `fragrance_id` + `size_ml` checkout line, the admin "View on site" `/fragrance/` link (→ `/product/`), and the flat perfume keys on the product (`concentration`, `gender`, `notes`…) and `/meta` (`genders`, `concentrations`) — 37b reads `attributes` / `filters` | §36 "As built" (36b) | after-go-live | | |
 
 ## Log
 
@@ -62,3 +63,4 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 2026-09-25 · fix #118 · owner review (parity fixture) applied on #119's branch: courier + payment-method money paths (Mark-paid defaults, online fee settle → 0 Paid, COD short settle → 12,500 Unpaid, courier float, balance outstanding 560,500), existing figures unchanged; merged up into #120; 380 tests · #119
 2026-09-25 · fix #114, #117 · #114: settings.json deny list tightened (+refspec, refs/heads/main|develop pushes, docker compose down); #117: plan says a brand with products can't be deleted (archive it) and step 37 rebuilds search_text on brand rename; code on #120: products.brand_id NO ACTION (not RESTRICT — SQLite checks it mid shop-cascade), admin delete/bulk delete refuse with a notice, 4 new tests; merged up the stack; 383 tests green on SQLite and on Postgres · #120
 2026-09-25 · 4b · step 36b: /products API + aliases, checkout by variant_id (legacy pair kept to go-live), storefront /product/[slug] + 308 redirect, cart v2; reviewer blocker (deploy order) fixed → API first under maintenance; row 32 added (remove aliases after go-live); 386 tests · #121
+2026-09-25 · 5 · step 37 split: 37a built (App\Templates + DecantTemplate, products.attributes jsonb + search_text + template, shop_settings.template, per-shop categories + isolation test, template-driven admin/import/filters, /meta filters; API additive, flat keys kept to go-live); 5 columns dropped with lossless down (hashes identical on Postgres and SQLite); row 5b added for the storefront; 401 tests on SQLite and Postgres · #122

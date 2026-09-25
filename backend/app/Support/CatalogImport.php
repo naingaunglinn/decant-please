@@ -3,9 +3,10 @@
 namespace App\Support;
 
 use App\Enums\BrandType;
-use App\Enums\Concentration;
-use App\Enums\Gender;
 use App\Models\Brand;
+use App\Templates\Attribute;
+use App\Templates\Template;
+use App\Templates\Templates;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -20,6 +21,8 @@ use InvalidArgumentException;
  * - Fragrances are matched by (brand, name). Existing ones are SKIPPED unless
  *   $updateExisting — so re-uploading the same file after fixing failed rows
  *   never duplicates what already landed.
+ * - Attribute columns are the shop template's attributes (step 37), by key —
+ *   concentration, gender, notes… for decant; a required one must have a column.
  * - In update mode, only non-blank cells overwrite (a blank description won't
  *   erase one written by hand), and prices upsert per size — sizes missing
  *   from the CSV are left alone, never deleted.
@@ -45,7 +48,10 @@ class CatalogImport
     /** @var array<array{row: int, message: string, data: array<string, string>}> */
     public array $failures = [];
 
-    private function __construct(private readonly bool $updateExisting) {}
+    private function __construct(
+        private readonly bool $updateExisting,
+        private readonly Template $template,
+    ) {}
 
     /**
      * @throws InvalidArgumentException when the file itself is unusable
@@ -53,7 +59,7 @@ class CatalogImport
      */
     public static function run(string $csv, bool $updateExisting = false): self
     {
-        $import = new self($updateExisting);
+        $import = new self($updateExisting, Templates::forShop());
         $rows = self::parseCsv($csv);
 
         if ($rows === []) {
@@ -62,7 +68,12 @@ class CatalogImport
 
         $import->header = array_map(fn ($cell) => strtolower(trim((string) $cell)), array_shift($rows));
 
-        foreach (['brand', 'name', 'concentration', 'gender'] as $required) {
+        $requiredAttributes = array_map(
+            fn (Attribute $attribute): string => $attribute->key,
+            array_filter($import->template->attributes(), fn (Attribute $attribute): bool => $attribute->required),
+        );
+
+        foreach (['brand', 'name', ...$requiredAttributes] as $required) {
             if (! in_array($required, $import->header, true)) {
                 throw new InvalidArgumentException(
                     "The file has no \"{$required}\" column — download the template to see the expected format."
@@ -139,15 +150,10 @@ class CatalogImport
             throw new InvalidArgumentException('name is required.');
         }
 
-        $concentration = Concentration::tryFrom(strtolower($data['concentration'] ?? ''))
-            ?? throw new InvalidArgumentException(
-                "unknown concentration \"{$data['concentration']}\" — use EDT, EDP, Parfum, Cologne, Extrait or Other."
-            );
-
-        $gender = Gender::tryFrom(strtolower($data['gender'] ?? ''))
-            ?? throw new InvalidArgumentException(
-                "unknown gender \"{$data['gender']}\" — use male, female or unisex."
-            );
+        $attributes = [];
+        foreach ($this->template->attributes() as $attribute) {
+            $attributes[$attribute->key] = self::attributeValue($attribute, $data[$attribute->key] ?? '');
+        }
 
         $brandTypeCell = $data['brand_type'] ?? '';
         $brandType = $brandTypeCell === ''
@@ -178,7 +184,7 @@ class CatalogImport
             throw new InvalidArgumentException('every fragrance needs at least one price.');
         }
 
-        DB::transaction(function () use ($data, $brandName, $name, $concentration, $gender, $brandType, $prices) {
+        DB::transaction(function () use ($data, $brandName, $name, $attributes, $brandType, $prices) {
             $brand = Brand::query()->whereLike('name', self::likeLiteral($brandName))->first()
                 ?? Brand::create(['name' => $brandName, 'type' => $brandType, 'is_active' => true]);
 
@@ -193,13 +199,12 @@ class CatalogImport
             $text = fn (string $column): ?string => ($data[$column] ?? '') === '' ? null : $data[$column];
 
             if ($existing) {
+                // blank cells keep whatever the admin already wrote by hand
                 $existing->update([
-                    'concentration' => $concentration,
-                    'gender' => $gender,
-                    // blank cells keep whatever the admin already wrote by hand
-                    'notes' => $text('notes') ?? $existing->notes,
-                    'vibes' => $text('vibes') ?? $existing->vibes,
-                    'performance' => $text('performance') ?? $existing->performance,
+                    'attributes' => array_merge(
+                        $existing->attributes ?? [],
+                        array_filter($attributes, fn ($value): bool => $value !== null),
+                    ),
                     'description' => $text('description') ?? $existing->description,
                 ]);
 
@@ -218,11 +223,7 @@ class CatalogImport
 
             $fragrance = $brand->products()->create([
                 'name' => $name,
-                'concentration' => $concentration,
-                'gender' => $gender,
-                'notes' => $text('notes'),
-                'vibes' => $text('vibes'),
-                'performance' => $text('performance'),
+                'attributes' => $attributes,
                 'description' => $text('description'),
                 'is_active' => true,
             ]);
@@ -233,6 +234,41 @@ class CatalogImport
 
             $this->created++;
         });
+    }
+
+    /**
+     * A cell as the attribute stores it: null when blank (a required one fails),
+     * a select's option value matched case-insensitively on value or label.
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function attributeValue(Attribute $attribute, string $cell): string|int|null
+    {
+        if ($cell === '') {
+            return $attribute->required ? throw new InvalidArgumentException("{$attribute->key} is required.") : null;
+        }
+
+        if ($attribute->type === Attribute::NUMBER) {
+            return ctype_digit($cell) ? (int) $cell
+                : throw new InvalidArgumentException("\"{$cell}\" is not a number ({$attribute->key}).");
+        }
+
+        if ($attribute->type === Attribute::TEXT) {
+            return $cell;
+        }
+
+        foreach ($attribute->options as $value => $label) {
+            if (mb_strtolower($cell) === mb_strtolower((string) $value) || mb_strtolower($cell) === mb_strtolower($label)) {
+                return (string) $value;
+            }
+        }
+
+        $labels = array_values($attribute->options);
+        $last = array_pop($labels);
+
+        throw new InvalidArgumentException(
+            "unknown {$attribute->key} \"{$cell}\" — use ".($labels === [] ? $last : implode(', ', $labels)." or {$last}").'.'
+        );
     }
 
     /** @return array<array<string>> */

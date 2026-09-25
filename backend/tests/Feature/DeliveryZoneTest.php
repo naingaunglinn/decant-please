@@ -27,7 +27,7 @@ class DeliveryZoneTest extends TestCase
 
         $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
         $this->allure = $chanel->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+            'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
         ]);
         $this->allure->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
     }

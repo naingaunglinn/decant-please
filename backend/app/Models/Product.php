@@ -2,31 +2,94 @@
 
 namespace App\Models;
 
-use App\Enums\Concentration;
-use App\Enums\Gender;
 use App\Models\Concerns\BelongsToShop;
 use App\Models\Concerns\HasSlug;
+use App\Templates\Template;
+use App\Templates\Templates;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
-#[Fillable(['brand_id', 'name', 'slug', 'concentration', 'gender', 'notes', 'vibes', 'performance', 'description', 'image_path', 'is_active', 'is_featured', 'stock_ml', 'low_stock_threshold_ml', 'bottle_cost_mmk', 'bottle_volume_ml'])]
+#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_ml', 'low_stock_threshold_ml', 'bottle_cost_mmk', 'bottle_volume_ml'])]
 /**
  * A catalog product (step 36; was `Fragrance`). Its sellable options are
- * ProductVariant rows. The perfume columns (concentration, notes, stock_ml, the
- * reference bottle) stay here until step 37 moves attributes to the template and
- * step 40 generalizes stock.
+ * ProductVariant rows. What it carries beyond the core columns is its template's
+ * attributes (step 37), stored in the `attributes` jsonb column — read one with
+ * attr(), never `$this->attributes` inside this class (that is Eloquent's own raw
+ * array). The stock and reference-bottle columns stay until step 40 generalizes stock.
  */
 class Product extends Model
 {
     use BelongsToShop;
     use HasSlug;
 
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product): void {
+            // A new product takes the shop's default template; a changed one must
+            // stay in the shop's group (roadmap decision 3).
+            $product->template ??= Templates::shopDefaultKey();
+
+            if ($product->isDirty('template')) {
+                Templates::assertAllowedForShop($product->template);
+            }
+
+            // No foreign key crosses a shop boundary: the category must be this
+            // shop's (the scope makes another shop's id not found).
+            if ($product->isDirty('category_id') && $product->category_id !== null
+                && ! Category::query()->whereKey($product->category_id)->exists()) {
+                throw new InvalidArgumentException('That category does not exist in this shop.');
+            }
+
+            if ($product->search_text === null || $product->isDirty(['name', 'brand_id', 'attributes', 'template'])) {
+                $product->refreshSearchText();
+            }
+        });
+    }
+
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function catalogTemplate(): Template
+    {
+        return Templates::get($this->template ?? Templates::shopDefaultKey());
+    }
+
+    /** One stored attribute value (products.attributes), or null. */
+    public function attr(string $key): mixed
+    {
+        return ($this->getAttribute('attributes') ?? [])[$key] ?? null;
+    }
+
+    /** An attribute as a customer reads it: a select's label ("EDP"), else the value. */
+    public function attrDisplay(string $key): ?string
+    {
+        return $this->catalogTemplate()->attribute($key)?->display($this->attr($key));
+    }
+
+    /**
+     * Rebuild search_text from brand, name and the searchable attributes. The
+     * brand name is queried, not lazy-loaded, unless the relation is already here
+     * and current (a Brand rename sets it; see Brand::booted()).
+     */
+    public function refreshSearchText(): void
+    {
+        // A loaded brand is stale once brand_id changes (Laravel keeps the old one).
+        $brandName = $this->relationLoaded('brand') && ! $this->isDirty('brand_id')
+            ? $this->brand?->name
+            : ($this->brand_id ? Brand::query()->whereKey($this->brand_id)->value('name') : null);
+
+        $this->search_text = $this->catalogTemplate()->searchText($brandName, (string) $this->name, $this->getAttribute('attributes') ?? []);
     }
 
     /**
@@ -49,6 +112,17 @@ class Product extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Substring search over search_text. Case-folded in PHP on both sides, so the
+     * column is never wrapped in LOWER(), and `%` / `_` in the needle are literal.
+     */
+    public function scopeSearch(Builder $query, string $needle): Builder
+    {
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower($needle));
+
+        return $query->whereRaw("products.search_text LIKE ? ESCAPE '\\'", ["%{$escaped}%"]);
     }
 
     /** Fragrances the decanter tracks by volume and is at/below the reorder line. */
@@ -135,8 +209,7 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'concentration' => Concentration::class,
-            'gender' => Gender::class,
+            'attributes' => 'array',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
             'stock_ml' => 'integer',

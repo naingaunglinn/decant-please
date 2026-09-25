@@ -79,7 +79,7 @@ class ProductMigrationTest extends TestCase
         app(TenantContext::class)->set($shop);
 
         $product = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+            'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
             'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
         ]);
         $product->variants()->create(['size_ml' => 30, 'price_mmk' => 150000]);

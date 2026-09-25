@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Templates;
+
+/**
+ * A shop category, defined in code (step 37; AGENTS.md P4 — never DB-editable).
+ * A template says what a product of its kind carries: its attributes, the names of
+ * its variant options, its order-status labels (step 39) and its default modules
+ * (step 41). Products store their template key (products.template); a shop's
+ * default is shop_settings.template. Registered in Templates.
+ */
+abstract class Template
+{
+    /** The stored key — products.template, shop_settings.template. Never rename one. */
+    abstract public function key(): string;
+
+    /** The roadmap group (prompts/43-cornerarea-roadmap.md). A shop mixes templates only within one group. */
+    abstract public function group(): int;
+
+    /** @return list<Attribute> in admin and storefront display order */
+    abstract public function attributes(): array;
+
+    /** @return list<string> variant option names, e.g. ["Size"] or ["Size", "Color"] */
+    abstract public function variantOptions(): array;
+
+    /** Admin words for a product of this template: [singular, plural]. */
+    abstract public function productNouns(): array;
+
+    /** @return array<string, string> order status value => label (read by step 39) */
+    abstract public function statusLabels(): array;
+
+    /** @return list<string> modules on by default (read by step 41) */
+    abstract public function defaultModules(): array;
+
+    public function attribute(string $key): ?Attribute
+    {
+        foreach ($this->attributes() as $attribute) {
+            if ($attribute->key === $key) {
+                return $attribute;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<Attribute> */
+    public function filterable(): array
+    {
+        return array_values(array_filter($this->attributes(), fn (Attribute $a): bool => $a->filterable));
+    }
+
+    /**
+     * The lowercase text `q` searches (products.search_text): brand, name, and every
+     * searchable attribute. Pure — the product saving hook and the step-37 backfill
+     * migration both call it, so the two can't drift. Lowercased here in PHP
+     * (mb_strtolower) because SQLite's LOWER() folds ASCII only; the search lowercases
+     * its needle the same way and never wraps the column in LOWER().
+     *
+     * @param  array<string, mixed>  $values  products.attributes
+     */
+    public function searchText(?string $brandName, string $name, array $values): string
+    {
+        $parts = [$brandName, $name];
+
+        foreach ($this->attributes() as $attribute) {
+            if ($attribute->searchable) {
+                $parts[] = $attribute->display($values[$attribute->key] ?? null);
+            }
+        }
+
+        return mb_strtolower(implode(' ', array_filter($parts, fn ($part): bool => filled($part))));
+    }
+}

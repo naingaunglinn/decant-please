@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Enums\BrandType;
-use App\Enums\Concentration;
-use App\Enums\Gender;
 use App\Models\Brand;
+use App\Models\Product;
 use App\Support\TenantContext;
+use App\Templates\Attribute;
+use App\Templates\Template;
+use App\Templates\Templates;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -25,6 +28,10 @@ class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
+        // The product's own template when editing, the shop's default when creating.
+        $record = $schema->getRecord();
+        $template = $record instanceof Product ? $record->catalogTemplate() : Templates::forShop();
+
         return $schema
             ->columns(2)
             ->components([
@@ -53,12 +60,6 @@ class ProductForm
                             ->required()
                             ->maxLength(255)
                             ->helperText('Slug is generated automatically from the brand and name.'),
-                        Select::make('concentration')
-                            ->options(Concentration::class)
-                            ->required(),
-                        Select::make('gender')
-                            ->options(Gender::class)
-                            ->required(),
                         FileUpload::make('image_path')
                             ->label('Image')
                             ->image()
@@ -70,16 +71,9 @@ class ProductForm
                             ->maxSize(2048)
                             ->helperText('Square (1:1) images look best on the cards.'),
                     ]),
-                Section::make('Scent profile')
+                Section::make('Details')
                     ->schema([
-                        Textarea::make('notes')
-                            ->rows(2)
-                            ->helperText('Comma separated — e.g. Citrus, Musk, Amber, Orange, Grapefruit'),
-                        Textarea::make('vibes')
-                            ->rows(2)
-                            ->helperText('e.g. Modern, Clean, Alluring, Classy'),
-                        TextInput::make('performance')
-                            ->helperText('e.g. Around 6-8 Hours'),
+                        ...self::attributeFields($template),
                         Textarea::make('description')
                             ->rows(3),
                         Toggle::make('is_active')
@@ -196,5 +190,27 @@ class ProductForm
                             ]),
                     ]),
             ]);
+    }
+
+    /**
+     * One field per template attribute, bound to products.attributes.{key} (step 37).
+     *
+     * @return list<Field>
+     */
+    public static function attributeFields(Template $template): array
+    {
+        return array_map(function (Attribute $attribute): Field {
+            $field = match (true) {
+                $attribute->type === Attribute::SELECT => Select::make("attributes.{$attribute->key}")->options($attribute->options),
+                $attribute->type === Attribute::NUMBER => TextInput::make("attributes.{$attribute->key}")->numeric(),
+                $attribute->long => Textarea::make("attributes.{$attribute->key}")->rows(2),
+                default => TextInput::make("attributes.{$attribute->key}"),
+            };
+
+            return $field
+                ->label($attribute->label)
+                ->required($attribute->required)
+                ->helperText($attribute->help);
+        }, $template->attributes());
     }
 }

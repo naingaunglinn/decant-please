@@ -438,9 +438,11 @@ class GenericShopParityTest extends TestCase
         $oldHouse = Brand::create(['name' => 'Old House', 'type' => 'designer', 'is_active' => false]);
 
         $this->allure = $this->chanel->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
-            'notes' => 'Orange, Sea Notes, Musk', 'vibes' => 'Fresh, Sporty',
-            'performance' => 'Around 4-6 Hours', 'description' => 'A crisp citrus-marine cologne.',
+            'name' => 'Allure Homme Sport', 'attributes' => [
+                'concentration' => 'cologne', 'gender' => 'male', 'notes' => 'Orange, Sea Notes, Musk',
+                'vibes' => 'Fresh, Sporty', 'performance' => 'Around 4-6 Hours',
+            ],
+            'description' => 'A crisp citrus-marine cologne.',
             'is_featured' => true, 'bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100,
             'stock_ml' => 100,
         ]);
@@ -451,8 +453,8 @@ class GenericShopParityTest extends TestCase
         ]);
 
         $this->aventus = $this->creed->products()->create([
-            'name' => 'Aventus', 'concentration' => 'edp', 'gender' => 'male',
-            'notes' => 'Pineapple, Birch', 'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
+            'name' => 'Aventus', 'attributes' => ['concentration' => 'edp', 'gender' => 'male', 'notes' => 'Pineapple, Birch'],
+            'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
             'stock_ml' => 12,
         ]);
         $this->aventus->variants()->createMany([
@@ -461,15 +463,15 @@ class GenericShopParityTest extends TestCase
         ]);
 
         $this->loveInWhite = $this->creed->products()->create([
-            'name' => 'Love In White', 'concentration' => 'edp', 'gender' => 'female',
+            'name' => 'Love In White', 'attributes' => ['concentration' => 'edp', 'gender' => 'female'],
         ]);
         $this->loveInWhite->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
 
         $this->creed->products()->create([
-            'name' => 'Green Irish Tweed', 'concentration' => 'edp', 'gender' => 'male', 'is_active' => false,
+            'name' => 'Green Irish Tweed', 'attributes' => ['concentration' => 'edp', 'gender' => 'male'], 'is_active' => false,
         ])->variants()->create(['size_ml' => 5, 'price_mmk' => 999000]);
         $oldHouse->products()->create([
-            'name' => 'Ghost', 'concentration' => 'edt', 'gender' => 'unisex',
+            'name' => 'Ghost', 'attributes' => ['concentration' => 'edt', 'gender' => 'unisex'],
         ])->variants()->create(['size_ml' => 5, 'price_mmk' => 1000]);
 
         $this->sanchaung = $this->serviceableTownship(fee: 2500, name: 'Sanchaung');
@@ -564,7 +566,7 @@ class GenericShopParityTest extends TestCase
         try {
 
             $fragrance = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
-                'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+                'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
                 'bottle_cost_mmk' => 50000, 'bottle_volume_ml' => 100,
             ]);
             $fragrance->variants()->create(['size_ml' => 5, 'price_mmk' => 7000]);

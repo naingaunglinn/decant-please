@@ -93,11 +93,10 @@ The filterable catalog. All parameters optional:
 
 | Param | Type | Meaning |
 |---|---|---|
-| `q` | string ≤100 | matches fragrance name or brand name |
-| `notes` | string ≤100 | substring match on scent notes |
+| `q` | string ≤100 | substring of the product's search text: brand, name and the template's *searchable* attributes (decant: notes). Case-insensitive; `%` and `_` are literal |
+| `{attribute}` | per `/meta` `filters` | the shop template's filterable attributes (step 37). Decant: `gender` (`male\|female\|unisex`, exact) and `notes` (text, matched like `q`) |
 | `brand` | string | comma-separated brand slugs, e.g. `chanel,creed` |
 | `type` | `designer\|niche` | brand type — note: the storefront's URL uses `brand_type`, but the **API param is `type`** |
-| `gender` | `male\|female\|unisex` | |
 | `size` | int | only fragrances with this size **in stock** |
 | `min_price` / `max_price` | int Ks | matched against any in-stock decant price |
 | `featured` | bool | `1` = featured only |
@@ -116,6 +115,13 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
   "id": 20, "name": "Grand Soir", "slug": "maison-francis-kurkdjian-grand-soir",
   "brand": { "id": 8, "name": "Maison Francis Kurkdjian", "slug": "maison-francis-kurkdjian",
              "type": "niche", "type_label": "Niche", "logo_url": null },
+  "template": "decant",
+  "attributes": [
+    { "key": "concentration", "label": "Concentration", "value": "edp", "display": "EDP" },
+    { "key": "gender", "label": "Gender", "value": "unisex", "display": "Unisex" },
+    { "key": "notes", "label": "Scent notes", "value": "amber, honey, vanilla", "display": "amber, honey, vanilla" },
+    …
+  ],
   "concentration": "edp", "concentration_label": "EDP",
   "gender": "unisex", "gender_label": "Unisex",
   "notes": "amber, honey, vanilla", "vibes": "warm, evening", "performance": "8h+",
@@ -127,8 +133,15 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
 }
 ```
 
-`notes`, `vibes`, `performance`, `description`, `image_url`, `min_price_*` are all
-nullable. `concentration` is `edt|edp|parfum|cologne|extrait|other`.
+`attributes` (step 37) lists the product's template attributes in display order; an
+empty one is left out. `display` is what a customer reads: a select's label, else the
+value. `template` is the product's template key.
+
+The flat `concentration`, `concentration_label`, `gender`, `gender_label`, `notes`,
+`vibes`, `performance` keys are read from `attributes` since step 37 and kept for the
+pre-37 storefront; they go with the other deploy aliases after go-live. New clients
+read `attributes`. `notes`, `vibes`, `performance`, `description`, `image_url`,
+`min_price_*` are all nullable. `concentration` is `edt|edp|parfum|cologne|extrait|other`.
 
 Each `prices[]` entry is one **variant**: `id` is what checkout sends as `variant_id`,
 `label` is its display name (`"10ml"` for a decant). Archived variants are left out.
@@ -145,6 +158,11 @@ Everything a client needs to build filter UI without hardcoding:
 
 ```json
 {
+  "filters": [
+    { "key": "gender", "label": "Gender", "type": "select",
+      "options": [ { "value": "male", "label": "Male" }, … ] },
+    { "key": "notes", "label": "Scent notes", "type": "text", "options": [] }
+  ],
   "brand_types":     [ { "value": "designer", "label": "Designer" }, … ],
   "genders":         [ { "value": "male", "label": "Male" }, … ],
   "concentrations":  [ { "value": "edt", "label": "EDT" }, … ],
@@ -156,6 +174,11 @@ Everything a client needs to build filter UI without hardcoding:
                "wave_number": "…", "qr_url": "https://…", "instructions": "…" }
 }
 ```
+
+`filters` (step 37) is the shop template's filterable attributes, in order: each is
+a `/products` query parameter named by `key`. A `select` lists its options; a `text`
+filter is a free-text box. `genders` and `concentrations` are the pre-37 lists, same
+values as before.
 
 `sizes` and `price` reflect **in-stock** decants only; `price.min/max` are `null` on
 an empty catalog. `social` URLs are `null` when unconfigured. `payment` is the shop's

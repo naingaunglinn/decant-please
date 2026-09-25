@@ -29,8 +29,8 @@ class PublicApiTest extends TestCase
         $hidden = Brand::create(['name' => 'Old House', 'type' => 'designer', 'is_active' => false]);
 
         $this->allure = $chanel->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
-            'notes' => 'Orange, Grapefruit, Musk', 'is_featured' => true,
+            'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male', 'notes' => 'Orange, Grapefruit, Musk'],
+            'is_featured' => true,
         ]);
         $this->allure->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000],
@@ -39,22 +39,21 @@ class PublicApiTest extends TestCase
         ]);
 
         $this->aventus = $creed->products()->create([
-            'name' => 'Aventus', 'concentration' => 'edp', 'gender' => 'male',
-            'notes' => 'Pineapple, Birch',
+            'name' => 'Aventus', 'attributes' => ['concentration' => 'edp', 'gender' => 'male', 'notes' => 'Pineapple, Birch'],
         ]);
         $this->aventus->variants()->create(['size_ml' => 10, 'price_mmk' => 120000]);
 
         $this->loveInWhite = $creed->products()->create([
-            'name' => 'Love In White', 'concentration' => 'edp', 'gender' => 'female',
+            'name' => 'Love In White', 'attributes' => ['concentration' => 'edp', 'gender' => 'female'],
         ]);
         $this->loveInWhite->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
 
         // must never appear anywhere below
         $creed->products()->create([
-            'name' => 'Green Irish Tweed', 'concentration' => 'edp', 'gender' => 'male', 'is_active' => false,
+            'name' => 'Green Irish Tweed', 'attributes' => ['concentration' => 'edp', 'gender' => 'male'], 'is_active' => false,
         ])->variants()->create(['size_ml' => 5, 'price_mmk' => 60000]);
         $hidden->products()->create([
-            'name' => 'Ghost Scent', 'concentration' => 'edt', 'gender' => 'unisex',
+            'name' => 'Ghost Scent', 'attributes' => ['concentration' => 'edt', 'gender' => 'unisex'],
         ])->variants()->create(['size_ml' => 5, 'price_mmk' => 10000]);
     }
 

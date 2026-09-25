@@ -32,7 +32,7 @@ class ProductVariantTest extends TestCase
         parent::setUp();
 
         $this->allure = Brand::create(['name' => 'Chanel', 'type' => 'designer'])->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+            'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
         ]);
         $this->fiveMl = $this->allure->variants()->create(['size_ml' => 5, 'price_mmk' => 30000]);
         $this->tenMl = $this->allure->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);

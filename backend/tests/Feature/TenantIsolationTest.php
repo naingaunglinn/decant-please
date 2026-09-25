@@ -19,6 +19,7 @@ use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TopFragrances;
 use App\Filament\Widgets\UpcomingDecants;
 use App\Models\Brand;
+use App\Models\Category;
 use App\Models\DeliveryTownship;
 use App\Models\DeliveryTownshipCourier;
 use App\Models\Expense;
@@ -107,7 +108,7 @@ class TenantIsolationTest extends TestCase
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
 
         $fragrance = $brand->products()->create([
-            'name' => 'Allure Homme Sport', 'concentration' => 'cologne', 'gender' => 'male',
+            'name' => 'Allure Homme Sport', 'attributes' => ['concentration' => 'cologne', 'gender' => 'male'],
         ]);
         $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
@@ -120,11 +121,46 @@ class TenantIsolationTest extends TestCase
         $brand = Brand::firstOrCreate(['name' => $brandName], ['type' => 'designer']);
 
         $fragrance = $brand->products()->create([
-            'name' => $fragranceName, 'concentration' => 'edp', 'gender' => 'unisex',
+            'name' => $fragranceName, 'attributes' => ['concentration' => 'edp', 'gender' => 'unisex'],
         ]);
         $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
         return $fragrance;
+    }
+
+    public function test_categories_are_scoped_and_a_product_cannot_take_another_shops(): void
+    {
+        // Step 37's per-shop categories: the same name coexists (unique per shop).
+        $this->forShop($this->shopA);
+        $tops = Category::create(['name' => 'Tops']);
+        Category::create(['name' => 'Dresses']);
+
+        $this->forShop($this->shopB);
+        $bTops = Category::create(['name' => 'Tops']);
+
+        $this->assertSame(1, Category::count());
+        $this->assertSame([$bTops->id], Category::pluck('id')->all());
+        $this->assertNull(Category::find($tops->id));
+
+        // A product in B can't point at A's category — no FK crosses a shop.
+        $product = $this->makeFragrance();
+        try {
+            $product->update(['category_id' => $tops->id]);
+            $this->fail('Another shop\'s category was accepted.');
+        } catch (\InvalidArgumentException) {
+        }
+        $this->assertNull($product->fresh()->category_id);
+
+        $product->update(['category_id' => $bTops->id]);
+        $this->assertSame($bTops->id, $product->fresh()->category_id);
+
+        $this->forShop($this->shopA);
+        $this->assertSame(2, Category::count());
+        $this->assertSame(0, $tops->products()->count());
+
+        app(TenantContext::class)->set(null);
+        $this->expectException(TenantNotSetException::class);
+        Category::count(); // must throw, NOT return every shop's rows
     }
 
     public function test_catalog_queries_return_only_the_current_shops_rows(): void
@@ -390,7 +426,7 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopA);
         $this->makeFragrance();
         Brand::firstOrFail()->products()->create([
-            'name' => 'Bleu de Chanel', 'concentration' => 'edp', 'gender' => 'male',
+            'name' => 'Bleu de Chanel', 'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
         ]);
 
         $this->forShop($this->shopB);
