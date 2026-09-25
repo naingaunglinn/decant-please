@@ -63,7 +63,8 @@ class MetaController extends Controller
                 'concentrations' => $this->options(Concentration::cases()),
                 // ->all(): cache a plain array — a Collection object doesn't survive
                 // the cache store's hardened unserialize (comes back as __PHP_Incomplete_Class)
-                'sizes' => $available->clone()->distinct()->orderBy('size_ml')->pluck('size_ml')->all(),
+                // ml sizes only: a clothing variant's size_ml is null (step 38)
+                'sizes' => $available->clone()->whereNotNull('size_ml')->distinct()->orderBy('size_ml')->pluck('size_ml')->all(),
                 'price' => [
                     'min' => $min !== null ? (int) $min : null,
                     'max' => $max !== null ? (int) $max : null,

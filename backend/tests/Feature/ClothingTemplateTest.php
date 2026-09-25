@@ -237,6 +237,7 @@ class ClothingTemplateTest extends TestCase
         $meta = $this->getJson('/api/v1/decant-please/meta')->assertOk()->json();
 
         $this->assertSame(['material', 'gender'], array_column($meta['filters'], 'key'));
+        $this->assertSame([], $meta['sizes']); // no ml sizes, never [null]
         $this->assertSame([
             ['name' => 'Size', 'values' => ['M', 'L']],
             ['name' => 'Color', 'values' => ['Blue', 'Red']],
@@ -351,6 +352,47 @@ class ClothingTemplateTest extends TestCase
         $this->assertSame('M / Blue', $item->variant_label_snapshot);
         $this->assertNull($item->size_ml);
         $this->assertSame(25000, $item->unit_price_mmk);
+    }
+
+    public function test_switching_a_clothing_lines_variant_in_the_admin_refreezes_its_label_and_price(): void
+    {
+        $this->actingAs($this->studioUser());
+        $shirt = $this->shirt();
+        $blue = $this->variant($shirt, 'M / Blue');
+        $red = $this->variant($shirt, 'L / Red');
+        $order = Order::create([
+            'customer_name' => 'Manual Customer', 'phone' => '09-700000000', 'address' => 'Yangon',
+            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'decant_date' => today()->addDay(),
+        ]);
+        $item = $order->items()->create([
+            'product_id' => $shirt->id, 'product_variant_id' => $blue->id,
+            'fragrance_name_snapshot' => 'Yangon Threads Linen Shirt', 'unit_price_mmk' => 25000, 'quantity' => 1,
+        ]);
+        $line = "data.items.record-{$item->id}";
+
+        Livewire::test(EditOrder::class, ['record' => $order->getRouteKey()])
+            ->assertFormFieldHidden("items.record-{$item->id}.size_ml")
+            ->set("{$line}.product_variant_id", $red->id)
+            ->assertSet("{$line}.unit_price_mmk", 27000) // autofilled from the picked variant
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $item->refresh();
+        $this->assertSame($red->id, $item->product_variant_id);
+        $this->assertSame('L / Red', $item->variant_label_snapshot);
+        $this->assertNull($item->size_ml);
+        $this->assertSame(27000, $item->unit_price_mmk);
+        $this->assertSame(27000, $order->fresh()->total_mmk);
+
+        // another product's variant is not an option for this line
+        $other = $this->variant($this->shirt('Cotton Tee', 'cotton', [['S', 'Green', 11000]]), 'S / Green');
+
+        Livewire::test(EditOrder::class, ['record' => $order->getRouteKey()])
+            ->set("{$line}.product_variant_id", $other->id)
+            ->call('save')
+            ->assertHasFormErrors(["items.record-{$item->id}.product_variant_id"]);
+
+        $this->assertSame($red->id, $item->fresh()->product_variant_id);
     }
 
     public function test_the_production_schedule_keeps_each_variant_on_its_own_line(): void

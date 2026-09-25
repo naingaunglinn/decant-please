@@ -364,9 +364,13 @@ class OrderForm
     /** Whether a line for this product is an ml size (decant) rather than a picked variant. */
     protected static function measured(mixed $productId): bool
     {
-        $product = filled($productId) ? Product::query()->find($productId) : null;
+        // once(): the visible() closures ask per field per row, several times a
+        // round-trip — one query per product per request, not dozens.
+        return once(function () use ($productId): bool {
+            $product = filled($productId) ? Product::query()->find($productId) : null;
 
-        return ($product?->catalogTemplate() ?? Templates::forShop())->measure() === 'ml';
+            return ($product?->catalogTemplate() ?? Templates::forShop())->measure() === 'ml';
+        });
     }
 
     protected static function autofillUnitPrice(Get $get, Set $set): void
