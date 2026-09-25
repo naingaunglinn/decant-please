@@ -84,6 +84,37 @@ class AdminCatalogTest extends TestCase
         $this->assertSame(1, Brand::count());
     }
 
+    public function test_deleting_a_brand_with_fragrances_keeps_it_and_says_why(): void
+    {
+        $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+        $allure = $chanel->products()->create(['name' => 'Allure', 'concentration' => 'edt', 'gender' => 'male']);
+        $dior = Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        Livewire::test(ListBrands::class)
+            ->callTableAction('delete', $chanel)
+            ->assertNotified('This brand has fragrances')
+            ->callTableAction('delete', $dior)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertNotNull($chanel->fresh());
+        $this->assertSame($chanel->id, $allure->fresh()->brand_id);
+        $this->assertNull($dior->fresh());
+    }
+
+    public function test_bulk_deleting_brands_keeps_the_ones_with_fragrances(): void
+    {
+        $chanel = Brand::create(['name' => 'Chanel', 'type' => 'designer']);
+        $chanel->products()->create(['name' => 'Allure', 'concentration' => 'edt', 'gender' => 'male']);
+        $dior = Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        Livewire::test(ListBrands::class)
+            ->callTableBulkAction('delete', [$chanel, $dior])
+            ->assertNotified('1 brand(s) kept');
+
+        $this->assertNotNull($chanel->fresh());
+        $this->assertNull($dior->fresh());
+    }
+
     public function test_fragrance_can_be_created_with_three_decant_prices(): void
     {
         $brand = Brand::create(['name' => 'Chanel', 'type' => 'designer']);

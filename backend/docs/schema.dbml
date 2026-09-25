@@ -114,7 +114,7 @@ Table brands {
 Table products {
   id bigint [pk, increment]
   shop_id bigint [not null]
-  brand_id bigint [null, note: 'optional per template; SET NULL when the brand is deleted']
+  brand_id bigint [null, note: 'optional per template; a brand with products cannot be deleted (archive it)']
   name varchar [not null]
   slug varchar [not null]
   concentration varchar [not null, note: 'Concentration enum']
@@ -373,7 +373,7 @@ Ref: studio_audit_events.shop_id > shops.id [delete: set null]
 // Tenant
 Ref: brands.shop_id > shops.id [delete: cascade]
 Ref: products.shop_id > shops.id [delete: cascade]
-Ref: products.brand_id > brands.id [delete: set null]
+Ref: products.brand_id > brands.id [delete: no action]
 Ref: product_variants.shop_id > shops.id [delete: cascade]
 Ref: product_variants.product_id > products.id [delete: cascade]
 Ref: promo_codes.shop_id > shops.id [delete: cascade]

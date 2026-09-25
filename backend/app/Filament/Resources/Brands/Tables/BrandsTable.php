@@ -7,12 +7,14 @@ use App\Filament\Resources\Brands\BrandResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class BrandsTable
 {
@@ -50,9 +52,31 @@ class BrandsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    // Products outlive their brand (nullOnDelete), so nothing blocks this.
+                    // A brand with products is FK-protected (NO ACTION on delete): keep it.
                     DeleteBulkAction::make()
-                        ->modalDescription('Their fragrances stay in your catalog without a brand, hidden from the shop until you give them one again.'),
+                        ->action(function (Collection $records, DeleteBulkAction $action): void {
+                            $kept = 0;
+
+                            foreach ($records as $record) {
+                                if ($record->products()->exists()) {
+                                    $kept++;
+
+                                    continue;
+                                }
+
+                                $record->delete();
+                            }
+
+                            if ($kept > 0) {
+                                Notification::make()
+                                    ->warning()
+                                    ->title("{$kept} brand(s) kept")
+                                    ->body('They have fragrances — deactivate them instead.')
+                                    ->send();
+                            }
+
+                            $action->success();
+                        }),
                 ]),
             ]);
     }

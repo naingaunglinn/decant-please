@@ -199,8 +199,11 @@ spec's contract rule (a Resource change lands with `types.ts`) gives the seam:
 - **36a (v40): schema, models, admin — the public API is byte-identical.** Both migrations,
   `Product`/`ProductVariant` (relations `variants()`, `activeVariants()`, `product()`,
   `OrderItem::variant()`), the Filament `Resources/Products/` rename, archived variants, the
-  brand `nullOnDelete`. Also renamed, beyond the spec: `product_variants.fragrance_id →
-  product_id` (the variant's own FK), and the Shield permissions `{Ability}:Fragrance →
+  brand delete rule (after the #117 review a brand with products can't be deleted — it is
+  archived, and the admin's delete says so instead of failing). **Deviation:** the FK is
+  `NO ACTION`, not `RESTRICT`. Both refuse deleting a brand with products, but SQLite checks
+  `RESTRICT` mid-cascade, so a shop delete would trip over it. Also renamed, beyond the
+  spec: `product_variants.fragrance_id → product_id` (the variant's own FK), and the Shield permissions `{Ability}:Fragrance →
   {Ability}:Product` (a data migration; role grants follow the row, so nobody loses the
   catalog). Postgres keeps constraint/index/sequence names through a rename, so the
   migration renames them to match (both ways). Every order line created from now on stamps

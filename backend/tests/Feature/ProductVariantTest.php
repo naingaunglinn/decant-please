@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -135,12 +136,28 @@ class ProductVariantTest extends TestCase
         $this->tenMl->delete();
     }
 
-    public function test_deleting_a_brand_keeps_its_products(): void
+    public function test_a_brand_with_products_cannot_be_deleted(): void
     {
-        $this->allure->brand->delete();
+        // Archived with is_active instead: a database-level null would bypass the
+        // product saving hook and silently strip the brand from every product.
+        // The savepoint keeps Postgres's test transaction usable after the violation.
+        try {
+            DB::transaction(fn () => $this->allure->brand->delete());
+            $this->fail('A brand with products was deleted.');
+        } catch (QueryException) {
+        }
 
-        $this->assertNull($this->allure->fresh()->brand_id);
+        $this->assertNotNull($this->allure->fresh()->brand_id);
         $this->assertSame(2, $this->allure->variants()->count());
+    }
+
+    public function test_a_brand_with_no_products_still_deletes(): void
+    {
+        $brand = Brand::create(['name' => 'Dior', 'type' => 'designer']);
+
+        $brand->delete();
+
+        $this->assertNull(Brand::find($brand->id));
     }
 
     public function test_variants_list_by_position_then_size(): void

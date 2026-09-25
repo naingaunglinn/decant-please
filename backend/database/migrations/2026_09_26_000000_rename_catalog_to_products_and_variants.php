@@ -25,9 +25,12 @@ use Illuminate\Support\Facades\Schema;
  *     variant keeps a null id and a synthesized "10ml" label.
  *
  * Loosened for categories that aren't perfume (the #115 amendments):
- *   order_items.size_ml nullable, products.brand_id nullable and nullOnDelete
- *   (deleting a brand clears it on its products, never deletes them),
- *   brands.type nullable.
+ *   order_items.size_ml nullable, brands.type nullable, products.brand_id nullable
+ *   and NO ACTION on delete: a brand with products is archived via brands.is_active,
+ *   never deleted (a database-level null would bypass the product saving hook).
+ *   NO ACTION, not RESTRICT: it refuses the same direct delete, but is checked at the
+ *   end of the statement, so a shop delete can still cascade a brand and its products
+ *   (SQLite checks RESTRICT mid-cascade and refuses).
  *
  * Money and snapshots are untouched: unit/line price and cost, size_ml and
  * fragrance_name_snapshot keep every stored value.
@@ -75,7 +78,7 @@ return new class extends Migration
         });
         Schema::table('products', function (Blueprint $table) {
             $table->unsignedBigInteger('brand_id')->nullable()->change();
-            $table->foreign('brand_id')->references('id')->on('brands')->nullOnDelete();
+            $table->foreign('brand_id')->references('id')->on('brands')->noActionOnDelete();
         });
 
         Schema::table('brands', function (Blueprint $table) {

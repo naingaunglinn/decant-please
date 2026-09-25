@@ -10,6 +10,7 @@ use App\Filament\Resources\Brands\Tables\BrandsTable;
 use App\Models\Brand;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -27,13 +28,28 @@ class BrandResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     /**
-     * Deleting a brand never deletes its products (step 36: products.brand_id is
-     * nullOnDelete) — it clears the brand on them. Say so before the click.
+     * A brand with products is FK-protected (step 36: products.brand_id is
+     * NO ACTION on delete). Check first and steer the seller to deactivation — a
+     * caught violation would abort any surrounding Postgres transaction.
      */
     public static function safeDeleteAction(): DeleteAction
     {
         return DeleteAction::make()
-            ->modalDescription(fn (Brand $record): string => "Deleting \"{$record->name}\" removes it from its {$record->products()->count()} fragrance(s). They stay in your catalog, hidden from the shop until you give them a brand again.");
+            ->action(function (Brand $record, DeleteAction $action): void {
+                if ($record->products()->exists()) {
+                    Notification::make()
+                        ->danger()
+                        ->title('This brand has fragrances')
+                        ->body('Its fragrances would lose their brand, so it can\'t be deleted — deactivate it instead.')
+                        ->send();
+
+                    return;
+                }
+
+                $record->delete();
+
+                $action->success();
+            });
     }
 
     public static function form(Schema $schema): Schema

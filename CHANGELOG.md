@@ -26,8 +26,11 @@ storefront are unchanged; that half (36b) is the next queue row.
     `variant_label_snapshot`. Backfill matches each line on shop + product + size; a
     size with no variant keeps a null id and a synthesized `"7ml"` label.
   - `order_items.size_ml`, `products.brand_id` and `brands.type` are now nullable.
-    `products.brand_id` is **`nullOnDelete`**: deleting a brand clears it on its products
-    and never deletes them.
+    Deleting a brand that still has products is refused (owner review on #117;
+    `products.brand_id` is `NO ACTION`): archive it with `is_active` instead. A brand with
+    no products still deletes. A shop delete still cascades a brand with products (tested
+    on SQLite and Postgres). `NO ACTION`, not `RESTRICT`: SQLite checks `RESTRICT`
+    mid-cascade and would refuse the shop delete.
   - Postgres keeps constraint, index and sequence names through a rename, so the migration
     renames them to the new table and column names, and back on rollback.
   - The Shield permissions `{Ability}:Fragrance` are renamed to `{Ability}:Product` in
@@ -45,10 +48,10 @@ storefront are unchanged; that half (36b) is the next queue row.
   offers delete on unsaved rows, and a "Selling" toggle archives a size.
 - **Admin.** `Resources/Fragrances/` is now `Resources/Products/`. The URL
   (`/admin/{shop}/fragrances`) and the "Fragrances" label are unchanged. Deleting a brand
-  now says its fragrances stay, hidden from the shop until they get a brand again.
+  that has fragrances (one or in bulk) keeps it and tells the seller to deactivate it.
 - **Fix: editing an order no longer re-snapshots its lines.** The order form's save used to
-  rewrite every line's name snapshot on any edit, even an address fix. Deleting a brand
-  would then have changed the name printed on old invoices. A line is now re-snapshotted
+  rewrite every line's name snapshot on any edit, even an address fix. Renaming a
+  product or brand would then have changed the name printed on old invoices. A line is now re-snapshotted
   only when the admin changes its product or size (rule 3).
 - **Tests.** New `ProductVariantTest` (9) and `ProductMigrationTest` (the backfill on
   seeded rows of two shops). `RoleAuthorizationTest` gains a permission-rename test,

@@ -179,7 +179,7 @@ class AdminOrdersTest extends TestCase
         ]);
 
         $variant->product->update(['name' => 'Renamed Later']);
-        $variant->product->brand->delete(); // products outlive a brand since step 36
+        $variant->product->brand->update(['name' => 'Renamed Brand']);
         $variant->update(['size_ml' => 12]);
 
         Livewire::test(EditOrder::class, ['record' => $order->getRouteKey()])
