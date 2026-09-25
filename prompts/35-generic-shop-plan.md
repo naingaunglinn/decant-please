@@ -26,7 +26,7 @@ Principles P1–P6) throughout.
 - [x] **39** — Status labels (template-driven; `decanted→prepared`) — **built** (v46, #126)
 - [x] **40** — Stock modes (`per_variant` / `pooled`) — split in two (#128): **40a built** (v47: both modes, draw-down under lock, per-variant cost, low stock), **40b built** (v48: Myanmar weight units — `stock_unit`, frozen line `measure`, the unit guard)
 - [x] **41** — Module toggles — **built** (v49, #131)
-- [ ] **42** — Design-spec sync (docs)
+- [x] **42** — Design-spec sync (docs) — **built** (v50, #133)
 
 Issues: 35–38 created with this plan (#103's PR); 39–42 issues are opened as each step starts
 (the unattended run in `prompts/RUN-QUEUE.md`).
@@ -669,6 +669,32 @@ pass.
 **Risks.** None (code); keep the §8 ledger accurate.
 
 **Deliberately not built.** No new ADR unless a boundary changed.
+
+**As built (v50, #133).** Docs only; no boundary changed, so no ADR.
+
+- **`multi-tenancy-design.md`**: a dated amendment line in the status header (the rename
+  map). §2's request flow names `/products`. §7 gains a "generic-shop refactor" block: the
+  renames kept every row's `shop_id`, `categories` is the one new tenant-owned table,
+  templates and modules are one `shop_settings` column each, the `once()` memos are keyed
+  per shop id (no new cache key), and there is no new bypass. §7's storage layout records
+  the `shops/{id}/…` prefixes as built (seven write sites). §8 renames the catalog row,
+  adds rows for categories, variant checkout, template words and modules, and records the
+  ledger as it stands: 2 of the 5 allowed call sites in `app/` (tracking-code dedup,
+  `StudioShopStats`). None were added by 35–41. The ADRs (§3–§6) are left as decided.
+- **`multi-tenancy-findings.md`**: a point-in-time audit, so the body keeps its names; one
+  note at the top maps them to the new ones.
+- **`TENANCY-KIT.md`**: unchanged. It is the session runbook for steps 32–34, all done, and
+  nothing in it names the renamed tables.
+- **`backend/docs/api.md`**: ten `{shop}` endpoints, not nine (`POST /orders/payment-proof`
+  was never documented), plus the platform `GET /_storefront/host/{host}`. CORS includes
+  verified shop domains. Rate limits are keyed by shop + IP, and the `payment-proof` and
+  `host-resolve` buckets are listed. Checkout's `payment_method` and `proof` (multipart
+  for online) are documented. Catalog wording says variant/product, not decant/fragrance.
+  The receipt's `fragrance_name` is documented as it behaves: read from the current
+  product, not the line's name snapshot.
+- Found, not fixed (outside a docs step): the receipt name above; `decant:fresh-start`
+  leaves variant photos on the public disk; the payment-proof endpoint's comment says it
+  only makes sense before the order is settled, but it doesn't check the status.
 
 ---
 

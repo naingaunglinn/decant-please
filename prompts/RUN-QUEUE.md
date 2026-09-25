@@ -30,7 +30,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 8 | Step 40: stock modes (pooled / per variant), Myanmar weight units | §40 + roadmap group 1 | pr-open | 128-stock-modes | #129 |
 | 8b | Step 40b: Myanmar weight units — pooled stock by weight (kyatthar / viss, 1 viss = 100 kyatthar): `products.stock_unit`, a frozen per-line amount on `order_items` (not `size_ml`), weight-measured variants in the admin, the reference-cost pair renamed off `_ml`, and a guard on switching a pooled product between units; tested with a test-only weight template (the produce template itself is row 15) | §40 "As built" (split from row 8); issue #128, don't file another | pr-open | 128-weight-units | #130 |
 | 9 | Step 41: module toggles, template default modules | §41 + roadmap "default modules" | pr-open | 131-module-toggles | #132 |
-| 10 | Step 42: design-spec sync (docs) | §42 | todo | | |
+| 10 | Step 42: design-spec sync (docs) | §42 | in-progress | 133-design-spec-sync | |
 | 11 | Self-serve sign-up + automatic `slug.cornerarea.me` | roadmap: shared foundation. The wildcard DNS/Vercel attach is an owner step: document it, don't do it | todo | | |
 | 12 | Help button (admin → studio on Viber/Telegram) | roadmap: shared foundation | todo | | |
 | 13 | Design system: section library, 3 base designs, `shop_designs`, preset picker, manual editor (no AI) | roadmap: design system | todo | | |
