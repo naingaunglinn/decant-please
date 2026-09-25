@@ -56,6 +56,12 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3001'),
 
+    // Step 44a: the platform domain every shop gets a subdomain of, automatically at
+    // registration — `{slug}.cornerarea.me` in production (the wildcard DNS + the
+    // Vercel wildcard make it reachable, so the row is created verified). Blank = no
+    // automatic address. A platform value, never a shop's config (not ShopConfig).
+    'storefront_base_domain' => env('STOREFRONT_BASE_DOMAIN'),
+
     // Multi-tenancy (Step 23): the slug of the default shop. The backfill migration
     // creates it; seeders, decant:probe-postgres and the test suite pin their context
     // to it. The storefront no longer bakes in a shop — it resolves the tenant from the

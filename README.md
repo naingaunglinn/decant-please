@@ -58,9 +58,11 @@ lives in `prompts/multi-tenancy-design.md`.
 Since multi-tenancy Step 25a the panel is tenant-aware: every URL carries the shop
 (`/admin/{shop}/…`), a switcher moves the studio operator between shops, and the
 **studio panel** at `/studio` is the super-admin home outside any shop — registering
-a shop there seeds its national delivery geography (inactive, unpriced) and, by
-default, creates the owner's login: an account with full control of that shop and
-access to nothing else. Zone activation and pricing are the go-live steps. Per shop,
+a shop there seeds its national delivery geography (inactive, unpriced), gives it its
+automatic `{slug}.cornerarea.me` address (step 44a, when `STOREFRONT_BASE_DOMAIN` is set)
+and, by default, creates the owner's login: an account with full control of that shop and
+access to nothing else. All of that is one method, `ShopRegistration::register()`, which
+the self-serve sign-up (step 44b) reuses. Zone activation and pricing are the go-live steps. Per shop,
 the panel offers:
 
 - Brand & fragrance CRUD with image upload, per-size pricing, stock toggles, and a

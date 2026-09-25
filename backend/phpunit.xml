@@ -48,6 +48,11 @@
         <server name="TELEGRAM_BOT_TOKEN" value=""/>
         <env name="TELEGRAM_ADMIN_CHAT_ID" value="" force="true"/>
         <server name="TELEGRAM_ADMIN_CHAT_ID" value=""/>
+        <!-- Step 44a: no automatic platform address unless a test opts in via
+             config() — the developer's .env value must not change what a
+             registered shop's domains look like. -->
+        <env name="STOREFRONT_BASE_DOMAIN" value="" force="true"/>
+        <server name="STOREFRONT_BASE_DOMAIN" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

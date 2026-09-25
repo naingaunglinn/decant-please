@@ -3,6 +3,8 @@
 namespace App\Filament\Studio\Resources\Shops\Schemas;
 
 use App\Enums\ShopStatus;
+use App\Models\Shop;
+use App\Support\ShopRegistration;
 use App\Templates\Templates;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -19,12 +21,13 @@ class ShopForm
             TextInput::make('name')
                 ->required()
                 ->maxLength(255),
+            // The slug rules live with registration (step 44a) — a DNS label, never a
+            // reserved platform name — because the slug is now a public hostname too.
             TextInput::make('slug')
                 ->required()
-                ->maxLength(255)
-                ->rules(['alpha_dash'])
-                ->unique(ignoreRecord: true)
-                ->helperText('Lowercase letters, numbers and dashes — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}). The storefront resolves it from the visitor\'s domain, not a per-deploy variable, but it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
+                ->maxLength(40)
+                ->rules(fn (?Shop $record): array => ShopRegistration::slugRules($record))
+                ->helperText('Lowercase letters, numbers and single dashes, 3–40 characters — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}) and its automatic storefront address {slug}.{platform domain}. Renaming it later does not move that address (edit Domains by hand), and it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
             // The shop's category (step 38): what its products carry and how its
             // admin reads. Picked once, at registration — changing it later is
             // not built (its products would keep the old template's attributes).

@@ -80,6 +80,36 @@ class Shop extends Model
     }
 
     /**
+     * The seller's own go-live (step 44a): onboarding → live, and nothing else.
+     * Not activate(): that also un-suspends, which stays a Studio power — a
+     * suspended or archived shop can never publish itself back. Only a member of
+     * this shop (or a studio admin) may press it.
+     */
+    public function publish(User $actor): void
+    {
+        if (! $actor->canAccessTenant($this)) {
+            throw new AuthorizationException('Only this shop\'s own team can publish it.');
+        }
+
+        // One conditional UPDATE, not check-then-save: a Shop loaded before the
+        // Studio suspended it must not flip `suspended` back to `live`.
+        $published = static::query()
+            ->whereKey($this->getKey())
+            ->where('status', ShopStatus::Onboarding)
+            ->update(['status' => ShopStatus::Live, 'updated_at' => now()]);
+
+        if ($published === 0) {
+            throw new \DomainException('Only a shop that is still being set up can be published.');
+        }
+
+        $this->refresh();
+
+        // corsOrigins() lists only live shops' domains and no domain row changed,
+        // so bust it here — or the shop's own address is refused for up to 60s.
+        ShopDomain::forgetCorsOrigins();
+    }
+
+    /**
      * Suspend — reason + actor are required (Step 34 §1); storefront/API then 404.
      *
      * Authorization lives HERE, in the one domain method, not in a future UI action
