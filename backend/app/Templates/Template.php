@@ -14,6 +14,12 @@ abstract class Template
     /** The stored key — products.template, shop_settings.template. Never rename one. */
     abstract public function key(): string;
 
+    /** What the studio calls this category when registering a shop ("Clothing"). */
+    public function name(): string
+    {
+        return ucfirst(str_replace('_', ' ', $this->key()));
+    }
+
     /** The roadmap group (prompts/43-cornerarea-roadmap.md). A shop mixes templates only within one group. */
     abstract public function group(): int;
 
@@ -31,6 +37,29 @@ abstract class Template
 
     /** @return list<string> variant option names, e.g. ["Size"] or ["Size", "Color"] */
     abstract public function variantOptions(): array;
+
+    /**
+     * The unit a variant's size is measured in, or null when its options are free
+     * text (step 38). Decant is "ml": a variant is a size_ml, and the ml stock and
+     * cost screens apply. With null, a variant is its option values ("M / Blue")
+     * and has no size_ml — the admin asks for the options instead.
+     */
+    public function measure(): ?string
+    {
+        return null;
+    }
+
+    /** Whether each variant may carry its own photo (a photo per colour). */
+    public function variantPhotos(): bool
+    {
+        return false;
+    }
+
+    /** The admin heading over a product's variants. */
+    public function variantsHeading(): string
+    {
+        return 'Options & prices';
+    }
 
     /** Admin words for a product of this template: [singular, plural]. */
     abstract public function productNouns(): array;

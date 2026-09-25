@@ -3,6 +3,7 @@
 namespace App\Filament\Studio\Resources\Shops\Schemas;
 
 use App\Enums\ShopStatus;
+use App\Templates\Templates;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -24,6 +25,15 @@ class ShopForm
                 ->rules(['alpha_dash'])
                 ->unique(ignoreRecord: true)
                 ->helperText('Lowercase letters, numbers and dashes — the shop\'s admin + API path segment (/admin/{slug}, /api/v1/{slug}). The storefront resolves it from the visitor\'s domain, not a per-deploy variable, but it\'s baked into admin links and shared API URLs — so avoid changing it once live.'),
+            // The shop's category (step 38): what its products carry and how its
+            // admin reads. Picked once, at registration — changing it later is
+            // not built (its products would keep the old template's attributes).
+            Select::make('template')
+                ->label('Category')
+                ->options(Templates::options())
+                ->default(Templates::DEFAULT)
+                ->required()
+                ->visibleOn('create'),
             Select::make('status')
                 ->options(ShopStatus::class)
                 ->default(ShopStatus::Onboarding)

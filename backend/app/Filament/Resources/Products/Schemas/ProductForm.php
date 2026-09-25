@@ -9,6 +9,7 @@ use App\Support\TenantContext;
 use App\Templates\Attribute;
 use App\Templates\Template;
 use App\Templates\Templates;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
@@ -31,6 +32,8 @@ class ProductForm
         // The product's own template when editing, the shop's default when creating.
         $record = $schema->getRecord();
         $template = $record instanceof Product ? $record->catalogTemplate() : Templates::forShop();
+        // The ml stock and cost screens only mean something when a variant is an ml size.
+        $measured = $template->measure() === 'ml';
 
         return $schema
             ->columns(2)
@@ -81,6 +84,7 @@ class ProductForm
                         Toggle::make('is_featured'),
                     ]),
                 Section::make('Stock')
+                    ->visible($measured)
                     ->description('Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.')
                     ->columnSpanFull()
                     ->columns(2)
@@ -119,6 +123,7 @@ class ProductForm
                             ->helperText('Flag it on the dashboard once the remaining volume falls to this.'),
                     ]),
                 Section::make('Cost')
+                    ->visible($measured)
                     ->description('What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
                     ->columnSpanFull()
                     ->columns(2)
@@ -140,55 +145,122 @@ class ProductForm
                             ->datalist([30, 50, 75, 100, 125, 200])
                             ->requiredWith('bottle_cost_mmk'),
                     ]),
-                Section::make('Decant prices')
+                Section::make($template->variantsHeading())
                     ->columnSpanFull()
-                    ->schema([
-                        // Saved sizes are archived, never removed: a size on a placed
-                        // order can't be deleted (order_items restricts it), so only a
-                        // row that isn't saved yet ("record-{id}" keys are saved rows)
-                        // gets a delete button — "Selling" off hides a size from the shop.
-                        Repeater::make('variants')
-                            ->relationship()
-                            ->hiddenLabel()
-                            ->columns(4)
-                            ->minItems(1)
-                            ->deleteAction(fn (Action $action): Action => $action
-                                ->visible(fn (array $arguments, Repeater $component): bool => $component->isDeletable()
-                                    && ! str_starts_with((string) ($arguments['item'] ?? ''), 'record-')))
-                            ->addActionLabel('Add size')
-                            ->default([
-                                ['size_ml' => 5, 'in_stock' => true],
-                                ['size_ml' => 10, 'in_stock' => true],
-                                ['size_ml' => 30, 'in_stock' => true],
-                            ])
-                            ->schema([
-                                TextInput::make('size_ml')
-                                    ->label('Size')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->suffix('ml')
-                                    ->datalist([5, 10, 30])
-                                    ->required()
-                                    ->distinct()
-                                    ->validationMessages(['distinct' => 'Each size can only appear once.']),
-                                TextInput::make('price_mmk')
-                                    ->label('Price')
-                                    ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
-                                    ->stripCharacters(',')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->suffix('Ks')
-                                    ->required(),
-                                Toggle::make('in_stock')
-                                    ->default(true)
-                                    ->inline(false),
-                                Toggle::make('is_active')
-                                    ->label('Selling')
-                                    ->helperText('Off hides this size from the shop. Past orders keep it.')
-                                    ->default(true)
-                                    ->inline(false),
-                            ]),
-                    ]),
+                    ->schema([self::variantsRepeater($template)]),
+            ]);
+    }
+
+    /**
+     * A product's variants (step 38): ml sizes for decant, exactly as before; for a
+     * template with no measure, one text field per variant option (Size, Color),
+     * an optional photo per variant, and drag-to-reorder into `position`.
+     */
+    public static function variantsRepeater(Template $template): Repeater
+    {
+        $measured = $template->measure() === 'ml';
+
+        // Saved variants are archived, never removed: a variant on a placed order
+        // can't be deleted (order_items restricts it), so only a row that isn't
+        // saved yet ("record-{id}" keys are saved rows) gets a delete button —
+        // "Selling" off hides a variant from the shop.
+        $repeater = Repeater::make('variants')
+            ->relationship()
+            ->hiddenLabel()
+            ->columns(4)
+            ->minItems(1)
+            ->deleteAction(fn (Action $action): Action => $action
+                ->visible(fn (array $arguments, Repeater $component): bool => $component->isDeletable()
+                    && ! str_starts_with((string) ($arguments['item'] ?? ''), 'record-')));
+
+        $price = TextInput::make('price_mmk')
+            ->label('Price')
+            ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
+            ->stripCharacters(',')
+            ->numeric()
+            ->minValue(1)
+            ->suffix('Ks')
+            ->required();
+
+        if ($measured) {
+            return $repeater
+                ->addActionLabel('Add size')
+                ->default([
+                    ['size_ml' => 5, 'in_stock' => true],
+                    ['size_ml' => 10, 'in_stock' => true],
+                    ['size_ml' => 30, 'in_stock' => true],
+                ])
+                ->schema([
+                    TextInput::make('size_ml')
+                        ->label('Size')
+                        ->numeric()
+                        ->minValue(1)
+                        ->suffix('ml')
+                        ->datalist([5, 10, 30])
+                        ->required()
+                        ->distinct()
+                        ->validationMessages(['distinct' => 'Each size can only appear once.']),
+                    $price,
+                    Toggle::make('in_stock')
+                        ->default(true)
+                        ->inline(false),
+                    Toggle::make('is_active')
+                        ->label('Selling')
+                        ->helperText('Off hides this size from the shop. Past orders keep it.')
+                        ->default(true)
+                        ->inline(false),
+                ]);
+        }
+
+        $options = $template->variantOptions();
+
+        return $repeater
+            ->addActionLabel('Add '.mb_strtolower(implode(' + ', $options)))
+            ->defaultItems(1)
+            // S, M, L, XL isn't alphabetical: the seller drags them into order.
+            ->orderColumn('position')
+            ->rules([fn (): Closure => function (string $attribute, mixed $value, Closure $fail) use ($options): void {
+                $seen = [];
+
+                foreach ((array) $value as $item) {
+                    $combination = mb_strtolower(implode('|', array_map(
+                        fn (string $option): string => trim((string) ($item['options'][$option] ?? '')),
+                        $options,
+                    )));
+
+                    if (isset($seen[$combination])) {
+                        $fail('Each '.mb_strtolower(implode(' and ', $options)).' can only appear once.');
+
+                        return;
+                    }
+
+                    $seen[$combination] = true;
+                }
+            }])
+            ->schema([
+                ...array_map(fn (string $option): TextInput => TextInput::make("options.{$option}")
+                    ->label($option)
+                    ->required()
+                    ->maxLength(50), $options),
+                $price,
+                Toggle::make('in_stock')
+                    ->default(true)
+                    ->inline(false),
+                Toggle::make('is_active')
+                    ->label('Selling')
+                    ->helperText('Off hides this option from the shop. Past orders keep it.')
+                    ->default(true)
+                    ->inline(false),
+                FileUpload::make('image_path')
+                    ->label('Photo')
+                    ->image()
+                    ->disk(config('filesystems.media_disk'))
+                    // shops/{id}/ prefix (step 32), like the product image
+                    ->directory(fn (): string => 'shops/'.app(TenantContext::class)->id().'/variants')
+                    ->maxSize(2048)
+                    ->helperText('Optional — shown when a customer picks this colour.')
+                    ->visible($template->variantPhotos())
+                    ->columnSpanFull(),
             ]);
     }
 

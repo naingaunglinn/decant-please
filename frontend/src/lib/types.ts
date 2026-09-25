@@ -13,7 +13,13 @@ export interface Brand {
 export interface ProductVariant {
   id: number;
   label: string;
-  size_ml: number;
+  /** Option name → value in the template's order (step 38): `{ Size: "10ml" }`,
+   *  `{ Size: "M", Color: "Blue" }`. */
+  options: Record<string, string>;
+  /** The variant's own photo (a photo per colour), or null. */
+  image_url: string | null;
+  /** Null when the template's variants aren't ml sizes (clothing). */
+  size_ml: number | null;
   price_mmk: number;
   price_formatted: string;
   in_stock: boolean;
@@ -97,6 +103,9 @@ export interface CatalogMeta {
   genders: { value: string; label: string }[];
   concentrations: { value: string; label: string }[];
   sizes: number[];
+  /** Variant option filters (step 38) — `?option[{name}]=` on /products. Empty for
+   *  decant, which filters by `sizes`. */
+  variant_options: { name: string; values: string[] }[];
   price: { min: number | null; max: number | null };
   sorts: string[];
   social: { tiktok_url: string | null; facebook_url: string | null };
@@ -205,7 +214,9 @@ export interface OrderStatusResponse {
   address: string;
   items: {
     fragrance_name: string;
-    size_ml: number;
+    size_ml: number | null;
+    /** How the line's variant read when it sold: "10ml", "M / Blue" (step 38). */
+    variant_label: string;
     quantity: number;
     unit_price_mmk: number;
     line_total_mmk: number;

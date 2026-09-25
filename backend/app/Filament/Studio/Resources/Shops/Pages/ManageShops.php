@@ -6,6 +6,7 @@ use App\Filament\Studio\Resources\Shops\ShopResource;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\NationalGeography;
+use App\Templates\Templates;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 use Illuminate\Support\Arr;
@@ -24,6 +25,8 @@ class ManageShops extends ManageRecords
             //      carrying only the shop_owner role, so they fully control this
             //      shop and see nothing else. Never studio_admin: that role means
             //      "sees every shop".
+            //   2b. its category (step 38) — shop_settings.template, written
+            //      under the new shop's context;
             //   3. its delivery geography (after-hook) — all inactive at fee 0;
             //      activation and pricing are the owner's go-live steps.
             // Shop + owner commit together: a shop whose owner creation failed
@@ -33,6 +36,7 @@ class ManageShops extends ManageRecords
                 ->using(function (array $data): Shop {
                     return DB::transaction(function () use ($data): Shop {
                         $shop = Shop::create(Arr::only($data, ['name', 'slug', 'status']));
+                        Templates::assignToShop($shop, $data['template'] ?? Templates::DEFAULT);
 
                         if ($data['create_owner'] ?? false) {
                             $owner = User::create([

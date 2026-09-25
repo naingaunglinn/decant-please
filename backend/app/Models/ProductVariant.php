@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToShop;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * One sellable option of a product (step 36; was `DecantPrice`): a price, an
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * order is never deleted (order_items restricts it) — it is archived with
  * `is_active`, which hides it from the storefront and checkout.
  */
-#[Fillable(['product_id', 'size_ml', 'price_mmk', 'in_stock', 'options', 'measure', 'is_active', 'position'])]
+#[Fillable(['product_id', 'size_ml', 'price_mmk', 'in_stock', 'options', 'measure', 'is_active', 'position', 'image_path'])]
 class ProductVariant extends Model
 {
     use BelongsToShop;
@@ -30,6 +31,27 @@ class ProductVariant extends Model
                 $variant->options = ['Size' => "{$variant->size_ml}ml"];
                 $variant->measure = $variant->size_ml;
             }
+
+            // A variant with no size is its option values (step 38): trimmed and in
+            // the template's option order, so it labels "M / Blue" however it was
+            // entered. A key the template doesn't name is kept, after them.
+            $product = $variant->size_ml === null && $variant->isDirty('options')
+                ? ($variant->relationLoaded('product') ? $variant->product : Product::query()->find($variant->product_id))
+                : null;
+
+            if ($product !== null) {
+                $given = array_map(fn ($value) => is_string($value) ? trim($value) : $value, $variant->options ?? []);
+                $ordered = [];
+
+                foreach ($product->catalogTemplate()->variantOptions() as $name) {
+                    if (filled($given[$name] ?? null)) {
+                        $ordered[$name] = $given[$name];
+                    }
+                    unset($given[$name]);
+                }
+
+                $variant->options = $ordered + $given;
+            }
         });
     }
 
@@ -42,6 +64,12 @@ class ProductVariant extends Model
     public function label(): string
     {
         return implode(' / ', array_values($this->options ?? []));
+    }
+
+    /** Public URL of this variant's own photo (a photo per colour, step 38), or null. */
+    public function imageUrl(): ?string
+    {
+        return $this->image_path ? Storage::disk(config('filesystems.media_disk'))->url($this->image_path) : null;
     }
 
     protected function casts(): array

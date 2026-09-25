@@ -97,7 +97,7 @@
                     @foreach ($day['groups'] as $group)
                         <tr>
                             <td>{{ $group['label'] }}</td>
-                            <td>{{ $group['size_ml'] }}ml</td>
+                            <td>{{ $group['variant_label'] }}</td>
                             <td class="ps-qty">× {{ $group['quantity'] }}</td>
                             <td class="ps-orders">
                                 <details class="ps-no-print">

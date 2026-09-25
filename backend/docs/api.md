@@ -98,6 +98,7 @@ The filterable catalog. All parameters optional:
 | `brand` | string | comma-separated brand slugs, e.g. `chanel,creed` |
 | `type` | `designer\|niche` | brand type — note: the storefront's URL uses `brand_type`, but the **API param is `type`** |
 | `size` | int | only fragrances with this size **in stock** |
+| `option[{name}]` | string ≤50 | step 38, for a template whose variants aren't ml sizes (clothing): `option[Size]=M&option[Color]=Blue` keeps products with **one in-stock variant** matching every picked option (exact). Names per `/meta` `variant_options`; an unknown name is a `422`. A decant shop ignores it |
 | `min_price` / `max_price` | int Ks | matched against any in-stock decant price |
 | `featured` | bool | `1` = featured only |
 | `sort` | `newest\|price_asc\|price_desc\|name` | default `newest`; price sorts push all-sold-out items last |
@@ -128,7 +129,8 @@ objects, below), `links` (`first/last/prev/next`, filters preserved in the URLs)
   "description": "…", "image_url": "https://…/storage/fragrances/….jpg",
   "is_featured": true,
   "min_price_mmk": 25000, "min_price_formatted": "25,000 Ks",
-  "prices": [ { "id": 51, "label": "5ml", "size_ml": 5, "price_mmk": 25000,
+  "prices": [ { "id": 51, "label": "5ml", "options": { "Size": "5ml" }, "image_url": null,
+                "size_ml": 5, "price_mmk": 25000,
                 "price_formatted": "25,000 Ks", "in_stock": true } ]
 }
 ```
@@ -148,7 +150,10 @@ read `attributes`. `notes`, `vibes`, `performance`, `description`, `image_url`,
 `min_price_*` are all nullable. `concentration` is `edt|edp|parfum|cologne|extrait|other`.
 
 Each `prices[]` entry is one **variant**: `id` is what checkout sends as `variant_id`,
-`label` is its display name (`"10ml"` for a decant). Archived variants are left out.
+`label` is its display name (`"10ml"` for a decant, `"M / Blue"` for clothing).
+`options` (step 38) is option name → value in the template's order, and `image_url`
+the variant's own photo (a photo per colour) or `null`. `size_ml` is `null` for a
+variant that isn't an ml size. Archived variants are left out.
 The key is still `prices` (not `variants`) so the shape stayed additive across step 36b.
 
 ## `GET /products/{slug}`
@@ -171,6 +176,7 @@ Everything a client needs to build filter UI without hardcoding:
   "genders":         [ { "value": "male", "label": "Male" }, … ],
   "concentrations":  [ { "value": "edt", "label": "EDT" }, … ],
   "sizes": [5, 10, 30],
+  "variant_options": [],
   "price": { "min": 8000, "max": 120000 },
   "sorts": ["newest", "price_asc", "price_desc", "name"],
   "social": { "tiktok_url": "https://…", "facebook_url": null },
@@ -183,6 +189,11 @@ Everything a client needs to build filter UI without hardcoding:
 a `/products` query parameter named by `key`. A `select` lists its options; a `text`
 filter is a free-text box. `genders` and `concentrations` are the pre-37 lists, same
 values as before.
+
+`variant_options` (step 38) is empty for decant. For a template whose variants aren't ml
+sizes it lists each option name with the values in stock now, in variant display order —
+`[{ "name": "Size", "values": ["S", "M", "L"] }, { "name": "Color", "values": ["Blue", "Red"] }]`
+— each a `/products` `option[{name}]` filter.
 
 `sizes` and `price` reflect **in-stock** decants only; `price.min/max` are `null` on
 an empty catalog. `social` URLs are `null` when unconfigured. `payment` is the shop's
@@ -322,7 +333,7 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
   "phone": "09-123456789",
   "address": "…",
   "items": [
-    { "fragrance_name": "Creed — Aventus (EDP)", "size_ml": 10,
+    { "fragrance_name": "Creed — Aventus (EDP)", "size_ml": 10, "variant_label": "10ml",
       "quantity": 2, "unit_price_mmk": 38000, "line_total_mmk": 76000 }
   ],
   "subtotal_mmk": 76000,

@@ -18,6 +18,11 @@ class DecantTemplate extends Template
         return 'decant';
     }
 
+    public function name(): string
+    {
+        return 'Perfume decants';
+    }
+
     public function group(): int
     {
         return 1;
@@ -43,6 +48,16 @@ class DecantTemplate extends Template
     public function variantOptions(): array
     {
         return ['Size'];
+    }
+
+    public function measure(): ?string
+    {
+        return 'ml';
+    }
+
+    public function variantsHeading(): string
+    {
+        return 'Decant prices';
     }
 
     public function productNouns(): array

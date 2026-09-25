@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Money;
 use App\Support\TenantContext;
+use App\Templates\Templates;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -145,12 +146,19 @@ class OrderForm
                                     ->searchable()
                                     ->required()
                                     ->live()
-                                    ->afterStateUpdated(fn (Get $get, Set $set) => self::autofillUnitPrice($get, $set)),
+                                    ->afterStateUpdated(function (Get $get, Set $set): void {
+                                        $set('product_variant_id', null);
+                                        self::autofillUnitPrice($get, $set);
+                                    }),
+                                // Decant: the size in ml, as always. A product whose
+                                // template has no measure (clothing, step 38) picks
+                                // one of its variants ("M / Blue") instead.
                                 TextInput::make('size_ml')
                                     ->label('Size')
                                     ->numeric()
                                     ->minValue(1)
                                     ->suffix('ml')
+                                    ->visible(fn (Get $get): bool => self::measured($get('product_id')))
                                     ->required()
                                     ->datalist(fn (Get $get): array => ProductVariant::query()
                                         ->where('product_id', $get('product_id'))
@@ -159,6 +167,21 @@ class OrderForm
                                         ->pluck('size_ml')
                                         ->all())
                                     ->live(onBlur: true)
+                                    ->afterStateUpdated(fn (Get $get, Set $set) => self::autofillUnitPrice($get, $set)),
+                                Select::make('product_variant_id')
+                                    ->label('Option')
+                                    ->options(fn (Get $get, ?OrderItem $record): array => ProductVariant::query()
+                                        ->where('product_id', $get('product_id'))
+                                        // an archived variant stays pickable on the line that already sells it
+                                        ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $record?->product_variant_id))
+                                        ->orderBy('position')
+                                        ->orderBy('id')
+                                        ->get()
+                                        ->mapWithKeys(fn (ProductVariant $variant): array => [$variant->id => $variant->label()])
+                                        ->all())
+                                    ->visible(fn (Get $get): bool => ! self::measured($get('product_id')))
+                                    ->required()
+                                    ->live()
                                     ->afterStateUpdated(fn (Get $get, Set $set) => self::autofillUnitPrice($get, $set)),
                                 TextInput::make('unit_price_mmk')
                                     ->label('Unit price')
@@ -338,11 +361,23 @@ class OrderForm
             ->sum(fn (array $item): int => (int) ($item['unit_price_mmk'] ?: 0) * (int) ($item['quantity'] ?: 0));
     }
 
+    /** Whether a line for this product is an ml size (decant) rather than a picked variant. */
+    protected static function measured(mixed $productId): bool
+    {
+        $product = filled($productId) ? Product::query()->find($productId) : null;
+
+        return ($product?->catalogTemplate() ?? Templates::forShop())->measure() === 'ml';
+    }
+
     protected static function autofillUnitPrice(Get $get, Set $set): void
     {
         $price = ProductVariant::query()
             ->where('product_id', $get('product_id'))
-            ->where('size_ml', $get('size_ml'))
+            ->when(
+                self::measured($get('product_id')),
+                fn ($query) => $query->where('size_ml', $get('size_ml')),
+                fn ($query) => $query->whereKey($get('product_variant_id')),
+            )
             ->value('price_mmk');
 
         if ($price !== null) {
@@ -380,11 +415,16 @@ class OrderForm
             ->all();
     }
 
-    /** Whether an edited line now sells a different product or size than it was saved with. */
+    /**
+     * Whether an edited line now sells a different product, size or variant than
+     * it was saved with. A hidden field isn't in $data: a decant line carries no
+     * product_variant_id, a clothing line no size_ml.
+     */
     protected static function sellsSomethingElse(array $data, OrderItem $record): bool
     {
         return (int) ($data['product_id'] ?? 0) !== (int) $record->product_id
-            || (int) ($data['size_ml'] ?? 0) !== (int) $record->size_ml;
+            || (int) ($data['size_ml'] ?? 0) !== (int) $record->size_ml
+            || (array_key_exists('product_variant_id', $data) && (int) $data['product_variant_id'] !== (int) $record->product_variant_id);
     }
 
     /**
@@ -408,6 +448,15 @@ class OrderForm
 
             $data['product_variant_id'] = $variant?->id;
             $data['variant_label_snapshot'] = $variant?->label() ?? "{$data['size_ml']}ml";
+        } elseif (isset($data['product_id'], $data['product_variant_id'])) {
+            // A picked variant (clothing): only one of this product's, never a
+            // stray id; it has no ml size.
+            $variant = ProductVariant::query()
+                ->where('product_id', $data['product_id'])
+                ->findOrFail($data['product_variant_id']);
+
+            $data['size_ml'] = $variant->size_ml;
+            $data['variant_label_snapshot'] = $variant->label();
         }
 
         return $data;

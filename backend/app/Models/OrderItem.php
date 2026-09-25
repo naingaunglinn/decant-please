@@ -69,6 +69,16 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * How this line's variant reads on every admin surface — invoice, schedule,
+     * order list, Telegram: the frozen label ("10ml", "M / Blue"), falling back
+     * to the size for a line that has none.
+     */
+    public function variantLabel(): string
+    {
+        return $this->variant_label_snapshot ?? ($this->size_ml !== null ? "{$this->size_ml}ml" : '—');
+    }
+
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');

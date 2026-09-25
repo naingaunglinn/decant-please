@@ -74,7 +74,7 @@ function ReceiptBody({ order, note }: { order: OrderStatusResponse; note: string
               <div>
                 <p>{item.fragrance_name}</p>
                 <p className="mt-0.5 text-muted">
-                  {item.size_ml}ml · {formatKyat(item.unit_price_mmk)} × {item.quantity}
+                  {item.variant_label} · {formatKyat(item.unit_price_mmk)} × {item.quantity}
                 </p>
               </div>
               <span className="whitespace-nowrap font-medium">

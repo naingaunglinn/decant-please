@@ -9,6 +9,49 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v44
+
+**v44** is the first half of step 38 (**#107**): the clothing template. A clothing shop can
+now be registered, stocked in the admin with Size + Color variants and a photo per colour,
+and sold through the API by `variant_id`. 38b (RUN-QUEUE row 6b) puts it on the storefront.
+A decant shop sees nothing new; the API only gains keys.
+
+- **`ClothingTemplate`** (`app/Templates/`): material and "For" (women/men/unisex/kids)
+  selects, both filterable; variant options Size + Color; a photo per variant. Status
+  labels ("Packed" for `decanted`) and default modules are data until steps 39 and 41.
+- **`Template::measure()`** — `'ml'` for decant, null for clothing. The ml size field,
+  the Stock and Cost sections, the ml table columns and size filter, and the CSV import
+  show only for an ml template. The CSV import also refuses a non-ml shop on the server.
+- **Migration:** `product_variants.image_path` (nullable) and `product_variants.size_ml`
+  nullable (it was still NOT NULL — a step-36 gap). Existing values untouched; up → down →
+  up on Postgres 17 keeps identical hashes of every variant and order line. `down()`
+  refuses while a variant without a size exists.
+- **Admin product form:** a clothing product's variants are one text field per option,
+  a price, in-stock, selling, and an optional photo (stored under `shops/{id}/variants/`).
+  The same Size + Color twice is refused. Rows drag into order (`position`). Options are
+  trimmed and kept in the template's order by `ProductVariant`, so the label always
+  reads "M / Blue". Duplicating a product copies options and photos.
+- **Admin order lines:** a clothing line picks its variant ("Option") instead of typing
+  ml; picking one fills the price. Before this, saving any clothing order in the admin
+  failed on the required ml size. Decant lines are unchanged.
+- **One variant label everywhere:** the invoice, the production-schedule day sheet, the
+  order list tooltip and CSV, upcoming decants and the Telegram alert print
+  `OrderItem::variantLabel()` (the frozen `variant_label_snapshot`) instead of
+  "{size_ml}ml" — the same text for decant. The schedule groups by it, so M / Blue and
+  L / Red are separate lines.
+- **API (additive):** `prices[].options` and `prices[].image_url`; `/products`
+  `option[{name}]=` (one in-stock variant must match every picked option, exact JSON-path
+  equality); `/meta` `variant_options` (empty for decant); `/orders/track`
+  `items[].variant_label`, which the receipt now shows. `types.ts` mirrors all of it, and
+  `size_ml` is `number | null`.
+- **Studio:** "Register a shop" picks the category (`Templates::assignToShop`, written
+  under the new shop's context and restored after, like `NationalGeography::seed` — no
+  new `withoutTenancy()`). Changing it later is not built.
+- **Tests:** `ClothingTemplateTest` (15). The parity test's `pick()` now ignores added
+  keys inside list elements too (the new variant keys); no expected value moved.
+  417 tests pass on SQLite and on Postgres 17.
+- **Deploy:** API first, as since 36b. The old storefront ignores the new keys.
+
 ## 0. What changed in v43
 
 **v43** is the second half of step 37 (**#106**). The storefront renders from the template

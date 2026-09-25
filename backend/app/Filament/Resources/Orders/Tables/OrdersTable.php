@@ -18,9 +18,9 @@ use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -50,7 +50,7 @@ class OrdersTable
                     ->label('Items')
                     ->state(fn (Order $record): string => $record->items->count().' item(s)')
                     ->tooltip(fn (Order $record): string => $record->items
-                        ->map(fn ($item) => "{$item->fragrance_name_snapshot} — {$item->size_ml}ml × {$item->quantity}")
+                        ->map(fn ($item) => "{$item->fragrance_name_snapshot} — {$item->variantLabel()} × {$item->quantity}")
                         ->implode("\n")),
                 TextColumn::make('tracking_code')
                     ->label('Tracking')
@@ -138,7 +138,7 @@ class OrdersTable
                                     $order->phone,
                                     $order->order_from->label(),
                                     $order->items
-                                        ->map(fn ($item) => "{$item->fragrance_name_snapshot} {$item->size_ml}ml × {$item->quantity}")
+                                        ->map(fn ($item) => "{$item->fragrance_name_snapshot} {$item->variantLabel()} × {$item->quantity}")
                                         ->implode('; '),
                                     $order->decant_date?->format('Y-m-d'),
                                     $order->delivery_date?->format('Y-m-d'),

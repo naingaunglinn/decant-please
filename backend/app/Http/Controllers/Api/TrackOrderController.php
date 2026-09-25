@@ -58,6 +58,8 @@ class TrackOrderController extends Controller
                 'fragrance_name' => ($item->product->brand ? "{$item->product->brand->name} — " : '').$item->product->name
                     .(($concentration = $item->product->attrDisplay('concentration')) !== null ? " ({$concentration})" : ''),
                 'size_ml' => $item->size_ml,
+                // How the line's variant read when it sold: "10ml", "M / Blue" (step 38).
+                'variant_label' => $item->variantLabel(),
                 'quantity' => $item->quantity,
                 'unit_price_mmk' => $item->unit_price_mmk,
                 'line_total_mmk' => $item->line_total_mmk,
