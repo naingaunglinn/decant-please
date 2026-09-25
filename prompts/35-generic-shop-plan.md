@@ -24,7 +24,7 @@ Principles P1–P6) throughout.
 - [x] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), **38b built** (v45: storefront option picker + variant photo, option filters, optional brand, size guide, demo clothing shop)
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [x] **39** — Status labels (template-driven; `decanted→prepared`) — **built** (v46, #126)
-- [ ] **40** — Stock modes (`per_variant` / `pooled`)
+- [ ] **40** — Stock modes (`per_variant` / `pooled`) — split in two (#128): **40a built** (v47: both modes, draw-down under lock, per-variant cost, low stock); 40b (Myanmar weight units) is RUN-QUEUE row 8b
 - [ ] **41** — Module toggles
 - [ ] **42** — Design-spec sync (docs)
 
@@ -527,6 +527,40 @@ low-stock; parity green.
 
 **Deliberately not built.** Per-bottle identity / batch / FIFO / weighted-average (NON-GOALS;
 #40/#41 parked). Stock mode is per-product/template, not arbitrary per-variant.
+
+**As built (#128).** Split in two, like 36–38: **40a** (v47) builds both modes for ml and
+pieces; **40b** (RUN-QUEUE row 8b) adds Myanmar weight units.
+
+- **Mode is a template method**, `Template::stockMode()`: `per_variant` by default,
+  `pooled` for decant. It isn't inferred from `measure()`: the roadmap's pet supplies sell
+  by weight but count bags.
+- **No `stock_unit` column in 40a.** The only pooled unit is the template's `measure()`
+  (ml). 40b owns the unit: it adds `products.stock_unit`, or refuses a template switch
+  that changes it, because otherwise 500 ml would read as 500 kyatthar after a switch.
+  40b also needs a frozen per-line amount on `order_items`: `size_ml` is named for ml, and
+  `variant.measure` is live, not a snapshot.
+- **The COGS denominator is the reference bottle, not the running stock.** The formula
+  above says `stock_amount`, but the running amount falls with every draw-down, so unit
+  cost would rise as the bottle empties. Pooled cost stays `liquidCostMmk()` over
+  `bottle_cost_mmk` / `bottle_volume_ml` (the parity figure 16,667 holds). The pair keeps
+  its names until 40b, which renames it off `_ml` for weight.
+- **#41's atomic design, folded in as locking, not blocking.** `Order::drawDownStock()`
+  runs in its own transaction (a plain `save()` opens none) and locks every affected
+  product and variant row (products then variants, id order) before writing any.
+  All-or-nothing refusal on a shortfall was not built: the draw-down runs at Prepared,
+  when the vials are already filled, and the decant rule is warn-only (tested). Accept is
+  where a shortfall is flagged, now per variant too.
+- **Cost by mode, never a fallback chain**: `OrderItem::currentUnitCost()` — pooled reads
+  the bottle pair, per variant reads `product_variants.unit_cost_mmk`. The line snapshot
+  now matches the variant before it costs the line.
+- **One reorder line per product** (`low_stock_threshold`): ml for pooled, pieces for
+  each variant of a per-variant product. The migration sets existing per-variant products
+  to 2 (the ml default 30 in pieces would flag every size at once); none was counted yet.
+- `LowStock` orders NULL pooled amounts last explicitly (SQLite and Postgres sort NULLs
+  differently) and qualifies both sides of the variant comparison inside `whereHas`.
+- Not built: a count reaching zero doesn't flip `in_stock` (manual, as for decant);
+  checkout doesn't reserve or refuse by count; "liquid only" margin wording stays on the
+  clothing order's margin (template copy, rows 13/15); per-variant reorder lines.
 
 ## Step 41 — Module toggles  *(after the review stop)*
 

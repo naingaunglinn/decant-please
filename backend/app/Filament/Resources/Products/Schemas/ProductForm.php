@@ -32,8 +32,9 @@ class ProductForm
         // The product's own template when editing, the shop's default when creating.
         $record = $schema->getRecord();
         $template = $record instanceof Product ? $record->catalogTemplate() : Templates::forShop();
-        // The ml stock and cost screens only mean something when a variant is an ml size.
-        $measured = $template->measure() === 'ml';
+        // The ml stock and cost screens only mean something for pooled ml stock;
+        // a per-variant template counts and costs each variant instead (step 40).
+        $measured = $template->measure() === 'ml' && $template->pooledStock();
 
         return $schema
             ->columns(2)
@@ -84,45 +85,63 @@ class ProductForm
                             ->default(true),
                         Toggle::make('is_featured'),
                     ]),
-                Section::make('Stock')
-                    ->visible($measured)
-                    ->description('Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.')
-                    ->columnSpanFull()
-                    ->columns(2)
-                    ->schema([
-                        TextInput::make('stock_ml')
-                            ->label('Remaining')
-                            ->numeric()
-                            ->minValue(0)
-                            ->suffix('ml')
-                            ->helperText('Blank = not tracked. Drops on its own each time an order is decanted.')
-                            ->hintAction(
-                                Action::make('addBottle')
-                                    ->label('Add bottle')
-                                    ->icon(Heroicon::OutlinedPlusCircle)
-                                    ->schema([
-                                        TextInput::make('ml')
-                                            ->label('Bottle size')
-                                            ->numeric()
-                                            ->minValue(1)
-                                            ->default(100)
-                                            ->suffix('ml')
-                                            ->datalist([30, 50, 75, 100, 125, 200])
-                                            ->required(),
-                                    ])
-                                    ->action(fn (array $data, Get $get, Set $set): mixed => $set(
-                                        'stock_ml',
-                                        (int) $get('stock_ml') + (int) $data['ml'],
-                                    )),
-                            ),
-                        TextInput::make('low_stock_threshold_ml')
-                            ->label('Reorder at')
-                            ->numeric()
-                            ->minValue(0)
-                            ->default(30)
-                            ->suffix('ml')
-                            ->helperText('Flag it on the dashboard once the remaining volume falls to this.'),
-                    ]),
+                // One stock section per mode: both bind low_stock_threshold, so the
+                // other mode's is left out, not hidden (a hidden field still fills).
+                ...($measured ? [
+                    Section::make('Stock')
+                        ->description('Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.')
+                        ->columnSpanFull()
+                        ->columns(2)
+                        ->schema([
+                            TextInput::make('stock_amount')
+                                ->label('Remaining')
+                                ->numeric()
+                                ->minValue(0)
+                                ->suffix('ml')
+                                ->helperText('Blank = not tracked. Drops on its own each time an order is decanted.')
+                                ->hintAction(
+                                    Action::make('addBottle')
+                                        ->label('Add bottle')
+                                        ->icon(Heroicon::OutlinedPlusCircle)
+                                        ->schema([
+                                            TextInput::make('ml')
+                                                ->label('Bottle size')
+                                                ->numeric()
+                                                ->minValue(1)
+                                                ->default(100)
+                                                ->suffix('ml')
+                                                ->datalist([30, 50, 75, 100, 125, 200])
+                                                ->required(),
+                                        ])
+                                        ->action(fn (array $data, Get $get, Set $set): mixed => $set(
+                                            'stock_amount',
+                                            (int) $get('stock_amount') + (int) $data['ml'],
+                                        )),
+                                ),
+                            TextInput::make('low_stock_threshold')
+                                ->label('Reorder at')
+                                ->numeric()
+                                ->minValue(0)
+                                ->default(30)
+                                ->suffix('ml')
+                                ->helperText('Flag it on the dashboard once the remaining volume falls to this.'),
+                        ]),
+                ] : []),
+                ...(! $template->pooledStock() ? [
+                    Section::make('Stock')
+                        ->description('Count each option in its row below ("In stock"). Leave a count blank to not track it: the in-stock toggles still apply.')
+                        ->columnSpanFull()
+                        ->columns(2)
+                        ->schema([
+                            TextInput::make('low_stock_threshold')
+                                ->label('Reorder at')
+                                ->numeric()
+                                ->minValue(0)
+                                ->default(2)
+                                ->suffix('pcs')
+                                ->helperText('Flag an option on the dashboard once its count falls to this.'),
+                        ]),
+                ] : []),
                 Section::make('Cost')
                     ->visible($measured)
                     ->description('What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
@@ -252,6 +271,23 @@ class ProductForm
                     ->helperText('Off hides this option from the shop. Past orders keep it.')
                     ->default(true)
                     ->inline(false),
+                // Per-variant stock and cost (step 40): pieces, and what one costs you.
+                TextInput::make('stock_qty')
+                    ->label('In stock')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('pcs')
+                    ->helperText('Blank = not counted. Drops on its own when an order is '.mb_strtolower($template->preparedLabel()).'.')
+                    ->visible(! $template->pooledStock()),
+                TextInput::make('unit_cost_mmk')
+                    ->label('Cost')
+                    ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
+                    ->stripCharacters(',')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('Ks')
+                    ->helperText('What one costs you. Blank = unknown; margin shows only when every line has a cost.')
+                    ->visible(! $template->pooledStock()),
                 FileUpload::make('image_path')
                     ->label('Photo')
                     ->image()

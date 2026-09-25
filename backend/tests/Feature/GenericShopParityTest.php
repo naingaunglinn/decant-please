@@ -274,7 +274,7 @@ class GenericShopParityTest extends TestCase
         // A → decanted pours 2 × 10ml Allure and 5ml Aventus; untracked stays untracked
         $this->assertSame(
             [80, 7, null],
-            [$this->allure->fresh()->stock_ml, $this->aventus->fresh()->stock_ml, $this->loveInWhite->fresh()->stock_ml],
+            [$this->allure->fresh()->stock_amount, $this->aventus->fresh()->stock_amount, $this->loveInWhite->fresh()->stock_amount],
         );
     }
 
@@ -444,7 +444,7 @@ class GenericShopParityTest extends TestCase
             ],
             'description' => 'A crisp citrus-marine cologne.',
             'is_featured' => true, 'bottle_cost_mmk' => 300000, 'bottle_volume_ml' => 100,
-            'stock_ml' => 100,
+            'stock_amount' => 100,
         ]);
         $this->allure->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 30000],
@@ -455,7 +455,7 @@ class GenericShopParityTest extends TestCase
         $this->aventus = $this->creed->products()->create([
             'name' => 'Aventus', 'attributes' => ['concentration' => 'edp', 'gender' => 'male', 'notes' => 'Pineapple, Birch'],
             'bottle_cost_mmk' => 100000, 'bottle_volume_ml' => 30,
-            'stock_ml' => 12,
+            'stock_amount' => 12,
         ]);
         $this->aventus->variants()->createMany([
             ['size_ml' => 5, 'price_mmk' => 65000],

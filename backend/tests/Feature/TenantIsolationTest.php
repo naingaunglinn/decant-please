@@ -910,7 +910,7 @@ class TenantIsolationTest extends TestCase
 
         $this->forShop($this->shopA);
         $aFragrance = $this->makeNamedFragrance('Chanel', 'Allure Homme Sport');
-        $aFragrance->update(['stock_ml' => 2, 'low_stock_threshold_ml' => 5]);
+        $aFragrance->update(['stock_amount' => 2, 'low_stock_threshold' => 5]);
         $this->makeOrder(OrderStatus::Pending)->items()->create([
             'product_id' => $aFragrance->id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 3,
@@ -918,7 +918,7 @@ class TenantIsolationTest extends TestCase
 
         $this->forShop($this->shopB);
         $bFragrance = $this->makeNamedFragrance('Dior', 'Sauvage');
-        $bFragrance->update(['stock_ml' => 1, 'low_stock_threshold_ml' => 5]);
+        $bFragrance->update(['stock_amount' => 1, 'low_stock_threshold' => 5]);
         $this->makeOrder(OrderStatus::Pending)->items()->create([
             'product_id' => $bFragrance->id, 'fragrance_name_snapshot' => 'Dior Sauvage',
             'size_ml' => 10, 'unit_price_mmk' => 55000, 'quantity' => 9,

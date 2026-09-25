@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Storage;
  * One sellable option of a product (step 36; was `DecantPrice`): a price, an
  * in-stock flag and its option values (`{"Size":"10ml"}`). A variant on a placed
  * order is never deleted (order_items restricts it) — it is archived with
- * `is_active`, which hides it from the storefront and checkout.
+ * `is_active`, which hides it from the storefront and checkout. A per-variant
+ * template (step 40) counts its pieces in `stock_qty` and costs one in
+ * `unit_cost_mmk`; both are null (untracked, unknown) for a pooled one.
  */
-#[Fillable(['product_id', 'size_ml', 'price_mmk', 'in_stock', 'options', 'measure', 'is_active', 'position', 'image_path'])]
+#[Fillable(['product_id', 'size_ml', 'price_mmk', 'in_stock', 'options', 'measure', 'is_active', 'position', 'image_path', 'stock_qty', 'unit_cost_mmk'])]
 class ProductVariant extends Model
 {
     use BelongsToShop;
@@ -72,6 +74,23 @@ class ProductVariant extends Model
         return $this->image_path ? Storage::disk(config('filesystems.media_disk'))->url($this->image_path) : null;
     }
 
+    /**
+     * Take `$quantity` pieces off this variant, clamped at zero — warn-only, like
+     * the pooled draw-down. No-op when untracked. Order::drawDownStock() calls it
+     * on a row it has locked.
+     */
+    public function drawDownStock(int $quantity): bool
+    {
+        if ($this->stock_qty === null || $quantity <= 0) {
+            return false;
+        }
+
+        $this->stock_qty = max(0, $this->stock_qty - $quantity);
+        $this->save();
+
+        return true;
+    }
+
     protected function casts(): array
     {
         return [
@@ -82,6 +101,8 @@ class ProductVariant extends Model
             'measure' => 'integer',
             'is_active' => 'boolean',
             'position' => 'integer',
+            'stock_qty' => 'integer',
+            'unit_cost_mmk' => 'integer',
         ];
     }
 }

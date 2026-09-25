@@ -29,11 +29,11 @@ class DecantStockTest extends TestCase
 
         // Nothing is drawn down while the order is only accepted (pending).
         $order->accept(today()->addDay(), today()->addDays(2));
-        $this->assertSame(100, $fragrance->refresh()->stock_ml);
+        $this->assertSame(100, $fragrance->refresh()->stock_amount);
 
         // The pour happens on the → Decanted transition: 10ml × 2 = 20ml.
         $order->update(['status' => OrderStatus::Prepared]);
-        $this->assertSame(80, $fragrance->refresh()->stock_ml);
+        $this->assertSame(80, $fragrance->refresh()->stock_amount);
     }
 
     public function test_multiple_sizes_of_the_same_fragrance_draw_from_one_total(): void
@@ -55,7 +55,7 @@ class DecantStockTest extends TestCase
         $order->update(['status' => OrderStatus::Prepared]);
 
         // 10 + 5 = 15ml off the single running total, in one write.
-        $this->assertSame(85, $fragrance->refresh()->stock_ml);
+        $this->assertSame(85, $fragrance->refresh()->stock_amount);
     }
 
     public function test_over_draw_is_warn_only_clamped_at_zero_and_never_blocks(): void
@@ -66,7 +66,7 @@ class DecantStockTest extends TestCase
         $order->update(['status' => OrderStatus::Prepared]);
 
         $fragrance->refresh();
-        $this->assertSame(0, $fragrance->stock_ml);                       // clamped, not -5
+        $this->assertSame(0, $fragrance->stock_amount);                       // clamped, not -5
         $this->assertTrue($fragrance->variants->first()->in_stock);   // manual toggle untouched
         $this->assertSame(OrderStatus::Prepared, $order->refresh()->status); // transition not blocked
     }
@@ -78,7 +78,7 @@ class DecantStockTest extends TestCase
 
         $order->update(['status' => OrderStatus::Prepared]); // must not error
 
-        $this->assertNull($fragrance->refresh()->stock_ml);
+        $this->assertNull($fragrance->refresh()->stock_amount);
     }
 
     public function test_add_bottle_tops_up_the_running_total(): void
@@ -86,10 +86,10 @@ class DecantStockTest extends TestCase
         $fragrance = $this->trackedFragrance(stockMl: null);
 
         $fragrance->addBottle(100); // starts tracking a previously-untracked fragrance
-        $this->assertSame(100, $fragrance->refresh()->stock_ml);
+        $this->assertSame(100, $fragrance->refresh()->stock_amount);
 
         $fragrance->addBottle(50);
-        $this->assertSame(150, $fragrance->refresh()->stock_ml);
+        $this->assertSame(150, $fragrance->refresh()->stock_amount);
     }
 
     public function test_low_stock_widget_lists_only_tracked_fragrances_at_or_below_threshold(): void
@@ -115,8 +115,8 @@ class DecantStockTest extends TestCase
         $fragrance = $brandModel->products()->create([
             'name' => $name,
             'attributes' => ['concentration' => 'edp', 'gender' => 'male'],
-            'stock_ml' => $stockMl,
-            'low_stock_threshold_ml' => $threshold,
+            'stock_amount' => $stockMl,
+            'low_stock_threshold' => $threshold,
         ]);
 
         $fragrance->variants()->create(['size_ml' => 10, 'price_mmk' => 90000, 'in_stock' => true]);

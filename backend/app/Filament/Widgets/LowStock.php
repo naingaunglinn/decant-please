@@ -10,10 +10,12 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 
 /**
- * Reorder panel: the fragrances whose running stock has fallen to or below
- * their threshold. Warn-only — it never stops an order, it just tells the
- * decanter what to buy next. Only tracked fragrances (non-null stock_ml)
- * can appear, so untracked catalog rows never show here (see Product::scopeLowStock).
+ * Reorder panel: the products whose stock has fallen to or below their reorder
+ * line, in either stock mode (step 40) — a pooled product's running amount, or a
+ * per-variant product's options by name ("M / Blue: 1"). Warn-only — it never
+ * stops an order, it just tells the seller what to buy next. Only tracked counts
+ * can appear (see Product::scopeLowStock). Scoping: the BelongsToShop scope on
+ * Product (a widget is outside Filament's resource tenancy).
  */
 class LowStock extends TableWidget
 {
@@ -27,28 +29,35 @@ class LowStock extends TableWidget
             ->heading('Low stock — reorder soon')
             ->query(
                 Product::query()
-                    ->with('brand')
+                    ->with(['brand', 'variants'])
                     ->lowStock()
-                    ->orderBy('stock_ml')
+                    // Per-variant products (no pooled amount) list after pooled
+                    // ones on both engines: NULLs sort differently on SQLite and
+                    // Postgres, so the order is spelled out.
+                    ->orderByRaw('CASE WHEN products.stock_amount IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy('products.stock_amount')
+                    ->orderBy('products.name')
             )
             ->emptyStateHeading('Nothing running low')
-            ->emptyStateDescription('Every tracked fragrance is above its reorder threshold.')
+            ->emptyStateDescription('Everything you count is above its reorder line.')
             ->emptyStateIcon(Heroicon::OutlinedCheckCircle)
             ->columns([
                 TextColumn::make('brand.name')
                     ->label('Brand'),
                 TextColumn::make('name')
-                    ->label('Fragrance')
+                    ->label('Product')
                     ->url(fn (Product $record): string => ProductResource::getUrl('edit', ['record' => $record])),
-                TextColumn::make('stock_ml')
+                TextColumn::make('stock_amount')
                     ->label('Remaining')
                     ->badge()
                     ->color('danger')
-                    ->formatStateUsing(fn (int $state): string => "{$state}ml")
+                    ->state(fn (Product $record): string => $record->pooledStock()
+                        ? "{$record->stock_amount}ml"
+                        : $record->lowVariants()->map(fn ($variant): string => "{$variant->label()}: {$variant->stock_qty}")->implode(', '))
                     ->alignEnd(),
-                TextColumn::make('low_stock_threshold_ml')
+                TextColumn::make('low_stock_threshold')
                     ->label('Reorder at')
-                    ->formatStateUsing(fn (int $state): string => "{$state}ml")
+                    ->formatStateUsing(fn (Product $record, int $state): string => $record->pooledStock() ? "{$state}ml" : "{$state} pcs")
                     ->alignEnd(),
             ])
             ->paginated(false);

@@ -90,7 +90,7 @@ class PaymentMethodTest extends TestCase
     public function test_stock_shortfalls_flags_tracked_fragrances_that_cannot_be_filled(): void
     {
         $price = $this->inStockPrice();
-        $price->product->update(['stock_ml' => 8]); // only 8ml left; order needs 10ml
+        $price->product->update(['stock_amount' => 8]); // only 8ml left; order needs 10ml
 
         $order = Order::create([
             'customer_name' => 'Aung Kyaw', 'phone' => '09-1', 'address' => 'Yangon',
@@ -108,7 +108,7 @@ class PaymentMethodTest extends TestCase
         $this->assertSame(8, $short[0]['available']);
 
         // an untracked fragrance (null stock) never counts as short
-        $price->product->update(['stock_ml' => null]);
+        $price->product->update(['stock_amount' => null]);
         $this->assertSame([], $order->fresh()->stockShortfalls());
     }
 

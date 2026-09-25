@@ -54,6 +54,12 @@ class DecantTemplate extends Template
         return 'ml';
     }
 
+    /** Millilitres poured from one bottle total (step 40). */
+    public function stockMode(): string
+    {
+        return self::STOCK_POOLED;
+    }
+
     public function brandTypes(): bool
     {
         return true;

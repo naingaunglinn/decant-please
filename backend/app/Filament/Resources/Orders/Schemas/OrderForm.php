@@ -390,9 +390,12 @@ class OrderForm
         }
 
         // Cost mirrors price: pre-filled from the live reference, hand-correctable.
-        // Only a real value overwrites — an uncosted fragrance keeps whatever's typed.
-        $cost = Product::query()->find($get('product_id'))
-            ?->liquidCostMmk((int) $get('size_ml'));
+        // Only a real value overwrites — an uncosted product keeps whatever's typed.
+        $cost = OrderItem::currentUnitCost(
+            Product::query()->find($get('product_id')),
+            filled($get('product_variant_id')) ? (int) $get('product_variant_id') : null,
+            filled($get('size_ml')) ? (int) $get('size_ml') : null,
+        );
 
         if ($cost !== null) {
             $set('unit_cost_mmk', $cost);

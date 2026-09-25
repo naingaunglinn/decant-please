@@ -11,15 +11,17 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
-#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_ml', 'low_stock_threshold_ml', 'bottle_cost_mmk', 'bottle_volume_ml'])]
+#[Fillable(['brand_id', 'category_id', 'template', 'name', 'slug', 'attributes', 'description', 'image_path', 'is_active', 'is_featured', 'stock_amount', 'low_stock_threshold', 'bottle_cost_mmk', 'bottle_volume_ml'])]
 /**
  * A catalog product (step 36; was `Fragrance`). Its sellable options are
  * ProductVariant rows. What it carries beyond the core columns is its template's
  * attributes (step 37), stored in the `attributes` jsonb column — read one with
  * attr(), never `$this->attributes` inside this class (that is Eloquent's own raw
- * array). The stock and reference-bottle columns stay until step 40 generalizes stock.
+ * array). Stock is counted the way its template says (step 40, Template::stockMode()):
+ * pooled in stock_amount, or per variant in product_variants.stock_qty.
  */
 class Product extends Model
 {
@@ -145,22 +147,54 @@ class Product extends Model
         return $query->whereRaw("products.search_text LIKE ? ESCAPE '\\'", ["%{$escaped}%"]);
     }
 
-    /** Fragrances the decanter tracks by volume and is at/below the reorder line. */
-    public function scopeLowStock(Builder $query): Builder
+    public function pooledStock(): bool
     {
-        return $query->whereNotNull('stock_ml')
-            ->whereColumn('stock_ml', '<=', 'low_stock_threshold_ml');
+        return $this->catalogTemplate()->pooledStock();
     }
 
-    /** Volume tracking is opt-in — null stock_ml means this fragrance isn't tracked. */
+    /**
+     * Products at or below their reorder line, in either stock mode: the pooled
+     * amount, or any selling variant's pieces. Untracked (null) counts never match.
+     * Both sides of each comparison are qualified — the variant one runs inside a
+     * correlated subquery, where a bare column is ambiguous on Postgres.
+     */
+    public function scopeLowStock(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->where(fn (Builder $pooled) => $pooled
+                ->whereNotNull('products.stock_amount')
+                ->whereColumn('products.stock_amount', '<=', 'products.low_stock_threshold'))
+            ->orWhereHas('activeVariants', fn (Builder $variant) => $variant
+                ->whereNotNull('product_variants.stock_qty')
+                ->whereColumn('product_variants.stock_qty', '<=', 'products.low_stock_threshold')));
+    }
+
+    /** Tracking is opt-in: a null count (the product's, or every selling variant's) is not tracked. */
     public function isStockTracked(): bool
     {
-        return $this->stock_ml !== null;
+        return $this->pooledStock()
+            ? $this->stock_amount !== null
+            : $this->variants->contains(fn (ProductVariant $variant): bool => $variant->is_active && $variant->stock_qty !== null);
     }
 
     public function isLowStock(): bool
     {
-        return $this->isStockTracked() && $this->stock_ml <= $this->low_stock_threshold_ml;
+        return $this->pooledStock()
+            ? $this->stock_amount !== null && $this->stock_amount <= $this->low_stock_threshold
+            : $this->lowVariants()->isNotEmpty();
+    }
+
+    /**
+     * A per-variant product's selling variants at or below the reorder line, from
+     * the loaded variants (eager-load them for a list).
+     *
+     * @return Collection<int, ProductVariant>
+     */
+    public function lowVariants(): Collection
+    {
+        return $this->variants->filter(fn (ProductVariant $variant): bool => $variant->is_active
+            && $variant->stock_qty !== null
+            && $variant->stock_qty <= $this->low_stock_threshold)->values();
     }
 
     /**
@@ -169,22 +203,23 @@ class Product extends Model
      */
     public function addBottle(int $ml): void
     {
-        $this->stock_ml = ($this->stock_ml ?? 0) + max(0, $ml);
+        $this->stock_amount = ($this->stock_amount ?? 0) + max(0, $ml);
         $this->save();
     }
 
     /**
-     * Pour `$ml` off the running total, clamped at zero. Warn-only: a shortfall
-     * doesn't block — the low-stock panel surfaces it, the decanter reorders.
-     * No-op for an untracked fragrance. Returns true if anything was drawn down.
+     * Take `$amount` off the pooled running total, clamped at zero. Warn-only: a
+     * shortfall doesn't block — the low-stock panel surfaces it, the seller
+     * reorders. No-op when untracked. Returns true if anything was drawn down.
+     * Order::drawDownStock() calls it on a row it has locked.
      */
-    public function drawDownStock(int $ml): bool
+    public function drawDownStock(int $amount): bool
     {
-        if (! $this->isStockTracked() || $ml <= 0) {
+        if ($this->stock_amount === null || $amount <= 0) {
             return false;
         }
 
-        $this->stock_ml = max(0, $this->stock_ml - $ml);
+        $this->stock_amount = max(0, $this->stock_amount - $amount);
         $this->save();
 
         return true;
@@ -232,8 +267,8 @@ class Product extends Model
             'attributes' => 'array',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
-            'stock_ml' => 'integer',
-            'low_stock_threshold_ml' => 'integer',
+            'stock_amount' => 'integer',
+            'low_stock_threshold' => 'integer',
             'bottle_cost_mmk' => 'integer',
             'bottle_volume_ml' => 'integer',
         ];

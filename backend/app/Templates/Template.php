@@ -51,6 +51,29 @@ abstract class Template
         return null;
     }
 
+    /** Stock modes (step 40). */
+    public const STOCK_POOLED = 'pooled';
+
+    public const STOCK_PER_VARIANT = 'per_variant';
+
+    /**
+     * How this category counts stock (step 40). Per variant: pieces per size and
+     * colour (products.stock_amount is unused), each variant with its own cost. Pooled:
+     * one running amount per product in its measure() unit, drawn down by each
+     * line's size × quantity, costed from the product's reference purchase. An
+     * explicit choice, never inferred from measure(): pet food sold by weight
+     * still counts bags.
+     */
+    public function stockMode(): string
+    {
+        return self::STOCK_PER_VARIANT;
+    }
+
+    public function pooledStock(): bool
+    {
+        return $this->stockMode() === self::STOCK_POOLED;
+    }
+
     /**
      * Whether every product needs a brand (step 38b). A perfume always has a house;
      * most clothes a social seller sells have none, so clothing leaves it optional
