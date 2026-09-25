@@ -37,7 +37,9 @@ go-live).
   `brands.type`; step 37 — `products.template`, `shop_settings.template` (moved from 41),
   per-shop `categories` with its isolation test; step 38 — `product_variants.image_path`.
   The step-38 gate is now a review stop. "Brand as a concept" resolved: optional per
-  template.
+  template. Owner review: `products.brand_id` **restricts** delete (a brand with products
+  is archived via `brands.is_active`; one without still deletes), and step 37 rebuilds
+  `search_text` for a brand's products when the brand is renamed.
 - The letterhead bug is filed as **#116** (not fixed here; queue row 2).
 
 ## 0.1 What changed in v36

@@ -137,9 +137,13 @@ with checkout keyed by variant. Server still derives every price.
 - **(amended)** `order_items.size_ml` becomes **nullable** — a clothing line has no ml.
   Existing values are untouched.
 - **(amended)** `products.brand_id` and `brands.type` become **nullable** — brand is optional
-  per template (a bakery has none). `products.brand_id` moves from `cascadeOnDelete` to
-  **`nullOnDelete`**: deleting a brand clears it on its products, never deletes them (a
-  cascade would also hit the `order_items.product_id` restrict).
+  per template (a bakery has none). **(amended, #117 review)** `products.brand_id` moves from
+  `cascadeOnDelete` to **`restrictOnDelete`**: a brand that still has products can't be
+  deleted — it is archived with the existing `brands.is_active`, like products and variants.
+  A brand with no products still deletes. (Not `nullOnDelete`: a database-level null bypasses
+  the product `saving` hook, so step 37's `search_text` would keep the deleted brand's name,
+  and the seller would silently lose the brand on every product. A cascade would also hit the
+  `order_items.product_id` restrict.)
 - Preserve `BelongsToShop`, `shop_id`, `unique(shop_id, slug)` on products.
 
 **API changes.** Routes `/fragrances`→`/products`, `/fragrances/{slug}`→`/products/{slug}`
@@ -163,8 +167,9 @@ from the old path (keep the `[host]` tenant segment). `types.ts` `Fragrance→Pr
 **Tests.** **Update the existing suite** (`TenantIsolationTest`, `PublicApiTest`,
 `AdminCatalogTest`, `DecantStockTest`, `DecantCostTest`, …) for the new names/payload.
 **(amended)** An archived variant is refused at checkout on the server (money path), is hidden
-from the catalog, and still shows on placed orders; a variant on an order can't be deleted. No new
-isolation test (renames). Parity (35) green with field-name updates only.
+from the catalog, and still shows on placed orders; a variant on an order can't be deleted.
+**(amended, #117 review)** A brand with products can't be deleted (archive it instead); a brand
+with no products still deletes. No new isolation test (renames). Parity (35) green with field-name updates only.
 
 **Risks.** Breaks much of the 28-file suite — update in-PR. FK/rename correctness on **Postgres**
 (migrate a real pgsql + portability). Legacy `product_variant_id`/`variant_label_snapshot`
@@ -212,13 +217,17 @@ definitions from the template** instead of hardcoded enum lists. `ProductResourc
 
 **Admin / storefront.** Filament product form fields generated from the template; storefront
 `FilterControls` stays `/meta`-driven, now with template options. `search_text` kept fresh via a
-model hook.
+model hook. **(amended, #117 review)** When a brand's name changes, rebuild `search_text` for its
+products (a `Brand` `saved` hook when `name` is dirty) — the product hook alone never sees a
+brand rename.
 
 **Tests.** Parity (35) green — `/meta` + filter *values* unchanged for the decant template;
 attribute round-trip; `search_text` search (**portability mandatory** — new `LIKE`); filterable/
 searchable honor the template. Update `PublicApiTest`/`AdminCatalogTest` for the attribute shape.
 **(amended)** `categories` isolation test (two shops, same category name, no leak); a product
 takes the shop's default template on create; a template outside the shop's group is refused.
+**(amended, #117 review)** Renaming a brand rebuilds its products' `search_text`: search finds
+them by the new name, not the old one.
 
 **Risks.** jsonb + search (use `search_text`, not jsonb `ilike`); the 5-column data migration must
 be lossless (parity guards values); template-driven Filament forms are the trickiest UI.
