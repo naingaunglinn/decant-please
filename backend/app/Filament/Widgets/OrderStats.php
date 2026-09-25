@@ -68,7 +68,7 @@ class OrderStats extends StatsOverviewWidget
                 ->description('Needs review')
                 ->color('warning'),
             Stat::make('Decants due today', Order::query()
-                ->whereDate('decant_date', today())
+                ->whereDate('prep_date', today())
                 ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected])
                 ->count()),
         ];

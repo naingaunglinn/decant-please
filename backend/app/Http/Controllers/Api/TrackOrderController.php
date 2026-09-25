@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Support\Money;
+use App\Templates\Templates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -47,8 +48,14 @@ class TrackOrderController extends Controller
             'order_number' => "#{$order->id}",
             'status' => $order->status->value,
             'status_label' => $order->status->label(),
+            // Every state's label in the shop's words (step 39), so the timeline
+            // names the steps the order hasn't reached yet: Decanted, Packed.
+            'status_labels' => Templates::statusLabels(),
             'placed_at' => $order->created_at->toIso8601String(),
-            'decant_date' => $order->decant_date?->toDateString(),
+            'prep_date' => $order->prep_date?->toDateString(),
+            // Deploy alias (step 39) for a storefront built before prep_date;
+            // removed after go-live with the other aliases (RUN-QUEUE row 32).
+            'decant_date' => $order->prep_date?->toDateString(),
             'delivery_date' => $order->delivery_date?->toDateString(),
             'rejection_reason' => $order->rejection_reason,
             'customer_name' => $order->customer_name,

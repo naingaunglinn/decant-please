@@ -226,7 +226,7 @@ class DeliveryZoneTest extends TestCase
 
         $this->actingAsAdmin();
         Livewire::test(ListOrders::class)->callTableAction('accept', $order, data: [
-            'decant_date' => today()->addDay()->toDateString(),
+            'prep_date' => today()->addDay()->toDateString(),
             'delivery_date' => today()->addDays(2)->toDateString(),
             'delivery_courier' => Courier::RoyalExpress->value,
         ]);

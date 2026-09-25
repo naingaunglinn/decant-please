@@ -120,7 +120,7 @@ class PaymentReceivedTest extends TestCase
             'address' => 'Yangon',
             'order_from' => 'tiktok',
             'status' => 'pending',
-            'decant_date' => today()->addDay()->toDateString(),
+            'prep_date' => today()->addDay()->toDateString(),
             'delivery_fee_mmk' => 0,
             'deposit_mmk' => 0,
             'items' => [[

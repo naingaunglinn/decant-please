@@ -2,6 +2,8 @@
 
 namespace App\Templates;
 
+use App\Enums\OrderStatus;
+
 /**
  * A shop category, defined in code (step 37; AGENTS.md P4 — never DB-editable).
  * A template says what a product of its kind carries: its attributes, the names of
@@ -84,8 +86,43 @@ abstract class Template
     /** Admin words for a product of this template: [singular, plural]. */
     abstract public function productNouns(): array;
 
-    /** @return array<string, string> order status value => label (read by step 39) */
-    abstract public function statusLabels(): array;
+    /**
+     * Order status value => the word this category's seller and buyer use (step 39).
+     * The states are fixed (AGENTS.md P4); only their labels vary. Override
+     * preparedLabel() for the usual case — the rest are category-free.
+     *
+     * @return array<string, string>
+     */
+    public function statusLabels(): array
+    {
+        $labels = [];
+
+        foreach (OrderStatus::cases() as $status) {
+            $labels[$status->value] = $status->defaultLabel();
+        }
+
+        $labels[OrderStatus::Prepared->value] = $this->preparedLabel();
+
+        return $labels;
+    }
+
+    /** What "prepared" means here: Decanted, Packed, Baked. */
+    public function preparedLabel(): string
+    {
+        return OrderStatus::Prepared->defaultLabel();
+    }
+
+    /** The admin's name for orders.prep_date — the day the order is made ready. */
+    public function prepDateLabel(): string
+    {
+        return 'Prep date';
+    }
+
+    /** The hint under that date on the order form. */
+    public function prepDateHelp(): string
+    {
+        return 'The day you get this order ready.';
+    }
 
     /** @return list<string> modules on by default (read by step 41) */
     abstract public function defaultModules(): array;

@@ -26,7 +26,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 5b | Step 37b: storefront renders from `/meta` `filters` and product `attributes` (FilterControls, product page, cards) | §37 "As built" (split from row 5); issue #106, don't file another | pr-open | 106-storefront-attributes | #123 |
 | 6 | Step 38a: clothing template, variant options + photos in the admin, option filters (API additive) | §38, as amended | pr-open | 107-clothing-template | #124 |
 | 6b | Step 38b: storefront option picker + variant photo, option filters UI, optional brand in the API contract, size guide, demo clothing seeder | §38 "As built" (split from row 6); issue #107, don't file another | pr-open | 107-storefront-options | #125 |
-| 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | todo | | |
+| 7 | Step 39: template status labels (`decanted` → `prepared`) | §39 | pr-open | 126-status-labels | #127 |
 | 8 | Step 40: stock modes (pooled / per variant), Myanmar weight units | §40 + roadmap group 1 | todo | | |
 | 9 | Step 41: module toggles, template default modules | §41 + roadmap "default modules" | todo | | |
 | 10 | Step 42: design-spec sync (docs) | §42 | todo | | |
@@ -51,7 +51,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 29 | Group 4d: per-provider day calendar | roadmap: group 4 | todo | | |
 | 30 | Group 4e: group 4 templates + presets | roadmap: group 4 | todo | | |
 | 31 | CornerArea brand rename in code | roadmap: build order 1 | after-go-live | | |
-| 32 | Remove the step-36b deploy aliases: `/fragrances` routes, the legacy `fragrance_id` + `size_ml` checkout line, the admin "View on site" `/fragrance/` link (→ `/product/`), and the flat perfume keys on the product (`concentration`, `gender`, `notes`…) and `/meta` (`genders`, `concentrations`) — 37b reads `attributes` / `filters` | §36 "As built" (36b) | after-go-live | | |
+| 32 | Remove the step-36b deploy aliases: `/fragrances` routes, the legacy `fragrance_id` + `size_ml` checkout line, the admin "View on site" `/fragrance/` link (→ `/product/`), and the flat perfume keys on the product (`concentration`, `gender`, `notes`…) and `/meta` (`genders`, `concentrations`) — 37b reads `attributes` / `filters`; the tracking receipt's `decant_date` alias and the storefront's `"decanted"` status tolerance (make `prep_date` / `status_labels` required in `types.ts`) | §36 "As built" (36b), §39 "As built" | after-go-live | | |
 
 ## Log
 
@@ -68,3 +68,4 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 2026-09-25 · 5b · step 37b: storefront filters, product page and cards render from /meta filters + attributes; attributes gain `show` (Template::headline, Attribute list); decant pages unchanged but pill order/tones and "Scent notes" heading; brand_type reserved; 402 tests; lint 4 + verify sticky-375 failures pre-existing on base · #123
 2026-09-25 · 6 · step 38 split: 38a built (ClothingTemplate, Template::measure(), variant_photos migration size_ml nullable + image_path, admin Size + Color variants with photos, clothing order lines pick a variant, variantLabel() on every admin surface, option[] filter, /meta variant_options, studio category pick); Postgres up/down/up hashes identical; reviewer: no blockers, day-sheet order + option trim fixed; 418 tests on SQLite and Postgres · #124
 2026-09-25 · 6b · step 38b: storefront Size → Color picker + variant photo, option filters, optional brand (`brand: null`, Product::scopeSellable replaces 4 whereHas sites), brand types decant-only, size guide (`show: section`), DemoClothingShopSeeder + verify-clothing (16/16); reviewer: no blockers, 4 should-fix fixed; 428 tests on SQLite and Postgres · #125
+2026-09-25 · 7 · step 39: `decanted` → `prepared`, `decant_date` → `prep_date` (migration, Postgres up/down/up hash identical), status labels from the shop template via one resolver (`Templates::statusLabel`, memo per shop id), `prepDateLabel`/`prepDateHelp`, tracking `status_labels` + `decant_date` alias (added to row 32); reviewer blocker (deploy note) fixed → maintenance on + rollback order; 434 tests on SQLite and Postgres; verify-clothing 17/17 · #127

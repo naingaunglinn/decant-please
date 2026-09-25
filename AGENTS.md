@@ -245,7 +245,7 @@ A change is done when **all** of these hold, and you have said so with evidence:
 - **Date windows use `whereDate`; dates cross the wire as bare `Y-m-d` strings.** Report
   and dashboard date filters use `whereDate` (`MonthlyPnl`, `OrderStats`, `Order`,
   `ListOrders`), not string ranges or raw casts. The API emits **and** accepts dates as
-  bare `Y-m-d` (`decant_date`, `delivery_date`), never ISO datetimes — the storefront and
+  bare `Y-m-d` (`prep_date`, `delivery_date`), never ISO datetimes — the storefront and
   the contract in `frontend/src/lib/types.ts` depend on that.
 - **Tests never reach a real Telegram bot.** `phpunit.xml` pins
   `TELEGRAM_BOT_TOKEN`/`TELEGRAM_ADMIN_CHAT_ID` blank with `force="true"`; keep them blank

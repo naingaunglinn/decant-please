@@ -32,7 +32,7 @@ class DecantStockTest extends TestCase
         $this->assertSame(100, $fragrance->refresh()->stock_ml);
 
         // The pour happens on the → Decanted transition: 10ml × 2 = 20ml.
-        $order->update(['status' => OrderStatus::Decanted]);
+        $order->update(['status' => OrderStatus::Prepared]);
         $this->assertSame(80, $fragrance->refresh()->stock_ml);
     }
 
@@ -52,7 +52,7 @@ class DecantStockTest extends TestCase
             ],
         ]);
 
-        $order->update(['status' => OrderStatus::Decanted]);
+        $order->update(['status' => OrderStatus::Prepared]);
 
         // 10 + 5 = 15ml off the single running total, in one write.
         $this->assertSame(85, $fragrance->refresh()->stock_ml);
@@ -63,12 +63,12 @@ class DecantStockTest extends TestCase
         $fragrance = $this->trackedFragrance(stockMl: 15);
         $order = $this->checkout($fragrance, sizeMl: 10, quantity: 2); // needs 20ml, only 15 left
 
-        $order->update(['status' => OrderStatus::Decanted]);
+        $order->update(['status' => OrderStatus::Prepared]);
 
         $fragrance->refresh();
         $this->assertSame(0, $fragrance->stock_ml);                       // clamped, not -5
         $this->assertTrue($fragrance->variants->first()->in_stock);   // manual toggle untouched
-        $this->assertSame(OrderStatus::Decanted, $order->refresh()->status); // transition not blocked
+        $this->assertSame(OrderStatus::Prepared, $order->refresh()->status); // transition not blocked
     }
 
     public function test_untracked_fragrance_is_left_alone(): void
@@ -76,7 +76,7 @@ class DecantStockTest extends TestCase
         $fragrance = $this->trackedFragrance(stockMl: null); // not tracked
         $order = $this->checkout($fragrance, sizeMl: 10, quantity: 1);
 
-        $order->update(['status' => OrderStatus::Decanted]); // must not error
+        $order->update(['status' => OrderStatus::Prepared]); // must not error
 
         $this->assertNull($fragrance->refresh()->stock_ml);
     }

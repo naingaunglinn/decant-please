@@ -335,8 +335,14 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
   "order_number": "#19",
   "status": "awaiting_confirmation",
   "status_label": "Awaiting Confirmation",
+  "status_labels": {                 // every state in the shop's words (step 39)
+    "awaiting_confirmation": "Awaiting Confirmation", "pending": "Pending",
+    "prepared": "Decanted",          // clothing: "Packed"
+    "delivered": "Delivered", "cancelled": "Cancelled", "rejected": "Rejected"
+  },
   "placed_at": "2026-07-14T08:05:00+06:30",
-  "decant_date": null,               // date string once the decanter accepts
+  "prep_date": null,                 // date string once the seller accepts
+  "decant_date": null,               // deploy alias of prep_date — removed after go-live (RUN-QUEUE row 32)
   "delivery_date": null,             // date string once scheduled
   "rejection_reason": null,          // string when status = rejected
   "customer_name": "Ma Thiri",
@@ -377,8 +383,11 @@ The payment fields on the receipt:
 }
 ```
 
-`status` is one of `awaiting_confirmation | pending | decanted | delivered |
-cancelled | rejected`; `status_label` is its human-ready form. Statuses only move
+`status` is one of `awaiting_confirmation | pending | prepared | delivered |
+cancelled | rejected` (`prepared` was `decanted` before step 39). The states are the
+same for every shop; the words are the shop template's: `status_label` is the current
+state's, `status_labels` every state's, so a timeline can name the steps not reached
+yet. Statuses only move
 forward via the decanter's admin actions — plus the one customer-initiated
 transition below.
 

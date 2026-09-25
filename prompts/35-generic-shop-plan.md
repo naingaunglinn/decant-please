@@ -23,7 +23,7 @@ Principles P1–P6) throughout.
 - [x] **37** — Templates + attributes — split in two (#106): **37a built** (v42: templates, attributes jsonb, search_text, categories, admin; API additive), **37b built** (v43: storefront renders from `attributes` / `filters`)
 - [x] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), **38b built** (v45: storefront option picker + variant photo, option filters, optional brand, size guide, demo clothing shop)
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
-- [ ] **39** — Status labels (template-driven; `decanted→prepared`)
+- [x] **39** — Status labels (template-driven; `decanted→prepared`) — **built** (v46, #126)
 - [ ] **40** — Stock modes (`per_variant` / `pooled`)
 - [ ] **41** — Module toggles
 - [ ] **42** — Design-spec sync (docs)
@@ -465,6 +465,40 @@ template tests.
 guard that P&L/revenue don't move.
 
 **Deliberately not built.** States stay **fixed** — never configurable (P4); only labels vary.
+
+**As built (#126, v46).** One PR (backend, migration and the storefront timeline together;
+under the size budget, so no split).
+
+- Migration `2026_09_29_000000`: `orders.status` `decanted` → `prepared` (DB::table, every
+  shop's rows) and `decant_date` → `prep_date`. The index keeps its name
+  `orders_decant_date_index`. `down()` reverses both; on Postgres the orders money/date hash
+  is identical up → down → up. `StatusLabelTest` round-trips it on seeded rows in two shops.
+- **The one resolver is `Templates::statusLabel()`**; `OrderStatus::label()` (and so the
+  Filament badge, status select and tabs, CSV, invoice and the tracking API) calls it. The
+  enum keeps a category-free `defaultLabel()`, which templates start from and never the
+  resolver (no recursion). `Template::statusLabels()` is concrete now; a template overrides
+  `preparedLabel()` (decant "Decanted", clothing "Packed").
+- No tenant set (a console command): the category-free word, not a throw. A label is not
+  shop data, so the fallback can't leak.
+- Memoised per shop id for the request with `once()` — the orders list would otherwise read
+  `shop_settings` once per badge (rule 6). `once()` keys on the closure's *captured*
+  variables, so the closure captures `$shopId`; keyed by the Shop object it could hand one
+  shop another's labels after GC. The two-shop test caught the uncaptured version.
+- `Template::prepDateLabel()` (decant "Decant date", clothing "Packing date", default
+  "Prep date") names the date on the order form, accept modal, orders table, upcoming
+  widget and CSV header — without it the rename would have shown a decant seller
+  "Prep date". `prepDateHelp()` does the same for the hint under it.
+- Tracking API: `status_labels` (every state, additive), `prep_date`, and a `decant_date`
+  deploy alias. The storefront timeline names the third step from `status_labels.prepared`
+  and accepts both `"prepared"` and `"decanted"`, so either deploy order works; the alias
+  and the tolerance leave with RUN-QUEUE row 32. The "Decanting {date}" caption became
+  "On the schedule for {date}" (category-free).
+- Not built: Burmese labels (no locale mechanism exists yet; they arrive with the group-1
+  presets, RUN-QUEUE row 15, from the roadmap's status-label table); decant words
+  elsewhere in the admin ("Today's Decants" tab, "Decants due today" stat, "Upcoming
+  decants" widget, accept-toast copy) — step 41's module toggles hide the production
+  schedule for clothing, and the rest comes with the template copy in rows 13/15; the
+  `UpcomingDecants` class name and the index name.
 
 ## Step 40 — Stock modes  *(after the review stop)*
 

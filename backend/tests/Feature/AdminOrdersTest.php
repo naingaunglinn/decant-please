@@ -48,23 +48,23 @@ class AdminOrdersTest extends TestCase
         $order = $this->checkoutOrder(quantity: 1);
         $second = $this->checkoutOrder(quantity: 2);
 
-        $decantDate = today()->addDay()->toDateString();
+        $prepDate = today()->addDay()->toDateString();
 
         $list = Livewire::test(ListOrders::class);
         foreach ([$order, $second] as $target) {
             $list->callTableAction('accept', $target, data: [
-                'decant_date' => $decantDate,
+                'prep_date' => $prepDate,
                 'delivery_date' => today()->addDays(2)->toDateString(),
             ]);
         }
 
         $order->refresh();
         $this->assertSame(OrderStatus::Pending, $order->status);
-        $this->assertSame($decantDate, $order->decant_date->toDateString());
+        $this->assertSame($prepDate, $order->prep_date->toDateString());
         $this->assertSame(today()->addDays(2)->toDateString(), $order->delivery_date->toDateString());
 
         // both orders' items aggregate into one production line: 1 + 2 = 3 vials
-        Livewire::test(ProductionScheduleDay::class, ['date' => $decantDate])
+        Livewire::test(ProductionScheduleDay::class, ['date' => $prepDate])
             ->assertOk()
             ->assertSee('Chanel — Allure Homme Sport')
             ->assertSee('× 3')
@@ -100,7 +100,7 @@ class AdminOrdersTest extends TestCase
         $order->refresh();
         $this->assertSame(OrderStatus::Rejected, $order->status);
         $this->assertSame('Suspicious duplicate of an earlier order.', $order->rejection_reason);
-        $this->assertNull($order->decant_date);
+        $this->assertNull($order->prep_date);
 
         Livewire::test(OrderStats::class)
             ->assertSee('100,000 Ks')       // revenue = delivered only
@@ -117,7 +117,7 @@ class AdminOrdersTest extends TestCase
             ->assertTableActionHidden('reject', $pending);
     }
 
-    public function test_manual_order_requires_decant_date_and_starts_pending(): void
+    public function test_manual_order_requires_prep_date_and_starts_pending(): void
     {
         $price = $this->price();
 
@@ -139,12 +139,12 @@ class AdminOrdersTest extends TestCase
         ];
 
         Livewire::test(CreateOrder::class)
-            ->fillForm($form) // no decant_date
+            ->fillForm($form) // no prep_date
             ->call('create')
-            ->assertHasFormErrors(['decant_date' => 'required']);
+            ->assertHasFormErrors(['prep_date' => 'required']);
 
         Livewire::test(CreateOrder::class)
-            ->fillForm($form + ['decant_date' => today()->addDay()->toDateString()])
+            ->fillForm($form + ['prep_date' => today()->addDay()->toDateString()])
             ->call('create')
             ->assertHasNoFormErrors();
 
@@ -171,7 +171,7 @@ class AdminOrdersTest extends TestCase
     public function test_editing_an_order_never_rewrites_its_line_snapshots(): void
     {
         // A DM order (no township): its edit page is the admin's to fix up.
-        $order = $this->manualOrder(OrderStatus::Pending, decantDate: today()->addDay());
+        $order = $this->manualOrder(OrderStatus::Pending, prepDate: today()->addDay());
         $variant = $this->price();
         $item = $order->items()->create([
             'product_id' => $variant->product_id, 'fragrance_name_snapshot' => 'Chanel Allure Homme Sport',
@@ -198,8 +198,8 @@ class AdminOrdersTest extends TestCase
 
     public function test_todays_decants_tab_excludes_cancelled_and_rejected(): void
     {
-        $due = $this->manualOrder(OrderStatus::Pending, decantDate: today());
-        $cancelled = $this->manualOrder(OrderStatus::Cancelled, decantDate: today());
+        $due = $this->manualOrder(OrderStatus::Pending, prepDate: today());
+        $cancelled = $this->manualOrder(OrderStatus::Cancelled, prepDate: today());
 
         Livewire::test(ListOrders::class)
             ->set('activeTab', 'todays_decants')
@@ -209,7 +209,7 @@ class AdminOrdersTest extends TestCase
 
     public function test_production_schedule_shows_confirmed_empty_days_and_ignores_cancelled(): void
     {
-        $this->manualOrder(OrderStatus::Cancelled, decantDate: today());
+        $this->manualOrder(OrderStatus::Cancelled, prepDate: today());
 
         Livewire::test(ProductionScheduleDay::class, ['date' => today()->toDateString()])
             ->assertOk()
@@ -263,7 +263,7 @@ class AdminOrdersTest extends TestCase
         ]);
     }
 
-    private function manualOrder(OrderStatus $status, $decantDate = null): Order
+    private function manualOrder(OrderStatus $status, $prepDate = null): Order
     {
         return Order::create([
             'customer_name' => 'Manual Customer',
@@ -271,7 +271,7 @@ class AdminOrdersTest extends TestCase
             'address' => 'Yangon',
             'order_from' => 'tiktok',
             'status' => $status,
-            'decant_date' => $decantDate,
+            'prep_date' => $prepDate,
         ])->refresh();
     }
 }

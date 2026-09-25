@@ -335,7 +335,7 @@ class ClothingTemplateTest extends TestCase
         $blue = $this->variant($this->shirt(), 'M / Blue');
         $order = Order::create([
             'customer_name' => 'Manual Customer', 'phone' => '09-700000000', 'address' => 'Yangon',
-            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'decant_date' => today()->addDay(),
+            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'prep_date' => today()->addDay(),
         ]);
         $order->items()->create([
             'product_id' => $blue->product_id, 'product_variant_id' => $blue->id,
@@ -362,7 +362,7 @@ class ClothingTemplateTest extends TestCase
         $red = $this->variant($shirt, 'L / Red');
         $order = Order::create([
             'customer_name' => 'Manual Customer', 'phone' => '09-700000000', 'address' => 'Yangon',
-            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'decant_date' => today()->addDay(),
+            'order_from' => 'tiktok', 'status' => OrderStatus::Pending, 'prep_date' => today()->addDay(),
         ]);
         $item = $order->items()->create([
             'product_id' => $shirt->id, 'product_variant_id' => $blue->id,
@@ -402,7 +402,7 @@ class ClothingTemplateTest extends TestCase
             ['variant_id' => $this->variant($shirt, 'M / Blue')->id, 'quantity' => 2],
             ['variant_id' => $this->variant($shirt, 'L / Red')->id, 'quantity' => 1],
         ]);
-        $order->update(['status' => OrderStatus::Pending, 'decant_date' => '2026-10-01']);
+        $order->update(['status' => OrderStatus::Pending, 'prep_date' => '2026-10-01']);
 
         $day = CarbonImmutable::parse('2026-10-01');
         $groups = Order::productionScheduleFor($day, $day)[0]['groups'];

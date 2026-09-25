@@ -13,6 +13,7 @@ use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\DeliveryTownship;
 use App\Models\Order;
 use App\Support\Money;
+use App\Templates\Templates;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -68,7 +69,8 @@ class OrderResource extends Resource
             ->modalDescription(fn (Order $record): string => self::acceptModalDescription($record))
             ->modalSubmitActionLabel('Accept order')
             ->schema([
-                DatePicker::make('decant_date')
+                DatePicker::make('prep_date')
+                    ->label(fn (): string => Templates::forShop()->prepDateLabel())
                     ->required()
                     ->default(today()->addDay())
                     ->live()
@@ -80,7 +82,7 @@ class OrderResource extends Resource
                 DatePicker::make('delivery_date')
                     ->required()
                     ->default(today()->addDays(2))
-                    ->afterOrEqual('decant_date'),
+                    ->afterOrEqual('prep_date'),
                 Select::make('delivery_courier')
                     ->label('Courier')
                     ->options(fn (Order $record): array => DeliveryTownship::courierOptionsFor($record->delivery_township_id))
@@ -93,7 +95,7 @@ class OrderResource extends Resource
                     $record->delivery_courier = $data['delivery_courier'];
                 }
 
-                $record->accept(Carbon::parse($data['decant_date']), Carbon::parse($data['delivery_date']));
+                $record->accept(Carbon::parse($data['prep_date']), Carbon::parse($data['delivery_date']));
 
                 Notification::make()
                     ->success()
@@ -121,7 +123,7 @@ class OrderResource extends Resource
         }
 
         if ($parts === []) {
-            return 'Sets the decant schedule and moves the order to Pending.';
+            return 'Sets the decant schedule and moves the order to '.OrderStatus::Pending->label().'.';
         }
 
         return implode(' ', $parts).' You can still accept — you know your bottles best.';
@@ -234,7 +236,7 @@ class OrderResource extends Resource
             ->label('Handed to courier')
             ->icon(Heroicon::OutlinedTruck)
             ->color('warning')
-            ->visible(fn (Order $record): bool => in_array($record->status, [OrderStatus::Decanted, OrderStatus::Delivered], true)
+            ->visible(fn (Order $record): bool => in_array($record->status, [OrderStatus::Prepared, OrderStatus::Delivered], true)
                 && $record->handed_to_courier_at === null)
             ->modalHeading('Handed to courier')
             ->modalDescription('Snapshots the cash this courier is carrying — the float holds it until you mark them settled. Marking the order paid later does not shrink the float.')
@@ -300,7 +302,7 @@ class OrderResource extends Resource
      * Download this order's packing invoice as an A5 PDF — exportCsv's
      * streamDownload mechanism with PDF bytes instead of CSV rows. Rendered
      * fresh on every click, never cached, so it always shows the order as-is.
-     * Only fulfillable orders (pending/decanted/delivered) have anything worth
+     * Only fulfillable orders (pending/prepared/delivered) have anything worth
      * invoicing; neither invoice action changes state, so no refreshEditPage().
      */
     public static function downloadInvoiceAction(): Action

@@ -43,7 +43,7 @@ class OrderSeeder extends Seeder
                 OrderStatus::Pending, $today, $today->addDays(2), 20000, 3000, 0, null,
                 [['Le Male Elixir', 10, 1]]],
             ['Ei Phyu Phyu', '09-773216549', '5 Kabar Aye Pagoda Road, Yankin, Yangon', OrderSource::Facebook,
-                OrderStatus::Decanted, $today->subDay(), $today->addDay(), 0, 2500, 0, 'Wants gift wrapping if possible.',
+                OrderStatus::Prepared, $today->subDay(), $today->addDay(), 0, 2500, 0, 'Wants gift wrapping if possible.',
                 [['Y', 10, 1], ['Bleu de Chanel', 5, 1]]],
             ['Min Khant', '09-421119876', '31 Anawrahta Road, Lanmadaw, Yangon', OrderSource::Facebook,
                 OrderStatus::Delivered, $today->subDays(6), $today->subDays(4), 0, 3000, 5000, null,
@@ -56,14 +56,14 @@ class OrderSeeder extends Seeder
                 [['Dylan Blue', 10, 1]]],
         ];
 
-        foreach ($manual as [$name, $phone, $address, $source, $status, $decantDate, $deliveryDate, $deposit, $fee, $discount, $note, $items]) {
+        foreach ($manual as [$name, $phone, $address, $source, $status, $prepDate, $deliveryDate, $deposit, $fee, $discount, $note, $items]) {
             $order = Order::create([
                 'customer_name' => $name,
                 'phone' => $phone,
                 'address' => $address,
                 'order_from' => $source,
                 'status' => $status,
-                'decant_date' => $decantDate,
+                'prep_date' => $prepDate,
                 'delivery_date' => $deliveryDate,
                 'deposit_mmk' => $deposit,
                 'delivery_fee_mmk' => $fee,

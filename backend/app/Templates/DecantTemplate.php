@@ -4,7 +4,6 @@ namespace App\Templates;
 
 use App\Enums\Concentration;
 use App\Enums\Gender;
-use App\Enums\OrderStatus;
 
 /**
  * Perfume decants — the first template (roadmap group 1). Its attributes are the
@@ -70,12 +69,19 @@ class DecantTemplate extends Template
         return ['fragrance', 'fragrances'];
     }
 
-    public function statusLabels(): array
+    public function preparedLabel(): string
     {
-        return array_combine(
-            array_map(fn (OrderStatus $status): string => $status->value, OrderStatus::cases()),
-            array_map(fn (OrderStatus $status): string => $status->label(), OrderStatus::cases()),
-        );
+        return 'Decanted';
+    }
+
+    public function prepDateLabel(): string
+    {
+        return 'Decant date';
+    }
+
+    public function prepDateHelp(): string
+    {
+        return 'The day you physically decant this order.';
     }
 
     public function defaultModules(): array

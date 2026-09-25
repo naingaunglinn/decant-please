@@ -74,7 +74,7 @@ the panel offers:
   badge + filter, the customer's transfer screenshot attached to the order (stored in a
   private bucket, served only through an authenticated admin route)
 - Decant stock by total ml — opt-in per fragrance, drawn down automatically when an
-  order is decanted; warn-only (a shortfall never blocks an order)
+  order is prepared (decanted); warn-only (a shortfall never blocks an order)
 - Bulk catalog CSV import — the decanter's existing price list, one row per fragrance;
   idempotent re-uploads, opt-in update mode, failed rows returned as a fixable CSV,
   downloadable template
@@ -109,10 +109,10 @@ stateDiagram-v2
     awaiting_confirmation --> pending: accepted — dates assigned
     awaiting_confirmation --> rejected: rejected — with reason
     awaiting_confirmation --> cancelled: customer self-cancel
-    pending --> decanted: vials filled
-    decanted --> delivered: handed to customer
+    pending --> prepared: vials filled (decant: "Decanted", clothing: "Packed")
+    prepared --> delivered: handed to customer
     pending --> cancelled
-    decanted --> cancelled
+    prepared --> cancelled
 ```
 
 Cancelled and rejected orders are excluded from all revenue figures and from the

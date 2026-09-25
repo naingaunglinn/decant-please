@@ -7,12 +7,14 @@ import type { OrderStatus } from "@/lib/types";
 interface StatusTimelineProps {
   status: OrderStatus;
   placedAt?: string | null;
-  decantDate?: string | null;
+  prepDate?: string | null;
+  /** The shop's word for "prepared" — Decanted, Packed (step 39). */
+  preparedLabel?: string;
   deliveryDate?: string | null;
   rejectionReason?: string | null;
 }
 
-const POSITIVE_ORDER: OrderStatus[] = ["awaiting_confirmation", "pending", "decanted", "delivered"];
+const POSITIVE_ORDER: OrderStatus[] = ["awaiting_confirmation", "pending", "prepared", "delivered"];
 
 function formatDate(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -27,14 +29,16 @@ function formatDate(value: string | null | undefined): string | null {
 export function StatusTimeline({
   status,
   placedAt,
-  decantDate,
+  prepDate,
+  preparedLabel = "Prepared",
   deliveryDate,
   rejectionReason,
 }: StatusTimelineProps) {
   const reduced = useReducedMotion();
 
   const negative = status === "rejected" || status === "cancelled";
-  const reached = negative ? 0 : POSITIVE_ORDER.indexOf(status);
+  // A pre-step-39 API still says "decanted" for the same state.
+  const reached = negative ? 0 : POSITIVE_ORDER.indexOf(status === "decanted" ? "prepared" : status);
   const fillPercent = reached <= 0 ? 9 : (reached / 3) * 100;
 
   const steps = [
@@ -46,16 +50,16 @@ export function StatusTimeline({
       label: "Confirmed",
       caption:
         reached >= 1
-          ? decantDate
-            ? `Decanting ${formatDate(decantDate)}`
+          ? prepDate
+            ? `On the schedule for ${formatDate(prepDate)}`
             : "On the schedule"
           : negative
             ? null
             : "We'll confirm shortly",
     },
     {
-      label: "Decanted",
-      caption: reached >= 2 ? formatDate(decantDate) : null,
+      label: preparedLabel,
+      caption: reached >= 2 ? formatDate(prepDate) : null,
     },
     {
       label: "Delivered",

@@ -9,6 +9,51 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v46
+
+**v46** is step 39 (**#126**). The order states are the same for every shop, and the shop's
+category supplies their words. The state after "pending" is now `prepared`: a decant shop
+still reads "Decanted", a clothing shop reads "Packed". No money value moves.
+
+- **Migration** `2026_09_29_000000_rename_decanted_to_prepared_on_orders`: `orders.status`
+  `decanted` → `prepared`, and `orders.decant_date` → `prep_date`. The index keeps its old
+  name. `down()` reverses both. Up → down → up on Postgres 17 leaves the orders money and
+  date hash identical.
+- **One resolver**: `Templates::statusLabel()`. `OrderStatus::label()` calls it, so the
+  admin badge, status select, order tabs, CSV, invoice and tracking API all use the shop's
+  words. Templates override `preparedLabel()`, and the enum keeps a category-free
+  `defaultLabel()`. With no tenant (a console command) the resolver returns the
+  category-free word. Labels are memoised per shop id for the request, so an orders list
+  doesn't read `shop_settings` once per badge.
+- **Date label**: `Template::prepDateLabel()` ("Decant date" / "Packing date") names the
+  date on the order form, accept modal, orders table, upcoming widget and CSV. A decant
+  seller's admin reads the same words as before.
+- **Tracking API** (additive, plus a rename): `status: "prepared"`, `status_labels` (every
+  state in the shop's words), `prep_date`, and a `decant_date` deploy alias. The storefront
+  timeline takes its third step's name from `status_labels.prepared`. It accepts both
+  `"prepared"` and `"decanted"`, so either deploy order works. The alias and that tolerance
+  are added to RUN-QUEUE row 32. The caption "Decanting {date}" is now "On the schedule for
+  {date}".
+- **Tests**: `StatusLabelTest` (6), covering two shops' labels, no-tenant fallback,
+  tracking, invoice, orders tab and date column, and the migration round trip on seeded
+  rows in two shops. The parity test changes names only, no values. 434 tests pass on
+  SQLite and on Postgres 17.
+- **Browser evidence**: `verify-clothing.mjs` gains a tracking check: a clothing order's
+  timeline says "Packed", never "Decanted" (17 checks).
+- **Deploy (maintenance on, like 37a).** The migration renames a column the running code
+  reads, and Heroku's release phase migrates while the old dynos still serve. Old code
+  would 500 on `decant_date`, and an order moved to Decanted in that window would store
+  `decanted`, which the new enum can't load. So turn Heroku maintenance on before the
+  `main` promotion, and off once the release is out. The API deploys first. An old
+  storefront shows a `prepared` order's timeline unfilled until the storefront deploys.
+  That affects words only: no money, and no broken page.
+  - **Rollback:** run `php artisan migrate:rollback --step=1` **before** rolling back the
+    code. A code-only rollback can't load any `prepared` row.
+  - **Recovery**, if a `decanted` row was written mid-release anyway:
+    `UPDATE orders SET status = 'prepared' WHERE status = 'decanted';`
+- **Not built**: Burmese labels (no locale mechanism yet; row 15's presets), and the other
+  decant words in the admin ("Today's Decants", "Decants due today", "Upcoming decants").
+
 ## 0. What changed in v45
 
 **v45** is the second half of step 38 (**#107**): a clothing shop on the storefront. A

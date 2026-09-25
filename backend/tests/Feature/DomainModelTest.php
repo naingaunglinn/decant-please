@@ -81,14 +81,14 @@ class DomainModelTest extends TestCase
 
         $order->refresh();
         $this->assertSame(OrderStatus::Pending, $order->status);
-        $this->assertSame('2026-07-20', $order->decant_date->toDateString());
+        $this->assertSame('2026-07-20', $order->prep_date->toDateString());
         $this->assertSame('2026-07-22', $order->delivery_date->toDateString());
 
         $this->expectException(LogicException::class);
         $order->accept(Carbon::parse('2026-07-21'));
     }
 
-    public function test_reject_sets_reason_and_leaves_decant_date_null(): void
+    public function test_reject_sets_reason_and_leaves_prep_date_null(): void
     {
         $order = $this->makeOrder();
         $order->reject('Bottle ran out.');
@@ -96,7 +96,7 @@ class DomainModelTest extends TestCase
         $order->refresh();
         $this->assertSame(OrderStatus::Rejected, $order->status);
         $this->assertSame('Bottle ran out.', $order->rejection_reason);
-        $this->assertNull($order->decant_date);
+        $this->assertNull($order->prep_date);
     }
 
     public function test_checkout_creates_awaiting_order_with_server_derived_prices(): void
@@ -118,7 +118,7 @@ class DomainModelTest extends TestCase
         $order->refresh()->load('items');
         $this->assertSame(OrderStatus::AwaitingConfirmation, $order->status);
         $this->assertSame(OrderSource::Website, $order->order_from);
-        $this->assertNull($order->decant_date);
+        $this->assertNull($order->prep_date);
         $this->assertNotNull($order->tracking_code);
         $this->assertSame(55000, $order->items[0]->unit_price_mmk);
         $this->assertSame(110000, $order->items[0]->line_total_mmk);

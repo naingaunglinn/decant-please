@@ -196,12 +196,12 @@ Table orders {
   address text [not null]
   order_from varchar [not null, default: 'website']
   tracking_code varchar [unique, not null]
-  decant_date date [null]
+  prep_date date [null, note: 'Renamed from decant_date (step 39); the index keeps its old name, orders_decant_date_index']
   delivery_date date [null]
   handed_to_courier_at date [null]
   courier_carrying_mmk int [null, note: 'COD float SNAPSHOT taken at handoff — not derived live']
   courier_settled_at date [null]
-  status varchar [not null, default: 'awaiting_confirmation', note: 'OrderStatus enum']
+  status varchar [not null, default: 'awaiting_confirmation', note: 'OrderStatus enum: awaiting_confirmation | pending | prepared | delivered | cancelled | rejected. Labels come from the shop template (step 39)']
   rejection_reason varchar [null]
   deposit_mmk int [not null, default: 0]
   delivery_fee_mmk int [not null, default: 0]
@@ -223,7 +223,7 @@ Table orders {
   updated_at timestamp [null]
   indexes {
     order_from
-    decant_date
+    prep_date
     delivery_date
     status
     payment_status

@@ -31,21 +31,22 @@ class ListOrders extends ListRecords
             'all' => Tab::make('All'),
             'todays_decants' => Tab::make("Today's Decants")
                 ->modifyQueryUsing(fn (Builder $query) => $query
-                    ->whereDate('decant_date', today())
+                    ->whereDate('prep_date', today())
                     ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected])),
             'todays_deliveries' => Tab::make("Today's Deliveries")
                 ->modifyQueryUsing(fn (Builder $query) => $query
                     ->whereDate('delivery_date', today())
                     ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Rejected])),
-            'pending' => Tab::make('Pending')
+            'pending' => Tab::make(OrderStatus::Pending->label())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Pending)),
-            'decanted' => Tab::make('Decanted')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Decanted)),
-            'delivered' => Tab::make('Delivered')
+            // The shop's word for it (step 39): Decanted, Packed.
+            'prepared' => Tab::make(OrderStatus::Prepared->label())
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Prepared)),
+            'delivered' => Tab::make(OrderStatus::Delivered->label())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Delivered)),
-            'rejected' => Tab::make('Rejected')
+            'rejected' => Tab::make(OrderStatus::Rejected->label())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Rejected)),
-            'cancelled' => Tab::make('Cancelled')
+            'cancelled' => Tab::make(OrderStatus::Cancelled->label())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('status', OrderStatus::Cancelled)),
         ];
     }

@@ -127,6 +127,18 @@ await check("checkout by variant_id: 2 × 19,000 + delivery, derived server-side
   () => ({ status: order.status, total: placed.total_mmk, fee: placed.delivery_fee_mmk }),
   (v) => v.status === 201 && v.total === 38000 + v.fee);
 
+// -- tracking: the timeline names the "prepared" step in the shop's words (step 39)
+await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });
+await page.getByLabel(/tracking code/i).fill(placed.tracking_code ?? "");
+await page.getByLabel(/phone/i).fill("09-771234561");
+await page.getByRole("button", { name: /track this order/i }).click();
+await check("tracking timeline says Packed, not Decanted",
+  async () => {
+    await page.locator("main ol li").first().waitFor();
+    return page.locator("main ol").innerText();
+  },
+  (v) => /packed/i.test(v) && !/decant/i.test(v));
+
 // -- decant unchanged
 await page.goto(`${DECANT_BASE}/shop`, { waitUntil: "networkidle" });
 const firstCard = page.getByRole("main").locator("a[href^='/product/']").first();

@@ -85,12 +85,13 @@ class OrderForm
                             ->default(OrderStatus::Pending->value)
                             ->required()
                             ->live(),
-                        DatePicker::make('decant_date')
+                        DatePicker::make('prep_date')
+                            ->label(fn (): string => Templates::forShop()->prepDateLabel())
                             ->required()
                             ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value)
-                            ->helperText('The day you physically decant this order.'),
+                            ->helperText(fn (): string => Templates::forShop()->prepDateHelp()),
                         DatePicker::make('delivery_date')
-                            ->afterOrEqual('decant_date')
+                            ->afterOrEqual('prep_date')
                             ->visible(fn (Get $get): bool => $get('status') !== OrderStatus::AwaitingConfirmation->value),
                         Select::make('delivery_courier')
                             ->label('Courier')
