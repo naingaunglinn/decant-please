@@ -16,7 +16,7 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 
 | # | Item | Spec | Status | Branch | PR |
 |---|---|---|---|---|---|
-| 0 | Commit the runner files; #112: money-table FKs cascade → restrict (orders, order_items, expenses `shop_id`) | issue #112 | in-progress | 112-money-fk-restrict | |
+| 0 | Commit the runner files; #112: money-table FKs cascade → restrict (orders, order_items, expenses `shop_id`) | issue #112 | pr-open | 112-money-fk-restrict | #114 |
 | 1 | Record the CornerArea scope | `prompts/queue-01-scope-docs.md` | todo | | |
 | 2 | Invoice and print letterheads use the shop's name, not "Decant Please!" | roadmap: shared foundation (letterhead bug) | todo | | |
 | 3 | Step 35: baseline parity test | `35-generic-shop-plan.md` §35 (stack from here, not from the #67 branch; #67 is merged) | todo | | |
@@ -52,3 +52,4 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 ## Log
 
 (one line per run: date · item · what happened · PR)
+2026-09-25 · 0 · runner files committed (2b132c3); #112 money-table shop_id FKs cascade → restrict, verified up/down/up on Postgres, 352 tests green · #114
