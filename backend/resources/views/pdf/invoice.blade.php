@@ -3,11 +3,16 @@
 
      Fed either a single $order (row/header actions, the invoice route) or a
      collection as $orders (bulk download) — the bulk case renders the same block
-     once per order with a page break between. Callers eager-load `items`. --}}
+     once per order with a page break between. Callers eager-load `items`.
+
+     The letterhead is the order's own shop name — never a hard-coded brand, so a
+     second shop's invoice can't carry another business's name (#116). --}}
 @use('App\Support\Money')
 @php
     /** @var \Illuminate\Support\Collection<int, \App\Models\Order> $orders */
     $orders = collect($orders ?? [$order]);
+    // One query for the letterhead however many orders are in the bulk PDF.
+    \Illuminate\Database\Eloquent\Collection::make($orders)->loadMissing('shop');
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -102,7 +107,7 @@
         $balanceDue = \App\Models\Order::balanceDueFrom($subtotal, $order->discount_mmk, $order->delivery_fee_mmk, $order->deposit_mmk);
     @endphp
     <div @if (! $loop->last) style="page-break-after: always;" @endif>
-        <p class="letterhead">Decant Please!</p>
+        <p class="letterhead">{{ $order->shop->name }}</p>
         <h1 class="doc-title">Invoice</h1>
 
         <p class="meta" style="margin-top: 3mm;">Order #{{ $order->id }} · <span class="tracking">{{ $order->tracking_code }}</span></p>

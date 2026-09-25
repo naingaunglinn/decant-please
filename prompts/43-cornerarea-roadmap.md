@@ -75,7 +75,7 @@ A category is released only when all of these work (P5):
 | Help button: admin → studio on Viber/Telegram, in Burmese | New |
 | Design system (below) | New |
 | Plans | New; free plan undecided |
-| Letterhead bug (#116): `pdf/invoice.blade.php` and `production-schedule-day.blade.php` hard-code "Decant Please!", so a second shop's invoices would print it. Must use the shop's name. | Fix before a second shop goes live |
+| Letterhead bug (#116): `pdf/invoice.blade.php` and `production-schedule-day.blade.php` hard-code "Decant Please!", so a second shop's invoices would print it. Must use the shop's name. | Built (v38, queue row 2); merge before a second shop goes live |
 
 ## Group 1: ship products
 
