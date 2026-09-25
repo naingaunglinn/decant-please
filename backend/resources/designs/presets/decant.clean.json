@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "base": "clean",
+    "preset": "decant.clean",
+    "theme": {
+        "colors": { "background": "#f2f8fc", "text": "#212121", "primary": "#013e37", "primary_text": "#f2f8fc" },
+        "font": "modern"
+    },
+    "sections": [
+        { "type": "hero", "on": true, "props": {
+            "title": "Great perfume, five millilitres at a time.",
+            "subtitle": "Authentic designer and niche bottles, hand-decanted into 5ml, 10ml and 30ml vials in Yangon — so you can wear the real thing before you commit to it.",
+            "button": "Browse the shop",
+            "track_button": "Track an order",
+            "image": null
+        } },
+        { "type": "featured", "on": true, "props": { "title": "Featured" } },
+        { "type": "recently_viewed", "on": true, "props": {} },
+        { "type": "steps", "on": true, "props": {
+            "title": "How it works",
+            "items": [
+                { "title": "Browse", "text": "Filter the whole catalog by brand, notes, vibe, size and budget." },
+                { "title": "Checkout", "text": "No account, no card. We confirm by phone, then you pay by transfer or on delivery." },
+                { "title": "Track", "text": "Your code follows the vial from decanting day to your door." }
+            ]
+        } },
+        { "type": "tiles", "on": true, "props": {
+            "items": [
+                { "label": "Designer", "text": "The houses you know", "link": "/shop?brand_type=designer" },
+                { "label": "Niche", "text": "The ones worth hunting", "link": "/shop?brand_type=niche" },
+                { "label": "Everything", "text": "The full shelf", "link": "/shop" }
+            ]
+        } }
+    ]
+}

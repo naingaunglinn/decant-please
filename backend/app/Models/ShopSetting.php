@@ -13,7 +13,9 @@ use Illuminate\Support\Once;
 /**
  * Per-shop settings row: payment details (MMQR + KBZPay/Wave), Telegram alert
  * credentials (step 33), storefront social links, the shop's default
- * template (step 37; App\Templates\Templates) and its enabled modules (step 41). One row per shop —
+ * template (step 37; App\Templates\Templates), its enabled modules (step 41) and its
+ * live storefront design (step 46, published_design_id — written only by
+ * App\Design\Designs::publish()). One row per shop —
  * BelongsToShop scopes it and `unique(shop_id)` enforces it — so
  * ShopSetting::current() returns *this shop's* row, not a global singleton.
  * Managed from the admin's Payment settings page; surfaced to the storefront via

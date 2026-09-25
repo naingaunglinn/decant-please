@@ -148,10 +148,11 @@ Trimmed to the files you'd look for first. Deployment-relevant paths are marked 
 backend/
 ├── app/
 │   ├── Console/Commands/                   # FreshStart (decant:fresh-start handover wipe), TelegramTest (telegram:test)
-│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, PromoType
+│   ├── Design/                             # storefront designs (step 46): Sections (the library), Theme, DesignConfig (the one validator), Presets, Designs (create/publish/undo)
+│   ├── Enums/                              # BrandType, Concentration, Gender, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, PromoType, DesignSource
 │   ├── Events/ + Listeners/                # OrderPlaced, PaymentProofUploaded → Telegram admin alerts (NotifyAdminOf*)
 │   ├── Filament/
-│   │   ├── Pages/                          # ProductionSchedule (month calendar), ProductionScheduleDay (printable day worklist), ManagePayment (MMQR settings)
+│   │   ├── Pages/                          # ProductionSchedule (month calendar), ProductionScheduleDay (printable day worklist), ManagePayment (MMQR settings), ManageFeatures, ManageDesign (design presets + history)
 │   │   ├── Resources/                      # Brands/, Products/, Orders/, PromoCodes/ — each: Resource + Schemas/ + Tables/ + Pages/
 │   │   └── Widgets/                        # OrderStats, RevenueChart, TopFragrances, UpcomingDecants, LowStock
 │   ├── Http/
@@ -173,6 +174,7 @@ backend/
 │   └── seeders/                            # admin user (ADMIN_PASSWORD) + demo catalog + demo orders
 ├── public/                                 # ← web root — served by Heroku's nginx buildpack (or artisan serve), never the repo root
 │   └── vendor/fullcalendar/                # vendored FullCalendar bundle (MIT) for the schedule calendar — no npm, no build step, ships via git
+├── resources/designs/presets/              # design presets as data, {template}.{base}.json (step 46)
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
