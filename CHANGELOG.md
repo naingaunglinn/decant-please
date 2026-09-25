@@ -25,7 +25,9 @@ wrong business once a second shop existed. No migration, no API change, no depen
   day sheet's letterhead is the current shop. Both fail on the old views.
 - Not changed: the panels' brand names (`AdminPanelProvider` falls back to
   "Decant Please!" only on the tenant-less login page; the studio's brand is the
-  platform's) — those move with the CornerArea rename (queue row 31, after the go-live).
+  platform's) and `telegram:test`'s "Decant Please! test message" (platform branding sent
+  to each shop's own chat) — those move with the CornerArea rename (queue row 31, after
+  the go-live).
 
 ## 0. What changed in v37
 
