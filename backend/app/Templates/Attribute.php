@@ -27,8 +27,8 @@ final readonly class Attribute
 
     public const NUMBER = 'number';
 
-    /** /products' own query parameters (ProductController::index). */
-    public const RESERVED_KEYS = ['q', 'brand', 'type', 'size', 'min_price', 'max_price', 'featured', 'sort', 'page', 'per_page'];
+    /** /products' own query parameters (ProductController::index), plus brand_type — the storefront's URL name for `type`. */
+    public const RESERVED_KEYS = ['q', 'brand', 'type', 'brand_type', 'size', 'min_price', 'max_price', 'featured', 'sort', 'page', 'per_page'];
 
     /** @param  array<string, string>  $options  value => label, for select attributes */
     private function __construct(

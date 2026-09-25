@@ -13,7 +13,8 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 **v43** is the second half of step 37 (**#106**). The storefront renders from the template
 instead of the perfume-only keys, so a clothing shop (step 38) gets its own filters and
-product details with no storefront change. A decant shop sees the same pages, with four
+product details from its template. (Page copy such as "Shop decants" is still decant's —
+the template's words come later.) A decant shop sees the same pages, with four
 small differences listed below.
 
 - **Filters from `/meta` `filters`.** `FilterControls` renders each text filter as a box
@@ -27,7 +28,8 @@ small differences listed below.
   concentration) and a new `Attribute` `list` flag (decant: notes, vibes). The name
   carries the headline, the pill row carries headline + pills, and each list gets its
   own section. "You may also like" tops up by the template's first select filter the
-  product has (decant: gender, as before).
+  product has (decant: gender, as before); if that fails, the same-brand picks still show.
+  `brand_type` is now a reserved attribute key (it is the storefront's URL name for `type`).
 - **Visible decant differences:** the pill row follows template order (EDP · Male ·
   Around 8-10 Hours, was Around 8-10 Hours · Male · EDP); performance is no longer
   pine-toned and vibes are no longer soft-toned (one pill style for all attributes);

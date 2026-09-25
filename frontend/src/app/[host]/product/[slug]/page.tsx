@@ -15,8 +15,9 @@ import type { Product } from "@/lib/types";
  *  first select filter (decant: gender). Only a /meta filter key is sent — the API
  *  ignores any other attribute, which would top up with unrelated products. */
 async function getRelated(shop: string, fragrance: Product): Promise<Product[]> {
+  let sameBrand: Product[] = [];
   try {
-    const sameBrand = (
+    sameBrand = (
       await getProducts(shop, { brand: fragrance.brand.slug, per_page: "8" })
     ).data.filter((f) => f.id !== fragrance.id);
 
@@ -34,7 +35,7 @@ async function getRelated(shop: string, fragrance: Product): Promise<Product[]> 
 
     return [...sameBrand, ...sameAttribute].slice(0, 4);
   } catch {
-    return []; // the detail page stands without the rail
+    return sameBrand; // the detail page stands with whatever the rail already has
   }
 }
 
@@ -123,8 +124,8 @@ export default async function ProductPage({ params }: PageProps) {
             {attribute.label}
           </h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {attribute.items.map((item) => (
-              <Pill key={item}>{item}</Pill>
+            {attribute.items.map((item, index) => (
+              <Pill key={`${index}-${item}`}>{item}</Pill>
             ))}
           </div>
         </section>

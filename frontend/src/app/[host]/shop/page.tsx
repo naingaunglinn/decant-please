@@ -62,7 +62,8 @@ function ShopResultsSkeleton() {
 async function ShopResults({ shop, flat }: { shop: string; flat: Filters }) {
   // /meta first: the shop template's filters (step 37b) decide which URL params
   // reach /products. Only those keys are sent — an arbitrary param would mint a
-  // new fetch-cache entry per value. Both /meta and /brands are 60s-cached.
+  // new fetch-cache entry per value. Both fetches revalidate every 60s (the API
+  // itself caches /meta for 10 minutes).
   const [brands, meta] = await Promise.all([getBrands(shop), getMeta(shop)]);
 
   const filters: ProductFilters = {
