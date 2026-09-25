@@ -271,6 +271,24 @@ Table shop_settings {
   updated_at timestamp [null]
   template varchar [not null, default: 'decant', note: 'the shop\'s default template; products take it on create']
   modules jsonb [null, note: 'enabled optional features (step 41); null = the template\'s defaults']
+  published_design_id bigint [null, note: 'FK → shop_designs (same shop, set by Designs::publish), SET NULL; null = the template\'s Clean preset (step 46)']
+}
+
+Table shop_designs {
+  id bigint [pk, increment]
+  shop_id bigint [not null]
+  config jsonb [not null, note: 'the design config (App\\Design\\DesignConfig, version 1), validated on write']
+  source varchar(16) [not null, note: 'DesignSource enum: preset | manual | ai']
+  prompt text [null, note: 'the seller\'s AI request (row 14)']
+  input_tokens int [null, note: 'AI cost per shop (row 14)']
+  output_tokens int [null]
+  created_by bigint [null, note: 'FK → users, SET NULL']
+  created_at timestamp [null]
+  updated_at timestamp [null]
+  indexes {
+    (shop_id, created_at)
+  }
+  Note: 'Append-only (step 46): every change is a new row; undo publishes an older one.'
 }
 
 Table expenses {
@@ -405,6 +423,9 @@ Ref: order_items.order_id > orders.id [delete: cascade]
 Ref: order_items.product_id > products.id [delete: restrict]
 Ref: order_items.product_variant_id > product_variants.id [delete: restrict]
 Ref: shop_settings.shop_id > shops.id [delete: cascade]
+Ref: shop_settings.published_design_id > shop_designs.id [delete: set null]
+Ref: shop_designs.shop_id > shops.id [delete: cascade]
+Ref: shop_designs.created_by > users.id [delete: set null]
 Ref: expenses.shop_id > shops.id [delete: restrict]
 Ref: delivery_townships.shop_id > shops.id [delete: cascade]
 Ref: delivery_township_couriers.shop_id > shops.id [delete: cascade]

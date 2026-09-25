@@ -1,0 +1,31 @@
+{
+    "version": 1,
+    "base": "bold",
+    "preset": "clothing.bold",
+    "theme": {
+        "colors": { "background": "#fff7f2", "text": "#1a1a1a", "primary": "#c2185b", "primary_text": "#ffffff" },
+        "font": "friendly"
+    },
+    "sections": [
+        { "type": "announcement", "on": true, "props": { "text": "ဒီတစ်ပတ် အသစ်ရောက် · ပစ္စည်းရောက်မှ ငွေချေနိုင်ပါတယ်" } },
+        { "type": "hero", "on": true, "props": {
+            "title": "ဒီရာသီ စတိုင်အသစ်",
+            "subtitle": "အရောင်တောက်တောက်၊ ဝတ်ရလွယ်လွယ်။ အပတ်တိုင်း အသစ်တင်ပါတယ်။",
+            "button": "အခုပဲ ကြည့်မယ်",
+            "image": null
+        } },
+        { "type": "featured", "on": true, "props": { "title": "အရောင်းရဆုံး" } },
+        { "type": "category_nav", "on": true, "props": { "title": "ရှာဖွေရန်" } },
+        { "type": "product_grid", "on": true, "props": { "title": "အသစ်ရောက်" } },
+        { "type": "steps", "on": true, "props": {
+            "title": "မှာယူနည်း",
+            "items": [
+                { "title": "ရွေးပါ", "text": "ဆိုဒ်နဲ့ အရောင် ရွေးပါ။" },
+                { "title": "မှာပါ", "text": "အကောင့်မလိုပါ။ ဖုန်းနဲ့ အတည်ပြုပြီးမှ ငွေပေးပါ။" },
+                { "title": "ဝတ်ပါ", "text": "တံခါးဝအထိ ပို့ပေးပါတယ်။" }
+            ]
+        } },
+        { "type": "contact", "on": true, "props": { "title": "ဆက်သွယ်ရန်", "text": "ဆိုဒ်မေးချင်ရင် Viber ဒါမှမဟုတ် Telegram ကနေ မေးပါ။" } },
+        { "type": "order_tracking", "on": true, "props": { "title": "အော်ဒါ စစ်ရန်", "text": "အော်ဒါကုဒ်နဲ့ ဖုန်းနံပါတ် ထည့်ပြီး စစ်ကြည့်ပါ။" } }
+    ]
+}

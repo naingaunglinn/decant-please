@@ -1,0 +1,28 @@
+{
+    "version": 1,
+    "base": "warm",
+    "preset": "clothing.warm",
+    "theme": {
+        "colors": { "background": "#f7f3ee", "text": "#2d2a26", "primary": "#5b6b4d", "primary_text": "#ffffff" },
+        "font": "classic"
+    },
+    "sections": [
+        { "type": "hero", "on": true, "props": {
+            "title": "ကိုယ်တိုင်ရွေးချယ်ထားတဲ့ အဝတ်အစားများ",
+            "subtitle": "ထည်ကောင်းကောင်း၊ ချုပ်ရိုးသေသေ။ ကိုယ်တိုင်ဝတ်ချင်တာကိုပဲ ရောင်းပါတယ်။",
+            "button": "စုစည်းမှုကို ကြည့်မယ်",
+            "image": null
+        } },
+        { "type": "about", "on": true, "props": {
+            "title": "ကျွန်မတို့ ဆိုင်အကြောင်း",
+            "text": "အိမ်ကနေ စခဲ့တဲ့ ဆိုင်လေးပါ။ အထည်တစ်ထည်ချင်းစီကို ကိုယ်တိုင်စစ်ပြီးမှ ပို့ပေးပါတယ်။ ဆိုဒ်မတော်ရင် ပြောပါ၊ အတတ်နိုင်ဆုံး ကူညီပေးပါမယ်။",
+            "image": null
+        } },
+        { "type": "featured", "on": true, "props": { "title": "ဒီလအတွက် ရွေးထားတာ" } },
+        { "type": "category_nav", "on": true, "props": { "title": "အမျိုးအစားများ" } },
+        { "type": "contact", "on": true, "props": { "title": "စကားပြောကြရအောင်", "text": "ဘာဝတ်ရမလဲ မသိရင် မေးပါ။ အရပ်နဲ့ ကိုယ်အလေးချိန် ပြောပြရင် ဆိုဒ်ရွေးပေးပါမယ်။" } },
+        { "type": "location", "on": false, "props": { "title": "ဆိုင်တည်နေရာ", "address": "", "map_link": null } },
+        { "type": "delivery_fees", "on": true, "props": { "title": "ပို့ခ" } },
+        { "type": "order_tracking", "on": true, "props": { "title": "အော်ဒါ စစ်ရန်", "text": "အော်ဒါကုဒ်နဲ့ ဖုန်းနံပါတ် ထည့်ပြီး စစ်ကြည့်ပါ။" } }
+    ]
+}

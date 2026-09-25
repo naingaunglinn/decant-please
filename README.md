@@ -91,6 +91,9 @@ the panel offers:
   schedule, promo codes and expenses / P&L on or off; defaults come from the shop's
   category, and a feature that's off disappears from the menu, dashboard and forms
   (nothing is deleted)
+- Design page (step 46) — pick one of three storefront designs for the shop's category
+  (Clean, Bold, Warm), publish, and undo from the history; every change is kept. Out of
+  the menu until the storefront renders it (step 46b)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Delivery zones (Settings) — a township rate table seeded from Royal Express's coverage
   chart, with per-courier coverage/reference costs (admin-eyes only), bulk fee/cost

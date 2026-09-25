@@ -9,6 +9,44 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v55
+
+**v55** is step 46a (**#142**, RUN-QUEUE row 13): the storefront design system's
+foundation. Spec: `prompts/46-design-system.md` (roadmap 43 § Design system, ADR-0005).
+The step splits in three: 46a (this) is schema, library, validator, presets and the admin
+picker, with the API unchanged; 46b (row 13b) renders the design on the storefront; 46c
+(row 13c) is the manual editor.
+
+- **`shop_designs`**, a new tenant table (`BelongsToShop`, isolation tests). It holds
+  `config` jsonb, `source` (`preset` | `manual` | `ai`, the new `DesignSource` enum),
+  `prompt`, `input_tokens` / `output_tokens` (row 14's, added now so it needs no
+  migration) and `created_by`. Rows are append-only.
+  **`shop_settings.published_design_id`** points at the live row (null on delete). Null
+  means the template's Clean preset, so no shop's storefront changes and no backfill is
+  needed. Postgres up/down/up with a live pointer: settings hash identical.
+- **`App\Design`**:
+  - `Sections`: the library, 13 home-page sections. Header and footer are the fixed frame.
+  - `Theme`: the Clean, Bold and Warm bases, four colours, three font keys, and the WCAG
+    contrast check.
+  - `DesignConfig`: the one validator. It refuses unknown keys, sections and props,
+    duplicate sections, non-hex or unreadable colours (below 4.5:1), over-long or
+    control-character text, a tile link off the shop, a map link that isn't Google Maps
+    over https, and an image outside this shop's `shops/{id}/design/` prefix. It fills
+    missing props.
+  - `Presets`: data in `resources/designs/presets/{template}.{base}.json`.
+  - `Designs`: the only writer. `create`, `publish` (a scoped lookup, so another shop's
+    id is a not-found), `usePreset` and `live`.
+- **Presets**: three each for decant and clothing. Decant's Clean is today's storefront
+  word for word (English, today's colours). The other five carry Burmese sample copy.
+- **Design · ဒီဇိုင်း page** (`ManageDesign`): the live design, three preset cards
+  (swatches, Use this design) and the history with Use this one (undo). It stays out of
+  the menu until 46b renders the design.
+- `DesignSystemTest` (51 cases) and 2 new `TenantIsolationTest` cases. 588 tests on
+  Postgres 17 (587 + 1 skip on SQLite). `schema.dbml` updated.
+- **Found on Postgres:** jsonb doesn't keep object key order, so a stored config compares
+  equal to its preset but not identical. Order that means something (sections, items)
+  is always a list.
+
 ## 0. What changed in v54
 
 **v54** is step 45 (**#140**, RUN-QUEUE row 12): the admin's Help button. Spec:

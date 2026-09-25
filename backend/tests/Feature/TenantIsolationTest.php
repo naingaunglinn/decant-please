@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Design\DesignConfig;
+use App\Design\Designs;
+use App\Design\Presets;
 use App\Enums\Courier;
+use App\Enums\DesignSource;
 use App\Enums\OrderStatus;
 use App\Enums\PromoType;
 use App\Exceptions\TenantNotSetException;
@@ -28,10 +32,12 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\PromoCode;
 use App\Models\Shop;
+use App\Models\ShopDesign;
 use App\Models\ShopSetting;
 use App\Models\User;
 use App\Support\MonthlyPnl;
 use App\Support\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -39,6 +45,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -161,6 +168,53 @@ class TenantIsolationTest extends TestCase
         app(TenantContext::class)->set(null);
         $this->expectException(TenantNotSetException::class);
         Category::count(); // must throw, NOT return every shop's rows
+    }
+
+    public function test_shop_designs_are_scoped_and_a_shop_cannot_publish_another_shops_design(): void
+    {
+        // Step 46's design history: counts per shop, and the published pointer
+        // never crosses — publish() finds the row through the scope.
+        $this->forShop($this->shopA);
+        $aDesign = Designs::usePreset('decant.bold');
+        Designs::usePreset('decant.warm');
+
+        $this->forShop($this->shopB);
+        $bDesign = Designs::usePreset('decant.clean');
+
+        $this->assertSame(1, ShopDesign::count());
+        $this->assertSame([$bDesign->id], ShopDesign::pluck('id')->all());
+        $this->assertNull(ShopDesign::find($aDesign->id));
+
+        try {
+            Designs::publish($aDesign->id);
+            $this->fail('Shop B published shop A\'s design.');
+        } catch (ModelNotFoundException) {
+            $this->assertSame($bDesign->id, ShopSetting::current()->published_design_id);
+            $this->assertEquals(Presets::get('decant.clean'), Designs::live());
+        }
+
+        $this->forShop($this->shopA);
+        $this->assertSame(2, ShopDesign::count());
+        $this->assertEquals(Presets::get('decant.warm'), Designs::live());
+
+        app(TenantContext::class)->set(null);
+        $this->expectException(TenantNotSetException::class);
+        ShopDesign::count(); // must throw, NOT return every shop's rows
+    }
+
+    public function test_a_design_image_under_another_shops_prefix_is_refused(): void
+    {
+        $this->forShop($this->shopB);
+        $config = Presets::get('decant.warm');
+        $config['sections'][1]['props']['image'] = DesignConfig::imagePrefix($this->shopA->id).'story.jpg';
+
+        try {
+            Designs::create($config, DesignSource::Manual);
+            $this->fail('Shop B saved a design showing shop A\'s image.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('sections.1.props.image', $exception->errors());
+            $this->assertSame(0, ShopDesign::count());
+        }
     }
 
     public function test_catalog_queries_return_only_the_current_shops_rows(): void
