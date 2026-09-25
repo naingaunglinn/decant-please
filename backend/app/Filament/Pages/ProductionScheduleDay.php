@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Order;
+use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -62,6 +63,17 @@ class ProductionScheduleDay extends Page
     public function getDay(): array
     {
         return Order::productionScheduleFor($this->day(), $this->day())[0];
+    }
+
+    /**
+     * The printed sheet's letterhead: the current shop, never a hard-coded brand
+     * (#116). Read from TenantContext, which the panel's tenancy already set —
+     * no fallback name, so a missing tenant fails loudly instead of printing
+     * another business's name.
+     */
+    public function getShopName(): string
+    {
+        return app(TenantContext::class)->get()->name;
     }
 
     public function previousDayUrl(): string

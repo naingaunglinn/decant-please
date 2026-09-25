@@ -8,6 +8,8 @@ use App\Filament\Pages\ProductionScheduleDay;
 use App\Models\Brand;
 use App\Models\Fragrance;
 use App\Models\Order;
+use App\Models\Shop;
+use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -238,6 +240,19 @@ class ProductionScheduleTest extends TestCase
             ->assertSee('2 order(s)')
             ->assertDontSee('Dior — Sauvage')
             ->assertSee('@media print', false); // the sheet carries its print styles
+    }
+
+    public function test_printed_letterhead_is_the_current_shops_name(): void
+    {
+        // #116: the bench sheet prints the shop it belongs to, not "Decant Please!".
+        $firstName = app(TenantContext::class)->get()->name;
+        app(TenantContext::class)->set(Shop::factory()->create(['name' => 'Ma Ma Bakery', 'slug' => 'ma-ma-bakery']));
+
+        Livewire::test(ProductionScheduleDay::class, ['date' => '2026-08-05'])
+            ->assertOk()
+            ->assertSeeHtml('<p class="ps-letterhead">Ma Ma Bakery</p>')
+            ->assertDontSee($firstName)
+            ->assertDontSee('Decant Please!');
     }
 
     public function test_day_page_shows_a_real_empty_state(): void

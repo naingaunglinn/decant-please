@@ -69,7 +69,7 @@
 
     {{-- Print letterhead — stands in for the hidden panel header on paper. --}}
     <div class="ps-print-only">
-        <p class="ps-letterhead">Decant Please!</p>
+        <p class="ps-letterhead">{{ $this->getShopName() }}</p>
         <h1 class="ps-doc-title">Production schedule</h1>
         <p class="ps-print-meta">{{ $day['date']->format('l, j M Y') }} · {{ $vials }} {{ Str::plural('vial', $vials) }}</p>
         @unless ($day['date']->isToday())

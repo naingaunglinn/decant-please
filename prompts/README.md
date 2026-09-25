@@ -57,6 +57,7 @@ Full history in `00-CLAUDE.md` §0.
 | #112 | issue #112 | Money-table FKs restrict shop delete: `orders`/`order_items`/`expenses` `shop_id` cascade → restrict, so a shop with financial history can't be hard-deleted | **built (v36)**, stacked on #113 |
 | 35–42 | `35-generic-shop-plan.md` | **Generic-shop refactor** (Decant = first template) — parity baseline, product/variant model, code-defined templates + attributes, clothing template, template-driven status labels, stock modes, module toggles, design-spec sync. One umbrella plan, one section + issue per step. | planned — #103; **#67 runs first**; review stop after step 38 (amended by #115; steps 36–38 amended from the catalog review) |
 | 43 | `43-cornerarea-roadmap.md` | **CornerArea roadmap** (a roadmap, not a step spec) — 23 categories in 4 groups, the "complete" checklist, shared foundation, per-group needs, status labels, default modules, the design system (ADR-0005), build order. Each phase gets its own step file when it starts. | recorded — #115 (docs only) |
+| #116 | issue #116 | **Letterheads use the shop's name**: the A5 invoice and the printed production-schedule day sheet print the order's / current shop's name instead of a hard-coded "Decant Please!" | **built (v38)**, stacked on #115 |
 
 4. For each step, paste the whole file content as your prompt (or tell Claude Code:
    `Read 02-database-schema.md and implement it`, if you keep the files in a `prompts/`

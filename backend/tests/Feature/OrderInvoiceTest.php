@@ -7,7 +7,9 @@ use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Models\Brand;
 use App\Models\DecantPrice;
 use App\Models\Order;
+use App\Models\Shop;
 use App\Models\User;
+use App\Support\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -184,6 +186,32 @@ class OrderInvoiceTest extends TestCase
         $html = view('pdf.invoice', ['order' => $order->refresh()->loadMissing('items')])->render();
         $this->assertStringContainsString('Delivery fee', $html);
         $this->assertStringContainsString('4,500 Ks', $html);
+    }
+
+    public function test_letterhead_is_the_orders_own_shop_name_not_a_hard_coded_brand(): void
+    {
+        // #116: two shops, each invoice carries its own shop's name — never
+        // "Decant Please!", never the other shop's.
+        $first = $this->fulfillableOrder();
+        $firstName = app(TenantContext::class)->get()->name;
+
+        $other = Shop::factory()->create(['name' => 'Ma Ma Bakery', 'slug' => 'ma-ma-bakery']);
+        app(TenantContext::class)->set($other);
+        $second = $this->fulfillableOrder();
+        $third = $this->fulfillableOrder(OrderStatus::Delivered);
+
+        $html = view('pdf.invoice', ['order' => $first])->render();
+        $this->assertStringContainsString($firstName, $html);
+        $this->assertStringNotContainsString('Ma Ma Bakery', $html);
+        $this->assertStringNotContainsString('Decant Please!', $html);
+
+        // Bulk: fresh models (no shop loaded) — the view eager-loads it once,
+        // and preventLazyLoading would throw here if it lazy-loaded per order.
+        $bulk = Order::with('items')->whereKey([$second->id, $third->id])->get();
+        $html = view('pdf.invoice', ['orders' => $bulk])->render();
+        $this->assertSame(2, substr_count($html, 'Ma Ma Bakery'));
+        $this->assertStringNotContainsString($firstName, $html);
+        $this->assertStringNotContainsString('Decant Please!', $html);
     }
 
     private function admin(): User

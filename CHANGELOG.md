@@ -9,6 +9,24 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v38
+
+**v38** fixes the letterhead bug (**#116**): the admin's printed documents named the
+wrong business once a second shop existed. No migration, no API change, no dependency.
+
+- **`pdf/invoice.blade.php`** prints the order's own shop name (`$order->shop->name`)
+  instead of "Decant Please!". The view eager-loads `shop` once for the whole bulk PDF
+  (`preventLazyLoading` is on), so a 50-order download is still one extra query.
+- **`production-schedule-day.blade.php`** prints the current shop's name, read through a
+  new `ProductionScheduleDay::getShopName()` from `TenantContext`. No fallback name: a
+  missing tenant fails loudly instead of printing another business's name.
+- **Tests**: `OrderInvoiceTest` renders single and bulk invoices across two shops and
+  asserts each carries only its own shop's name; `ProductionScheduleTest` asserts the
+  day sheet's letterhead is the current shop. Both fail on the old views.
+- Not changed: the panels' brand names (`AdminPanelProvider` falls back to
+  "Decant Please!" only on the tenant-less login page; the studio's brand is the
+  platform's) — those move with the CornerArea rename (queue row 31, after the go-live).
+
 ## 0. What changed in v37
 
 **v37** records the CornerArea scope in the repo (**#115**). Docs only — no code, no
