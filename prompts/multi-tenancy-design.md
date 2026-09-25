@@ -439,8 +439,8 @@ the create side — a bare scope can't do that second half; the hook has to.
 - **Renames, same rows, same `shop_id`.** `fragrances` → `products`, `decant_prices` →
   `product_variants`, `fragrance_id` → `product_id` on both child tables (step 36). The
   trait, the `(shop_id, slug)` composite and every isolation test moved with them; no row
-  changed shop. `order_items` gained `product_variant_id` + `variant_label_snapshot` (36,
-  38) and a frozen `measure` (40b) — columns on a model already on this list.
+  changed shop. `order_items` gained `product_variant_id` + `variant_label_snapshot` (36a)
+  and a frozen `measure` (40b) — columns on a model already on this list.
 - **One new tenant-owned table: `categories`** (step 37) — per-shop, `shop_id` + trait,
   unique `(shop_id, name)`; `products.category_id` points into it. Its isolation test
   (`test_categories_are_scoped_and_a_product_cannot_take_another_shops`) shipped in the same
@@ -584,10 +584,10 @@ This is not optional and it is not a follow-up. It ships with the seam.
 | Two shops, checkout township | A checkout under A's path with **B's** `delivery_township_id` gets a 422 (scoped `serviceable()->find()` returns null) — never routed to B's township or priced by B's fee |
 | Two shops, categories *(step 37)* | Each shop sees only its own categories; A's product can't take B's category id |
 | Two shops, checkout variant *(step 36b)* | A checkout under A's path naming **B's** `variant_id` gets the `items.N` 422 — never sold at B's price |
-| Two shops, template words *(step 39)* | Each shop's tracking and admin read the status words of its **own** template (`StatusLabelTest`) |
-| Two shops, modules *(step 41)* | With every module off in A, B still resolves its own set in the same request — the memo is per shop id (`ModuleTogglesTest`); `/meta` carries it under the per-shop key above |
+| Two shops, template words *(step 39)* | The per-shop resolver never hands one shop another shop's status words, in the same request (`StatusLabelTest::test_each_shop_reads_prepared_in_its_own_templates_word`) |
+| Two shops, modules *(step 41)* | With every module off in A, B still resolves its own set in the same request — the memo is per shop id (`ModuleTogglesTest::test_one_shops_modules_never_reach_another`). `/meta` serves it under the per-shop key (`test_brands_and_meta_endpoints_are_per_shop_in_content`, `test_meta_cache_key_and_busting_are_per_shop`) |
 | Unscoped access throws | A tenant-owned query with no `TenantContext` raises, and does not return all rows |
-| Escape hatch works | `withoutTenancy()` returns cross-shop rows, and is used in ≤ 5 places repo-wide |
+| Escape hatch works | `withoutTenancy()` returns cross-shop rows, and is called in ≤ 5 places in `app/` (the test walks `app/` only — see the ledger below) |
 
 Note the pattern from the Telegram double-send: **assert counts, not presence.** "Returns A's rows"
 passes while also returning B's. Every row above says *only*, and the test must check the count.
@@ -596,9 +596,10 @@ Extend `verify-postgres-portability.sh` too — the `(shop_id, slug)` composite 
 TopFragrances join (an unqualified `shop_id` is ambiguous on Postgres, green on SQLite) behave
 differently on the real engine, and SQLite will not tell you.
 
-The `withoutTenancy()` ledger so far: tracking-code generation (§7), the Step A backfill
-migration, and the studio's cross-shop views when Step C builds them. Anything beyond that list
-needs its inline justification reviewed.
+The `withoutTenancy()` ledger as first planned: tracking-code generation (§7), the Step A
+backfill migration, and the studio's cross-shop views when Step C builds them. Anything beyond
+that list needs its inline justification reviewed. (All three are now built or done; the
+current state follows.)
 
 **The ledger as built (synced in step 42, after steps 35–41).** `TenantIsolationTest`
 (`test_without_tenancy_is_a_rare_audited_escape_hatch`) counts `->withoutTenancy(` calls
@@ -607,7 +608,7 @@ in **`app/`** — not repo-wide — and caps them at 5. Two are spent:
 | Call site | Why it must see every shop |
 |---|---|
 | `Order::generateTrackingCode()` (`app/Models/Order.php`) | the dedup `exists()` checks every shop's codes, because the unique index is global (§7, tracking codes) |
-| `StudioShopStats` (`app/Support/StudioShopStats.php`) | the studio's per-shop order counts and last-order dates in one query (step 34, Step C) |
+| `StudioShopStats::orderStats()` (`app/Support/StudioShopStats.php`) | the studio's per-shop order counts and last-order dates in one query (step 34, Step C) |
 
 The Step A backfill migration is done and no longer calls it. `database/` is not counted,
 and holds no call today: the audit-events migration and `DemoClothingShopSeeder` only

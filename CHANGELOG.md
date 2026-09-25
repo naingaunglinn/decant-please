@@ -31,10 +31,11 @@ the code after steps 35–41.
   - Documents checkout's `payment_method` + `proof` fields.
   - Catalog wording is generic.
   - States that the receipt's item name comes from the current product.
-- **Found, not fixed** (recorded in the plan's §42 "As built"):
+- **Found, not fixed**, filed as #134 and queued as RUN-QUEUE row 10b:
   - The tracking receipt's item name is read live, not from the name snapshot.
   - `decant:fresh-start` leaves variant photos behind.
   - The payment-proof endpoint doesn't check order status.
+  - The customer-facing "fragrance" error strings reach a clothing shop.
 
 ## 0. What changed in v49
 

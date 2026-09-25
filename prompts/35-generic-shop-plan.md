@@ -692,9 +692,11 @@ pass.
   for online) are documented. Catalog wording says variant/product, not decant/fragrance.
   The receipt's `fragrance_name` is documented as it behaves: read from the current
   product, not the line's name snapshot.
-- Found, not fixed (outside a docs step): the receipt name above; `decant:fresh-start`
+- Found, not fixed (outside a docs step), filed as #134 (RUN-QUEUE row 10b): the receipt
+  name above; `decant:fresh-start`
   leaves variant photos on the public disk; the payment-proof endpoint's comment says it
-  only makes sense before the order is settled, but it doesn't check the status.
+  only makes sense before the order is settled, but it doesn't check the status; and the
+  customer-facing "fragrance" error strings reach a clothing shop.
 
 ---
 

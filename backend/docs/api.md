@@ -13,10 +13,11 @@ clients.
 
 **Tenant in the path (multi-tenancy Step 24).** Every endpoint below is prefixed with
 a `{shop}` slug: `GET /api/v1/{shop}/products`, `POST /api/v1/{shop}/orders`, and so
-on. The slug selects which decant shop the request is for; the storefront pins it once
-(one storefront serves exactly one shop). An unknown or inactive `{shop}` returns the
-same generic **404** as a bad tracking lookup — it is not a shop-enumeration oracle
-beyond what the storefront URL already reveals. Response shapes are unchanged from the
+on. The slug selects which shop the request is for; the storefront pins it once
+(one storefront serves exactly one shop). Only a **live** shop resolves: an unknown slug,
+or a shop that is onboarding, suspended or archived, gets a bare `404` (the framework's
+default body, not the tracking message) — it is not a shop-enumeration oracle beyond
+what the storefront URL already reveals. Response shapes are unchanged from the
 pre-prefix API; only the path gained the segment. The ten are `/brands`, `/products`,
 `/products/{slug}`, `/meta`, `/delivery-zones`, and under `/orders`: checkout, `track`,
 `cancel`, `payment-proof` and `validate-promo`. `/up` (health) stays unprefixed.
@@ -37,9 +38,9 @@ price from the live catalog at that moment and (at checkout) stores immutable
 snapshots on the order. A client that caches catalog prices for display must still
 expect the server's derived totals to win.
 
-**Tracking is not a guessing oracle.** `/orders/track` and `/orders/cancel` return
-the *same* generic 404 whether the code or the phone was wrong. Don't build UI that
-tries to distinguish; it can't.
+**Tracking is not a guessing oracle.** `/orders/track`, `/orders/cancel` and
+`/orders/payment-proof` return the *same* generic 404 whether the code or the phone was
+wrong. Don't build UI that tries to distinguish; it can't.
 
 **Validation errors are Laravel-shaped.** Invalid input returns `422` with:
 
@@ -291,8 +292,8 @@ falling back to a free-text address.
 
 **`online` orders prepay and must attach their transfer slip** as a `proof` file
 (jpeg/png/webp, ≤4 MB), so an online checkout is sent as `multipart/form-data`; a COD
-checkout may stay JSON. The slip lands on the private proofs disk; the API only ever
-answers with `has_payment_proof: true`.
+checkout may stay JSON. The slip lands on the private proofs disk; the receipt carries
+at most the `has_payment_proof` boolean, never a path or URL.
 
 The delivery fee is **never sent by the client** — it is read off the township row
 server-side, exactly as unit prices are. A township that is unknown, deactivated,
@@ -387,10 +388,11 @@ trimmed; the phone must match the order exactly as entered at checkout. Any mism
 }
 ```
 
-An item's `fragrance_name` is composed from the **current** product row (brand — name,
-plus the concentration where the template has one), not from the order line's frozen
-name snapshot: renaming a product renames it on old receipts. Its prices, `size_ml` and
-`variant_label` are the line's own and never move.
+**Known defect (#134):** an item's `fragrance_name` is composed from the **current**
+product row (brand — name, plus the concentration where the template has one), not from
+the order line's frozen name snapshot, so renaming a product renames it on old receipts.
+That breaks the snapshot rule and is queued to be fixed; clients should not rely on it.
+Its prices, `size_ml` and `variant_label` are the line's own and never move.
 
 `balance_due_mmk` is the one money field that can be **negative** (#67): it is
 `Σ line_total − discount + delivery_fee − deposit`, derived from the line snapshots so a
