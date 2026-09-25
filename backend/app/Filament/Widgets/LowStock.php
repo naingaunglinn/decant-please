@@ -56,12 +56,12 @@ class LowStock extends TableWidget
                     ->badge()
                     ->color('danger')
                     ->state(fn (Product $record): string => $record->pooledStock()
-                        ? "{$record->stock_amount}ml"
+                        ? $record->formatAmount((int) $record->stock_amount)
                         : $record->lowVariants()->map(fn ($variant): string => "{$variant->label()}: {$variant->stock_qty}")->implode(', '))
                     ->alignEnd(),
                 TextColumn::make('low_stock_threshold')
                     ->label('Reorder at')
-                    ->formatStateUsing(fn (Product $record, int $state): string => $record->pooledStock() ? "{$state}ml" : "{$state} pcs")
+                    ->formatStateUsing(fn (Product $record, int $state): string => $record->pooledStock() ? $record->formatAmount($state) : "{$state} pcs")
                     ->alignEnd(),
             ])
             ->paginated(false);

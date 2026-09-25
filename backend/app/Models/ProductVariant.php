@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToShop;
+use App\Support\StockUnit;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,13 +35,23 @@ class ProductVariant extends Model
                 $variant->measure = $variant->size_ml;
             }
 
-            // A variant with no size is its option values (step 38): trimmed and in
-            // the template's option order, so it labels "M / Blue" however it was
-            // entered. A key the template doesn't name is kept, after them.
-            $product = $variant->size_ml === null && $variant->isDirty('options')
+            $product = $variant->size_ml === null && $variant->isDirty(['options', 'measure'])
                 ? ($variant->relationLoaded('product') ? $variant->product : Product::query()->find($variant->product_id))
                 : null;
 
+            // A weighed variant (step 40b) is its amount, in the template's unit:
+            // measure 150 labels "1 viss 50 kyatthar" under the first option.
+            $unit = $product?->catalogTemplate()->measure();
+
+            if ($unit !== null && $variant->measure !== null) {
+                $variant->options = [$product->catalogTemplate()->variantOptions()[0] => StockUnit::format($variant->measure, $unit)];
+
+                return;
+            }
+
+            // A variant with no size is its option values (step 38): trimmed and in
+            // the template's option order, so it labels "M / Blue" however it was
+            // entered. A key the template doesn't name is kept, after them.
             if ($product !== null) {
                 $given = array_map(fn ($value) => is_string($value) ? trim($value) : $value, $variant->options ?? []);
                 $ordered = [];

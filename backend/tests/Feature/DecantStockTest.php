@@ -85,10 +85,10 @@ class DecantStockTest extends TestCase
     {
         $fragrance = $this->trackedFragrance(stockMl: null);
 
-        $fragrance->addBottle(100); // starts tracking a previously-untracked fragrance
+        $fragrance->addStock(100); // starts tracking a previously-untracked fragrance
         $this->assertSame(100, $fragrance->refresh()->stock_amount);
 
-        $fragrance->addBottle(50);
+        $fragrance->addStock(50);
         $this->assertSame(150, $fragrance->refresh()->stock_amount);
     }
 

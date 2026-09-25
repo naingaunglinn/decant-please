@@ -24,7 +24,7 @@ Principles P1–P6) throughout.
 - [x] **38** — Clothing template — split in two (#107): **38a built** (v44: clothing template, variant options + photos in the admin, option filters; API additive), **38b built** (v45: storefront option picker + variant photo, option filters, optional brand, size guide, demo clothing shop)
 - [ ] **⏸ Review stop** (owner reviews 35–38; then 39–41 continue — no real-seller wait)
 - [x] **39** — Status labels (template-driven; `decanted→prepared`) — **built** (v46, #126)
-- [ ] **40** — Stock modes (`per_variant` / `pooled`) — split in two (#128): **40a built** (v47: both modes, draw-down under lock, per-variant cost, low stock); 40b (Myanmar weight units) is RUN-QUEUE row 8b
+- [x] **40** — Stock modes (`per_variant` / `pooled`) — split in two (#128): **40a built** (v47: both modes, draw-down under lock, per-variant cost, low stock), **40b built** (v48: Myanmar weight units — `stock_unit`, frozen line `measure`, the unit guard)
 - [ ] **41** — Module toggles
 - [ ] **42** — Design-spec sync (docs)
 
@@ -563,6 +563,33 @@ pieces; **40b** (RUN-QUEUE row 8b) adds Myanmar weight units.
 - Not built: a count reaching zero doesn't flip `in_stock` (manual, as for decant);
   checkout doesn't reserve or refuse by count; "liquid only" margin wording stays on the
   clothing order's margin (template copy, rows 13/15); per-variant reorder lines.
+
+**40b as built (v48, RUN-QUEUE row 8b).**
+
+- **One base unit per product, integer.** `products.stock_unit` is `ml` or `kyatthar`,
+  set from the template's `measure()` when the product is pooled. A viss (100 kyatthar)
+  is display only — never stored — so packs of 25 kyatthar and 1 viss draw from one total
+  with no conversion. `App\Support\StockUnit::format()` is the one place an amount
+  becomes words. Admin words are English (the admin has no Burmese yet); the Burmese
+  unit names come with the produce template's sample content (row 15).
+- **The pair is `reference_cost_mmk` / `reference_amount`** (was `bottle_cost_mmk` /
+  `bottle_volume_ml`), in its own rename-only migration; `pooledCostMmk()` keeps the
+  ceiling rule. Decant's admin still says "Bottle cost" / "Bottle size".
+- **Frozen line amount: `order_items.measure`**, stamped once in `OrderItem`'s creating
+  hook from `size_ml` or the variant's `measure`; draw-down, shortfall and cost read it.
+  Backfilled from `size_ml`. No unit column on the line: the guard below means a product's
+  unit can't change once any line has an amount.
+- **Weighed variants reuse `product_variants.measure`** (whole kyatthar; `size_ml` null)
+  and label themselves from it under the template's first option (`Weight`). The API
+  serves them as options — `measure() !== 'ml'` is the "options, not ml sizes" test — so
+  the 38b picker sells them unchanged; no contract change.
+- **The guard** (in `Product`'s saving hook, so admin, import and studio all hit it):
+  switching to a template in another unit is refused while the product has stock, a
+  reference cost, or any order line with a frozen amount — including an untracked product
+  on an accepted, not-yet-prepared order. Clear the numbers, or add a new product.
+  A per-variant template keeps the unit. The reorder line is a setting and carries over.
+- Not built: sub-kyatthar weights (mat, pe); grams / kilograms; converting stock between
+  units; the produce template and its storefront copy (row 15).
 
 ## Step 41 — Module toggles  *(after the review stop)*
 

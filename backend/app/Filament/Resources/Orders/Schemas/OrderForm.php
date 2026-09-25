@@ -176,6 +176,7 @@ class OrderForm
                                         // an archived variant stays pickable on the line that already sells it
                                         ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $record?->product_variant_id))
                                         ->orderBy('position')
+                                        ->orderBy('measure')
                                         ->orderBy('id')
                                         ->get()
                                         ->mapWithKeys(fn (ProductVariant $variant): array => [$variant->id => $variant->label()])

@@ -74,8 +74,8 @@ the panel offers:
   badge + filter, the customer's transfer screenshot attached to the order (stored in a
   private bucket, served only through an authenticated admin route)
 - Stock in the product's category's mode (step 40): pooled (decant — total ml per
-  fragrance) or per variant (clothing — pieces per size and colour, each with its own
-  cost). Opt-in per product or variant, drawn down automatically, under row locks, when an
+  fragrance, or by weight in kyatthar / viss, step 40b) or per variant (clothing —
+  pieces per size and colour, each with its own cost). Opt-in per product or variant, drawn down automatically, under row locks, when an
   order is prepared; warn-only (a shortfall never blocks an order)
 - Bulk catalog CSV import — the decanter's existing price list, one row per fragrance;
   idempotent re-uploads, opt-in update mode, failed rows returned as a fixable CSV,
@@ -302,7 +302,7 @@ Guarantees worth knowing:
 Inside the Docker stack (no local toolchains needed):
 
 ```bash
-docker compose exec backend php artisan test   # 445 tests — parity baseline, domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, storefront hosts, full API
+docker compose exec backend php artisan test   # 454 tests — parity baseline, domain, admin (Livewire), invoices, payments, stock, CSV import, Telegram, tenant isolation, storefront hosts, full API
 docker compose exec frontend npm run build     # type-checks and builds the storefront
 ```
 

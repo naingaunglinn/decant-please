@@ -24,7 +24,8 @@ class ProductController extends Controller
         $attributeFilters = $template->filterable();
         // Variant options filter too (step 38): ?option[Size]=M&option[Color]=Blue.
         // Only the template's option names are accepted — each becomes a JSON path.
-        $optionNames = $template->measure() === null ? $template->variantOptions() : [];
+        // A weighed variant (step 40b) is an option too ("Weight": "1 viss").
+        $optionNames = $template->measure() !== 'ml' ? $template->variantOptions() : [];
 
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],

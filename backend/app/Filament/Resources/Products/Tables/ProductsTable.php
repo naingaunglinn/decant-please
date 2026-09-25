@@ -83,14 +83,14 @@ class ProductsTable
                         ->where('is_active', true)
                         ->map(fn ($variant) => $variant->label())
                         ->implode(' · ')),
-                // Pooled: the running ml; per variant (step 40): the pieces across
+                // Pooled: the running amount in its unit; per variant (step 40): the pieces across
                 // counted options, red when any is at its reorder line.
                 TextColumn::make('stock_amount')
                     ->label('Stock')
                     ->badge()
                     ->state(fn (Product $record): string => match (true) {
                         ! $record->isStockTracked() => '—',
-                        $record->pooledStock() => "{$record->stock_amount}ml",
+                        $record->pooledStock() => $record->formatAmount((int) $record->stock_amount),
                         default => $record->variants->where('is_active', true)->sum('stock_qty').' pcs',
                     })
                     ->color(fn (Product $record): string => match (true) {
@@ -100,7 +100,7 @@ class ProductsTable
                     })
                     ->tooltip(fn (Product $record): ?string => match (true) {
                         ! $record->isLowStock() => null,
-                        $record->pooledStock() => "Low — reorder at {$record->low_stock_threshold}ml",
+                        $record->pooledStock() => 'Low — reorder at '.$record->formatAmount($record->low_stock_threshold),
                         default => 'Low: '.$record->lowVariants()->map(fn ($variant): string => "{$variant->label()} ({$variant->stock_qty})")->implode(', '),
                     })
                     ->sortable($measured),

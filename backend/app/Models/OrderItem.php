@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['order_id', 'product_id', 'product_variant_id', 'fragrance_name_snapshot', 'variant_label_snapshot', 'size_ml', 'unit_price_mmk', 'unit_cost_mmk', 'quantity', 'line_total_mmk', 'line_cost_mmk'])]
+#[Fillable(['order_id', 'product_id', 'product_variant_id', 'fragrance_name_snapshot', 'variant_label_snapshot', 'size_ml', 'measure', 'unit_price_mmk', 'unit_cost_mmk', 'quantity', 'line_total_mmk', 'line_cost_mmk'])]
 class OrderItem extends Model
 {
     use BelongsToShop;
@@ -33,6 +33,16 @@ class OrderItem extends Model
                 $item->variant_label_snapshot ??= $item->size_ml !== null ? "{$item->size_ml}ml" : null;
             }
 
+            // Amount snapshot, creating-only (step 40b): how much of the pooled
+            // stock one unit draws, in the product's stock_unit — the ml size, or
+            // the weighed variant's measure. Frozen, because a variant's measure is
+            // live: editing it later must not move this line's draw-down or cost.
+            if (! $item->exists && $item->measure === null) {
+                $item->measure = $item->size_ml ?? ($item->product_variant_id !== null
+                    ? ProductVariant::query()->whereKey($item->product_variant_id)->value('measure')
+                    : null);
+            }
+
             // Cost snapshot, creating-only — cost behaves exactly like price:
             // written once from the live reference when the item is created
             // (checkout, manual admin entry, or a line added to an old order),
@@ -47,7 +57,7 @@ class OrderItem extends Model
                 $item->unit_cost_mmk = self::currentUnitCost(
                     $item->relationLoaded('product') ? $item->product : Product::query()->find($item->product_id),
                     $item->product_variant_id,
-                    $item->size_ml,
+                    $item->measure,
                 );
             }
 
@@ -67,19 +77,22 @@ class OrderItem extends Model
      * mode, or null when unknown. The one cost rule — the line snapshot and the
      * admin order form's pre-fill both call it.
      */
-    public static function currentUnitCost(?Product $product, ?int $variantId, ?int $sizeMl): ?int
+    public static function currentUnitCost(?Product $product, ?int $variantId, ?int $measure): ?int
     {
         if ($product === null) {
             return null;
         }
 
+        $variant = fn (string $column): ?int => $variantId === null ? null
+            : ProductVariant::query()->where('product_id', $product->id)->whereKey($variantId)->value($column);
+
         if ($product->pooledStock()) {
-            return $product->pooledCostMmk((int) $sizeMl);
+            // $measure is the line's amount in stock_unit; a weighed line picked by
+            // variant alone (the admin form) reads the variant's.
+            return $product->pooledCostMmk((int) ($measure ?? $variant('measure')));
         }
 
-        $cost = $variantId === null
-            ? null
-            : ProductVariant::query()->where('product_id', $product->id)->whereKey($variantId)->value('unit_cost_mmk');
+        $cost = $variant('unit_cost_mmk');
 
         return $cost === null ? null : (int) $cost;
     }
@@ -113,6 +126,7 @@ class OrderItem extends Model
     {
         return [
             'size_ml' => 'integer',
+            'measure' => 'integer',
             'unit_price_mmk' => 'integer',
             'unit_cost_mmk' => 'integer',
             'quantity' => 'integer',

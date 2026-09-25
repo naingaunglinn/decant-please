@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Products\Schemas;
 use App\Enums\BrandType;
 use App\Models\Brand;
 use App\Models\Product;
+use App\Support\StockUnit;
 use App\Support\TenantContext;
 use App\Templates\Attribute;
 use App\Templates\Template;
@@ -32,9 +33,12 @@ class ProductForm
         // The product's own template when editing, the shop's default when creating.
         $record = $schema->getRecord();
         $template = $record instanceof Product ? $record->catalogTemplate() : Templates::forShop();
-        // The ml stock and cost screens only mean something for pooled ml stock;
-        // a per-variant template counts and costs each variant instead (step 40).
-        $measured = $template->measure() === 'ml' && $template->pooledStock();
+        // The running-amount stock and cost screens are for pooled stock; a
+        // per-variant template counts and costs each variant instead (step 40).
+        // Decant keeps its bottle words; a weighed product buys by the sack (40b).
+        $pooled = $template->pooledStock();
+        $unit = (string) $template->measure();
+        $bottle = $unit === StockUnit::ML;
 
         return $schema
             ->columns(2)
@@ -87,9 +91,11 @@ class ProductForm
                     ]),
                 // One stock section per mode: both bind low_stock_threshold, so the
                 // other mode's is left out, not hidden (a hidden field still fills).
-                ...($measured ? [
+                ...($pooled ? [
                     Section::make('Stock')
-                        ->description('Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.')
+                        ->description($bottle
+                            ? 'Track how much you have left, in millilitres — the total across every bottle of this one. Leave blank to not track it: the manual in-stock toggles below still apply.'
+                            : "Track how much you have left, in {$unit} — everything you have of this one. Leave blank to not track it: the manual in-stock toggles below still apply.")
                         ->columnSpanFull()
                         ->columns(2)
                         ->schema([
@@ -97,20 +103,21 @@ class ProductForm
                                 ->label('Remaining')
                                 ->numeric()
                                 ->minValue(0)
-                                ->suffix('ml')
-                                ->helperText('Blank = not tracked. Drops on its own each time an order is decanted.')
+                                ->suffix($unit)
+                                ->helperText(trim('Blank = not tracked. Drops on its own each time an order is '.mb_strtolower($template->preparedLabel()).'. '.StockUnit::help($unit)))
                                 ->hintAction(
                                     Action::make('addBottle')
-                                        ->label('Add bottle')
+                                        ->label($bottle ? 'Add bottle' : 'Add stock')
                                         ->icon(Heroicon::OutlinedPlusCircle)
                                         ->schema([
                                             TextInput::make('ml')
-                                                ->label('Bottle size')
+                                                ->label($bottle ? 'Bottle size' : 'Amount')
                                                 ->numeric()
                                                 ->minValue(1)
-                                                ->default(100)
-                                                ->suffix('ml')
-                                                ->datalist([30, 50, 75, 100, 125, 200])
+                                                ->default($bottle ? 100 : null)
+                                                ->suffix($unit)
+                                                ->datalist($bottle ? [30, 50, 75, 100, 125, 200] : [])
+                                                ->helperText(StockUnit::help($unit))
                                                 ->required(),
                                         ])
                                         ->action(fn (array $data, Get $get, Set $set): mixed => $set(
@@ -123,11 +130,11 @@ class ProductForm
                                 ->numeric()
                                 ->minValue(0)
                                 ->default(30)
-                                ->suffix('ml')
-                                ->helperText('Flag it on the dashboard once the remaining volume falls to this.'),
+                                ->suffix($unit)
+                                ->helperText('Flag it on the dashboard once the remaining '.($bottle ? 'volume' : 'amount').' falls to this.'),
                         ]),
                 ] : []),
-                ...(! $template->pooledStock() ? [
+                ...(! $pooled ? [
                     Section::make('Stock')
                         ->description('Count each option in its row below ("In stock"). Leave a count blank to not track it: the in-stock toggles still apply.')
                         ->columnSpanFull()
@@ -143,13 +150,15 @@ class ProductForm
                         ]),
                 ] : []),
                 Section::make('Cost')
-                    ->visible($measured)
-                    ->description('What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
+                    ->visible($pooled)
+                    ->description($bottle
+                        ? 'What you pay for the juice — one bottle\'s price and its size. Liquid only: vials, labels and spillage aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.'
+                        : 'What you pay for the goods — one purchase\'s price and how much it was. Goods only: bags, labels and waste aren\'t in this number. Leave both blank to not track cost; margin shows only for orders whose lines all have one.')
                     ->columnSpanFull()
                     ->columns(2)
                     ->schema([
                         TextInput::make('reference_cost_mmk')
-                            ->label('Bottle cost')
+                            ->label($bottle ? 'Bottle cost' : 'Purchase cost')
                             ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
                             ->stripCharacters(',')
                             ->numeric()
@@ -158,11 +167,12 @@ class ProductForm
                             ->requiredWith('reference_amount')
                             ->helperText('Update by hand when you rebuy at a new price — past orders keep the cost they were created with.'),
                         TextInput::make('reference_amount')
-                            ->label('Bottle size')
+                            ->label($bottle ? 'Bottle size' : 'Purchase amount')
                             ->numeric()
                             ->minValue(1)
-                            ->suffix('ml')
-                            ->datalist([30, 50, 75, 100, 125, 200])
+                            ->suffix($unit)
+                            ->datalist($bottle ? [30, 50, 75, 100, 125, 200] : [])
+                            ->helperText(StockUnit::help($unit))
                             ->requiredWith('reference_cost_mmk'),
                     ]),
                 Section::make($template->variantsHeading())
@@ -172,13 +182,14 @@ class ProductForm
     }
 
     /**
-     * A product's variants (step 38): ml sizes for decant, exactly as before; for a
-     * template with no measure, one text field per variant option (Size, Color),
-     * an optional photo per variant, and drag-to-reorder into `position`.
+     * A product's variants (step 38): ml sizes for decant, exactly as before; a
+     * weight per variant for a weighed template (step 40b); for a template with
+     * no measure, one text field per variant option (Size, Color), an optional
+     * photo per variant, and drag-to-reorder into `position`.
      */
     public static function variantsRepeater(Template $template): Repeater
     {
-        $measured = $template->measure() === 'ml';
+        $measured = $template->measure() === StockUnit::ML;
 
         // Saved variants are archived, never removed: a variant on a placed order
         // can't be deleted (order_items restricts it), so only a row that isn't
@@ -232,6 +243,56 @@ class ProductForm
                 ]);
         }
 
+        // Per-variant stock and cost (step 40): pieces, and what one costs you.
+        $counted = [
+            TextInput::make('stock_qty')
+                ->label('In stock')
+                ->numeric()
+                ->minValue(0)
+                ->suffix('pcs')
+                ->helperText('Blank = not counted. Drops on its own when an order is '.mb_strtolower($template->preparedLabel()).'.')
+                ->visible(! $template->pooledStock()),
+            TextInput::make('unit_cost_mmk')
+                ->label('Cost')
+                ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
+                ->stripCharacters(',')
+                ->numeric()
+                ->minValue(0)
+                ->suffix('Ks')
+                ->helperText('What one costs you. Blank = unknown; margin shows only when every line has a cost.')
+                ->visible(! $template->pooledStock()),
+        ];
+
+        if ($template->measure() !== null) {
+            // A weighed variant is its amount, whole kyatthar; it labels itself
+            // ("1 viss") from that (ProductVariant::booted).
+            return $repeater
+                ->addActionLabel('Add '.mb_strtolower($template->variantOptions()[0]))
+                ->defaultItems(1)
+                ->schema([
+                    TextInput::make('measure')
+                        ->label($template->variantOptions()[0])
+                        ->numeric()
+                        ->integer()
+                        ->minValue(1)
+                        ->suffix($template->measure())
+                        ->helperText(StockUnit::help($template->measure()))
+                        ->required()
+                        ->distinct()
+                        ->validationMessages(['distinct' => 'Each amount can only appear once.']),
+                    $price,
+                    Toggle::make('in_stock')
+                        ->default(true)
+                        ->inline(false),
+                    Toggle::make('is_active')
+                        ->label('Selling')
+                        ->helperText('Off hides this amount from the shop. Past orders keep it.')
+                        ->default(true)
+                        ->inline(false),
+                    ...$counted,
+                ]);
+        }
+
         $options = $template->variantOptions();
 
         return $repeater
@@ -271,23 +332,7 @@ class ProductForm
                     ->helperText('Off hides this option from the shop. Past orders keep it.')
                     ->default(true)
                     ->inline(false),
-                // Per-variant stock and cost (step 40): pieces, and what one costs you.
-                TextInput::make('stock_qty')
-                    ->label('In stock')
-                    ->numeric()
-                    ->minValue(0)
-                    ->suffix('pcs')
-                    ->helperText('Blank = not counted. Drops on its own when an order is '.mb_strtolower($template->preparedLabel()).'.')
-                    ->visible(! $template->pooledStock()),
-                TextInput::make('unit_cost_mmk')
-                    ->label('Cost')
-                    ->mask(RawJs::make('$money($input, \'.\', \',\', 0)'))
-                    ->stripCharacters(',')
-                    ->numeric()
-                    ->minValue(0)
-                    ->suffix('Ks')
-                    ->helperText('What one costs you. Blank = unknown; margin shows only when every line has a cost.')
-                    ->visible(! $template->pooledStock()),
+                ...$counted,
                 FileUpload::make('image_path')
                     ->label('Photo')
                     ->image()
