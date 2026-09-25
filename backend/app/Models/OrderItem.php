@@ -15,21 +15,6 @@ class OrderItem extends Model
     protected static function booted(): void
     {
         static::saving(function (self $item) {
-            // Cost snapshot, creating-only — cost behaves exactly like price:
-            // written once from the live reference when the item is created
-            // (checkout, manual admin entry, or a line added to an old order),
-            // never refreshed on a later save. A snapshot that recomputes is a
-            // cache; this one prices the pour this order actually gets. find(),
-            // not the relation, so an unloaded relation can't trip the dev/test
-            // lazy-loading guard.
-            if (! $item->exists && $item->unit_cost_mmk === null && $item->product_id !== null) {
-                $product = $item->relationLoaded('product')
-                    ? $item->product
-                    : Product::query()->find($item->product_id);
-
-                $item->unit_cost_mmk = $product?->liquidCostMmk((int) $item->size_ml);
-            }
-
             // Variant snapshot, creating-only, like the name snapshot: which
             // variant this line sold and how it read at the time ("10ml"). A line
             // entered by product + size (the admin form, the decant checkout) is
@@ -48,6 +33,24 @@ class OrderItem extends Model
                 $item->variant_label_snapshot ??= $item->size_ml !== null ? "{$item->size_ml}ml" : null;
             }
 
+            // Cost snapshot, creating-only — cost behaves exactly like price:
+            // written once from the live reference when the item is created
+            // (checkout, manual admin entry, or a line added to an old order),
+            // never refreshed on a later save. A snapshot that recomputes is a
+            // cache; this one prices what this order actually gets. After the
+            // variant match above, because the product's stock mode picks the
+            // source (step 40): pooled costs its share of the reference purchase,
+            // per variant reads the variant's own cost — never one falling back
+            // to the other, and unknown stays null. find(), not the relation, so
+            // an unloaded relation can't trip the dev/test lazy-loading guard.
+            if (! $item->exists && $item->unit_cost_mmk === null && $item->product_id !== null) {
+                $item->unit_cost_mmk = self::currentUnitCost(
+                    $item->relationLoaded('product') ? $item->product : Product::query()->find($item->product_id),
+                    $item->product_variant_id,
+                    $item->size_ml,
+                );
+            }
+
             $item->line_total_mmk = $item->unit_price_mmk * $item->quantity;
 
             // Null-propagating: a quantity edit re-derives from the STORED unit
@@ -57,6 +60,28 @@ class OrderItem extends Model
                 ? null
                 : $item->unit_cost_mmk * $item->quantity;
         });
+    }
+
+    /**
+     * What one unit of this line costs the seller today, by the product's stock
+     * mode, or null when unknown. The one cost rule — the line snapshot and the
+     * admin order form's pre-fill both call it.
+     */
+    public static function currentUnitCost(?Product $product, ?int $variantId, ?int $sizeMl): ?int
+    {
+        if ($product === null) {
+            return null;
+        }
+
+        if ($product->pooledStock()) {
+            return $product->liquidCostMmk((int) $sizeMl);
+        }
+
+        $cost = $variantId === null
+            ? null
+            : ProductVariant::query()->where('product_id', $product->id)->whereKey($variantId)->value('unit_cost_mmk');
+
+        return $cost === null ? null : (int) $cost;
     }
 
     public function order(): BelongsTo

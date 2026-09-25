@@ -121,8 +121,8 @@ Table products {
   image_path varchar [null]
   is_active boolean [not null, default: true]
   is_featured boolean [not null, default: false]
-  stock_ml int [null, note: 'null = stock not tracked (opt-in)']
-  low_stock_threshold_ml int [not null, default: 30]
+  stock_amount int [null, note: 'pooled stock (step 40; was stock_ml), in the template\'s measure (ml); null = not tracked (opt-in)']
+  low_stock_threshold int [not null, default: 30, note: 'reorder line: ml for pooled, pieces per variant for per-variant']
   bottle_cost_mmk int [null, note: 'live reference cost — liquid only; null = cost not tracked']
   bottle_volume_ml int [null]
   created_at timestamp [null]
@@ -163,6 +163,8 @@ Table product_variants {
   is_active boolean [not null, default: true, note: 'archived, never deleted, once on an order']
   position int [not null, default: 0, note: 'display order; ties sort by size_ml']
   image_path varchar [null, note: 'a photo per variant (colour), under shops/{id}/variants/']
+  stock_qty int [null, note: 'per-variant stock in pieces (step 40); null = not tracked']
+  unit_cost_mmk int [null, note: 'per-variant cost of one (step 40); null = unknown, never 0; admin-eyes only']
   indexes {
     (product_id, size_ml) [unique]
   }

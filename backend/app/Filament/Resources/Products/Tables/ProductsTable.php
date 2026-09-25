@@ -49,7 +49,7 @@ class ProductsTable
             $template->attributes(),
             fn (Attribute $attribute): bool => $attribute->type === Attribute::SELECT,
         ));
-        // The ml stock, cost, size filter and CSV import are decant's (step 38).
+        // The ml cost, size filter and CSV import are decant's (step 38).
         $measured = $template->measure() === 'ml';
 
         return $table
@@ -83,22 +83,27 @@ class ProductsTable
                         ->where('is_active', true)
                         ->map(fn ($variant) => $variant->label())
                         ->implode(' · ')),
-                TextColumn::make('stock_ml')
+                // Pooled: the running ml; per variant (step 40): the pieces across
+                // counted options, red when any is at its reorder line.
+                TextColumn::make('stock_amount')
                     ->label('Stock')
-                    ->visible($measured)
                     ->badge()
-                    ->state(fn (Product $record): string => $record->isStockTracked()
-                        ? "{$record->stock_ml}ml"
-                        : '—')
+                    ->state(fn (Product $record): string => match (true) {
+                        ! $record->isStockTracked() => '—',
+                        $record->pooledStock() => "{$record->stock_amount}ml",
+                        default => $record->variants->where('is_active', true)->sum('stock_qty').' pcs',
+                    })
                     ->color(fn (Product $record): string => match (true) {
                         ! $record->isStockTracked() => 'gray',
                         $record->isLowStock() => 'danger',
                         default => 'success',
                     })
-                    ->tooltip(fn (Product $record): ?string => $record->isLowStock()
-                        ? "Low — reorder at {$record->low_stock_threshold_ml}ml"
-                        : null)
-                    ->sortable(),
+                    ->tooltip(fn (Product $record): ?string => match (true) {
+                        ! $record->isLowStock() => null,
+                        $record->pooledStock() => "Low — reorder at {$record->low_stock_threshold}ml",
+                        default => 'Low: '.$record->lowVariants()->map(fn ($variant): string => "{$variant->label()} ({$variant->stock_qty})")->implode(', '),
+                    })
+                    ->sortable($measured),
                 TextColumn::make('cost_per_ml')
                     ->label('Cost/ml')
                     ->visible($measured)
@@ -149,9 +154,10 @@ class ProductsTable
                 ReplicateAction::make()
                     ->excludeAttributes(['slug'])
                     ->after(function (Product $record, Product $replica): void {
-                        // slug was excluded, so the HasSlug hook generated a fresh one; copy the price rows
+                        // slug was excluded, so the HasSlug hook generated a fresh one; copy the price
+                        // rows with their cost — not their count: the copy starts uncounted
                         $record->variants->each(fn ($variant) => $replica->variants()->create(
-                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position'])
+                            $variant->only(['size_ml', 'options', 'image_path', 'price_mmk', 'in_stock', 'is_active', 'position', 'unit_cost_mmk'])
                         ));
                     }),
                 ProductResource::safeDeleteAction(),

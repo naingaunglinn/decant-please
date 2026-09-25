@@ -86,7 +86,7 @@ moves a studio user between shops**
 | `/admin/login` | The only public admin route |
 | `/admin/{shop}` | Dashboard — stats, revenue chart, top fragrances, upcoming decants |
 | `/admin/{shop}/brands` + `/create`, `/{id}/edit` | Brand CRUD |
-| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD — attribute fields, columns and filters come from the shop's template — sizes (archived, never deleted), stock, "View on site" |
+| `/admin/{shop}/fragrances` + `/create`, `/{id}/edit` | Product (fragrance) CRUD — attribute fields, columns and filters come from the shop's template — sizes (archived, never deleted), stock (pooled ml, or pieces + cost per variant), "View on site" |
 | `/admin/{shop}/orders` + `/create`, `/{id}/edit` | Order tabs (Needs review first), accept/reject, CSV export |
 | `/admin/{shop}/promo-codes` + `/create`, `/{id}/edit` | Promo code CRUD — caps, minimums, usage limits, dates |
 | `/admin/{shop}/production-schedule` | Decant schedule — month calendar; every day clicks through to its worklist |
@@ -175,7 +175,7 @@ backend/
 ├── resources/views/filament/               # schedule calendar + printable day-sheet Blade views
 ├── routes/api.php                          # /api/v1/{shop}/* with per-endpoint throttles
 ├── storage/                                # local uploads via storage:link — production images/proofs live in Cloudflare R2, not on the dyno
-├── tests/Feature/                          # 364 tests: parity baseline, domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
+├── tests/Feature/                          # 445 tests: parity baseline, stock modes, domain, admin, public API, promo, payments, stock, CSV import, Telegram, invoices, schedule, tenant isolation, storefront hosts, shop lifecycle, Shield roles, impersonation audit, studio registry
 ├── .env.example                            # ← local template — production configuration lives in Heroku config vars, no .env on the dyno
 └── composer.json                           # PHP 8.3+, Laravel 13, Filament v5
 ```

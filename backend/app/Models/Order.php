@@ -60,8 +60,8 @@ class Order extends Model
             }
         });
 
-        // Stock is drawn down when the vials are physically filled — i.e. the
-        // moment the order becomes Prepared (decanted), not when it's accepted. Warn-only:
+        // Stock is drawn down when the order is physically made up — the moment
+        // it becomes Prepared (decanted, packed), not when it's accepted. Warn-only:
         // this never blocks the transition (a shortfall just clamps to 0 and
         // shows on the low-stock panel), and it leaves the manual in_stock
         // toggle alone. wasChanged() means it fires once, on the actual
@@ -69,7 +69,7 @@ class Order extends Model
         // order won't pour twice.
         static::updated(function (self $order) {
             if ($order->wasChanged('status') && $order->status === OrderStatus::Prepared) {
-                $order->drawDownDecantStock();
+                $order->drawDownStock();
             }
         });
 
@@ -280,32 +280,50 @@ class Order extends Model
     }
 
     /**
-     * Pour every item's volume off its product's running stock total, once
-     * per product (a 5ml + a 10ml of the same juice draws 15ml in one write).
-     * Untracked products are skipped inside Product::drawDownStock. Called
-     * from the → Prepared transition in booted().
+     * Take this order off the shelf, in each product's stock mode (step 40): a
+     * pooled product once per product (a 5ml + a 10ml of the same juice draws
+     * 15ml in one write), a per-variant one once per variant, by quantity.
+     * Untracked counts are skipped. Called from the → Prepared transition.
+     *
+     * One transaction, and every affected row is locked (products, then variants,
+     * each in id order, so two orders never lock in opposite orders) before any is
+     * written: two different orders prepared at once can't both read 50ml and both
+     * write 40. (The same order saved to Prepared twice at once is not guarded
+     * here — the order row isn't locked; that was true before step 40 too.)
+     * Still warn-only — a shortfall clamps at zero rather than blocking an order
+     * whose vials are already filled; Accept is where it is flagged.
      */
-    protected function drawDownDecantStock(): void
+    protected function drawDownStock(): void
     {
-        $this->loadMissing('items');
+        $this->loadMissing('items.product');
 
-        $mlByProduct = [];
+        $byProduct = [];
+        $byVariant = [];
         foreach ($this->items as $item) {
-            if ($item->product_id === null || $item->size_ml === null) {
+            if ($item->product === null) {
                 continue;
             }
 
-            $mlByProduct[$item->product_id] = ($mlByProduct[$item->product_id] ?? 0)
-                + $item->size_ml * $item->quantity;
+            if ($item->product->pooledStock()) {
+                if ($item->size_ml !== null) {
+                    $byProduct[$item->product_id] = ($byProduct[$item->product_id] ?? 0) + $item->size_ml * $item->quantity;
+                }
+            } elseif ($item->product_variant_id !== null) {
+                $byVariant[$item->product_variant_id] = ($byVariant[$item->product_variant_id] ?? 0) + $item->quantity;
+            }
         }
 
-        if ($mlByProduct === []) {
+        if ($byProduct === [] && $byVariant === []) {
             return;
         }
 
-        Product::whereIn('id', array_keys($mlByProduct))
-            ->get()
-            ->each(fn (Product $product) => $product->drawDownStock($mlByProduct[$product->id]));
+        DB::transaction(function () use ($byProduct, $byVariant): void {
+            $products = $byProduct === [] ? collect() : Product::query()->whereKey(array_keys($byProduct))->orderBy('id')->lockForUpdate()->get();
+            $variants = $byVariant === [] ? collect() : ProductVariant::query()->whereKey(array_keys($byVariant))->orderBy('id')->lockForUpdate()->get();
+
+            $products->each(fn (Product $product) => $product->drawDownStock($byProduct[$product->id]));
+            $variants->each(fn (ProductVariant $variant) => $variant->drawDownStock($byVariant[$variant->id]));
+        });
     }
 
     /**
@@ -485,31 +503,48 @@ class Order extends Model
     }
 
     /**
-     * Tracked products this order can't be fully poured from, given current
-     * stock_ml — surfaced at Accept so a shortfall is caught before committing,
-     * not at the decant bench. Untracked (null stock_ml) products are ignored.
+     * What this order can't be fully made up from, given current stock, in each
+     * product's mode — surfaced at Accept so a shortfall is caught before
+     * committing, not at the bench. Untracked (null) counts are ignored. `unit`
+     * is the pooled measure ("ml"), or "" for pieces.
      *
-     * @return array<array{name: string, needed: int, available: int}>
+     * @return array<array{name: string, needed: int, available: int, unit: string}>
      */
     public function stockShortfalls(): array
     {
-        $this->loadMissing('items.product');
+        $this->loadMissing('items.product', 'items.variant');
 
         $needed = [];
         foreach ($this->items as $item) {
-            if ($item->product_id === null || $item->size_ml === null) {
+            if ($item->product === null) {
                 continue;
             }
 
-            $needed[$item->product_id]['name'] ??= $item->product?->name ?? $item->fragrance_name_snapshot;
-            $needed[$item->product_id]['ml'] = ($needed[$item->product_id]['ml'] ?? 0) + $item->size_ml * $item->quantity;
-            $needed[$item->product_id]['stock'] = $item->product?->stock_ml;
+            if ($item->product->pooledStock()) {
+                if ($item->size_ml === null) {
+                    continue;
+                }
+
+                $row = &$needed["p{$item->product_id}"];
+                $row['name'] ??= $item->product->name;
+                $row['amount'] = ($row['amount'] ?? 0) + $item->size_ml * $item->quantity;
+                $row['stock'] = $item->product->stock_amount;
+                $row['unit'] = (string) $item->product->catalogTemplate()->measure();
+            } elseif ($item->variant !== null) {
+                $row = &$needed["v{$item->product_variant_id}"];
+                $row['name'] ??= "{$item->product->name} {$item->variantLabel()}";
+                $row['amount'] = ($row['amount'] ?? 0) + $item->quantity;
+                $row['stock'] = $item->variant->stock_qty;
+                $row['unit'] = '';
+            }
+
+            unset($row);
         }
 
         $short = [];
         foreach ($needed as $row) {
-            if ($row['stock'] !== null && $row['ml'] > $row['stock']) {
-                $short[] = ['name' => $row['name'], 'needed' => $row['ml'], 'available' => (int) $row['stock']];
+            if ($row['stock'] !== null && $row['amount'] > $row['stock']) {
+                $short[] = ['name' => $row['name'], 'needed' => $row['amount'], 'available' => (int) $row['stock'], 'unit' => $row['unit']];
             }
         }
 

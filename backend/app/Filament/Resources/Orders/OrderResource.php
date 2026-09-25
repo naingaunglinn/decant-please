@@ -115,7 +115,7 @@ class OrderResource extends Resource
         $parts = [];
 
         foreach ($record->stockShortfalls() as $short) {
-            $parts[] = "⚠ {$short['name']}: needs {$short['needed']}ml but only {$short['available']}ml in stock.";
+            $parts[] = "⚠ {$short['name']}: needs {$short['needed']}{$short['unit']} but only {$short['available']}{$short['unit']} in stock.";
         }
 
         if ($record->payment_method === PaymentMethod::Online && $record->payment_status === PaymentStatus::Unpaid) {

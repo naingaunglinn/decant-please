@@ -25,7 +25,7 @@ treat §8 itself as the source.
 | Payment proof flag | `has_payment_proof` (v12) |
 | Revenue this month, revenue chart | `OrderStats.php:17`, `RevenueChart` |
 | Top fragrances (by vials, not money) | `TopFragrances` |
-| Stock in ml, low-stock alert | `stock_ml`, `low_stock_threshold_ml` (v8) |
+| Stock (pooled ml, or pieces per variant), low-stock alert | `stock_amount`, `low_stock_threshold` (v8; renamed step 40), `product_variants.stock_qty` (step 40) |
 | Bottle cost + liquid-only gross margin | `liquidCostMmk` (ceiling), `unit_cost_mmk`/`line_cost_mmk` snapshots, dashboard stat, CSV columns (step 28) |
 | Township rate table + fee derived at checkout | `delivery_townships` (+ per-courier coverage/reference-cost rows), `/delivery-zones`, order snapshots (step 30) |
 | Order CSV export incl. balance due | `OrdersTable.php:126` |

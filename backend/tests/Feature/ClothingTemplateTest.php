@@ -73,7 +73,7 @@ class ClothingTemplateTest extends TestCase
         $brand = Brand::create(['name' => 'Yangon Threads', 'type' => 'designer']);
 
         Livewire::test(CreateProduct::class)
-            ->assertFormFieldHidden('stock_ml')
+            ->assertFormFieldDoesNotExist('stock_amount')
             ->assertFormFieldHidden('bottle_cost_mmk')
             ->fillForm([
                 'brand_id' => $brand->id,
@@ -135,7 +135,7 @@ class ClothingTemplateTest extends TestCase
         $allure->variants()->create(['size_ml' => 10, 'price_mmk' => 55000]);
 
         Livewire::test(EditProduct::class, ['record' => $allure->getRouteKey()])
-            ->assertFormFieldVisible('stock_ml')
+            ->assertFormFieldVisible('stock_amount')
             ->call('save')
             ->assertHasNoFormErrors();
 
