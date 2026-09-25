@@ -198,6 +198,17 @@ class PublicApiTest extends TestCase
             'code' => 'NONE', 'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 10, 'quantity' => 1]],
         ])->assertOk();
 
+        // both sent: variant_id wins, the legacy pair is ignored
+        $this->postJson('/api/v1/decant-please/orders', $this->payload([
+            'items' => [[
+                'variant_id' => $this->variantId($this->allure, 10),
+                'fragrance_id' => $this->allure->id, 'size_ml' => 5, 'quantity' => 1,
+            ]],
+        ]))->assertCreated();
+        $item = Order::latest('id')->firstOrFail()->items()->firstOrFail();
+        $this->assertSame(10, $item->size_ml);
+        $this->assertSame(55000, $item->unit_price_mmk);
+
         $errors = $this->postJson('/api/v1/decant-please/orders', $this->payload([
             'items' => [['fragrance_id' => $this->allure->id, 'size_ml' => 7, 'quantity' => 1]],
         ]))->assertUnprocessable()->json('errors');

@@ -24,6 +24,7 @@ use App\Models\DeliveryTownshipCourier;
 use App\Models\Expense;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\PromoCode;
 use App\Models\Shop;
 use App\Models\ShopSetting;
@@ -248,6 +249,7 @@ class TenantIsolationTest extends TestCase
         $this->forShop($this->shopB);
         $bVariantId = $this->variantId($this->makeFragrance(), 10);
         $this->forShop($this->shopA);
+        $this->assertNull(ProductVariant::find($bVariantId)); // the variant scope itself
         $township = $this->serviceableTownship();
 
         $this->postJson("/api/v1/{$this->shopA->slug}/orders", [

@@ -220,8 +220,8 @@ class Order extends Model
      * archived variant is not for sale, so it never resolves — the server refuses
      * it whatever the client sends. A line names its variant by `variant_id`
      * (step 36b); the legacy `fragrance_id` + `size_ml` pair still resolves so a
-     * storefront or a saved cart from before the deploy keeps checking out
-     * (removed after go-live, RUN-QUEUE).
+     * pre-36b storefront (a page still open during the deploy) keeps checking out.
+     * `variant_id` wins when both are sent. Removed after go-live (RUN-QUEUE).
      *
      * @param  array{variant_id?: int, fragrance_id?: int, size_ml?: int}  $item
      */

@@ -28,8 +28,9 @@ Route::prefix('v1/{shop}')->middleware(ResolveTenant::class)->group(function () 
         Route::get('/brands', BrandController::class);
         Route::get('/products', [ProductController::class, 'index']);
         Route::get('/products/{slug}', [ProductController::class, 'show']);
-        // Pre-36b names, kept so the storefront and the API can deploy in either
-        // order. Removed after go-live (RUN-QUEUE).
+        // Pre-36b names, kept so a pre-36b storefront keeps working once this API
+        // is live. The API deploys first (the 36b storefront needs /products).
+        // Removed after go-live (RUN-QUEUE).
         Route::get('/fragrances', [ProductController::class, 'index']);
         Route::get('/fragrances/{slug}', [ProductController::class, 'show']);
         Route::get('/meta', MetaController::class);

@@ -54,7 +54,7 @@ never starves another (a burst of catalog browsing can't block a checkout):
 
 | Bucket | Endpoints | Limit |
 |---|---|---|
-| `catalog` | `GET /brands`, `/products`, `/products/{slug}`, `/meta`, `/delivery-zones` | 120/min |
+| `catalog` | `GET /brands`, `/products`, `/products/{slug}` (and the `/fragrances` aliases), `/meta`, `/delivery-zones` | 120/min |
 | `checkout` | `POST /orders` | 10/min |
 | `tracking` | `GET /orders/track` | 20/min |
 | `cancel` | `POST /orders/cancel` | 10/min |
@@ -85,8 +85,8 @@ Active brands, ordered by name.
 ## `GET /products`
 
 > **Renamed in step 36b** from `GET /fragrances` (and `/fragrances/{slug}` →
-> `/products/{slug}`). The old paths still answer, identically, so the storefront and
-> the API can deploy in either order; they are removed after go-live. New clients use
+> `/products/{slug}`). The old paths still answer, identically, so a pre-36b client
+> keeps working against this API; they are removed after go-live. New clients use
 > `/products`.
 
 The filterable catalog. All parameters optional:

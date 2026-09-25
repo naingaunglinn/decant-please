@@ -222,7 +222,9 @@ spec's contract rule (a Resource change lands with `types.ts`) gives the seam:
   - `/fragrances` and `/fragrances/{slug}` stay as aliases.
   - Checkout still resolves a legacy `fragrance_id` + `size_ml` line.
 
-  Both alias paths go after go-live (a RUN-QUEUE row). The storefront cart moved to a `v2`
+  Both alias paths go after go-live (a RUN-QUEUE row). They protect an old storefront on
+  the new API, not the reverse, so the API deploys first: Heroku maintenance mode stays on
+  from before the `main` promotion until the release is out. The storefront cart moved to a `v2`
   storage key, so a pre-deploy cart is dropped rather than migrated. Component names
   (`FragranceCard`, `FragranceGrid`) and the tracking receipt's `fragrance_name`/`size_ml`
   are unchanged. Step 37's template decides the storefront's words.
