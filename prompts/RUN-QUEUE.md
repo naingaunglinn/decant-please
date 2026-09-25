@@ -32,7 +32,8 @@ run handles them first. Merge stack PRs bottom-up with a merge commit, not a squ
 | 9 | Step 41: module toggles, template default modules | §41 + roadmap "default modules" | pr-open | 131-module-toggles | #132 |
 | 10 | Step 42: design-spec sync (docs) | §42 | pr-open | 133-design-spec-sync | #135 |
 | 10b | Fix #134 (found in step 42): the tracking receipt's item name from `fragrance_name_snapshot`, not the live product (snapshot rule); `decant:fresh-start` deletes variant photos; the payment-proof endpoint's status rule (check it, or correct the comment); generic wording for the "fragrance" error strings | issue #134, don't file another | pr-open | 134-snapshot-receipt-fixes | #136 |
-| 11 | Self-serve sign-up + automatic `slug.cornerarea.me` | roadmap: shared foundation. The wildcard DNS/Vercel attach is an owner step: document it, don't do it | todo | | |
+| 11 | Step 44a: shop registration foundation — one `ShopRegistration::register()` (Studio + sign-up), reserved slugs, automatic `slug.cornerarea.me` address, `Shop::publish()` | `prompts/44-self-serve-signup.md` §44a (roadmap: shared foundation). The wildcard DNS/Vercel attach is an owner step: document it, don't do it | in-progress | 137-self-serve-signup | |
+| 11b | Step 44b: seller sign-up in the admin panel (account + create-your-shop), phone verification (sender interface, fails closed when unconfigured), Publish button, English + Burmese | §44b (split from row 11); issue #137, don't file another | todo | | |
 | 12 | Help button (admin → studio on Viber/Telegram) | roadmap: shared foundation | todo | | |
 | 13 | Design system: section library, 3 base designs, `shop_designs`, preset picker, manual editor (no AI) | roadmap: design system | todo | | |
 | 14 | AI design editor + per-shop quota | roadmap: design system. API key from env (owner step); tests mock the API | todo | | |
