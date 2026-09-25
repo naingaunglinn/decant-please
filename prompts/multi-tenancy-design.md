@@ -434,7 +434,7 @@ the create side — a bare scope can't do that second half; the hook has to.
   them either. The one integrity watch is `orders.delivery_township_id` pointing at another
   shop's township — closed by the checkout re-validation note below.
 
-**Added by the generic-shop refactor (steps 35–41, v40–v49; synced in step 42):**
+**Added by the generic-shop refactor (steps 35–41, v39–v49; synced in step 42):**
 
 - **Renames, same rows, same `shop_id`.** `fragrances` → `products`, `decant_prices` →
   `product_variants`, `fragrance_id` → `product_id` on both child tables (step 36). The
