@@ -130,7 +130,7 @@ export interface CatalogMeta {
 export interface StoreDesign {
   version: number;
   base: string; // clean | bold | warm
-  preset?: string;
+  preset?: string | null; // null for a hand-edited design
   theme: {
     colors: { background: string; text: string; primary: string; primary_text: string };
     font: string; // modern | classic | friendly
@@ -142,7 +142,8 @@ export interface DesignSection {
   type: string;
   on: boolean;
   /** The section's props, per type (backend App\Design\Sections). Strings,
-   *  `image` (a URL or null) and `items` (a list of string records). */
+   *  `image` (a URL or null) and `items` (a list of string records). A section
+   *  without props may arrive as `[]` (PHP's empty array); read it as `{}`. */
   props: Record<string, unknown>;
 }
 

@@ -134,7 +134,8 @@ export function HomeSection({ section, data }: { section: DesignSection; data: S
       const brandTyped = data.meta ? data.meta.brand_types.length > 0 : true;
       const tiles = items(props)
         .map((tile, i) => ({ label: tile.label ?? "", text: tile.text ?? "", link: tile.link ?? "", dark: i === 1 }))
-        .filter((tile) => tile.link && (brandTyped || !tile.link.includes("brand_type")));
+        // On-shop paths only — the validator's rule, checked again on render.
+        .filter((tile) => /^\/(?!\/)/.test(tile.link) && (brandTyped || !tile.link.includes("brand_type")));
       if (tiles.length === 0) return null;
 
       return (

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\Api\MetaController;
 use App\Models\Concerns\BelongsToShop;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -52,7 +53,7 @@ class ShopSetting extends Model
         // Modules and status labels are memoised per request with once(): forget
         // them too, so a toggle or template change shows on the same request.
         static::saved(function (): void {
-            Cache::forget('api.meta.'.app(TenantContext::class)->slug());
+            Cache::forget(MetaController::cacheKey(app(TenantContext::class)->slug()));
             Once::flush();
         });
     }

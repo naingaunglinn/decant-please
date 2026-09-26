@@ -16,9 +16,12 @@ published design. Spec: `prompts/46-design-system.md` § Split.
 
 - **API**: `/meta` gains `design` — the live config (`Designs::forStorefront()`: the
   published row, else the template's Clean preset), with `image` paths resolved to media
-  URLs. The stored row keeps the path. It rides the existing per-shop `api.meta.{slug}`
-  key, which publishing already busts. `design` is **null** when the template has no
-  readable preset (reported, never a 500 — the design can't take checkout down).
+  URLs. The stored row keeps the path. The per-shop cache key is now versioned,
+  `api.meta.v2.{slug}`, spelled once in `MetaController::cacheKey()` (the settings hook
+  and `decant:fresh-start` bust it), so the deploy never serves a pre-46b entry without
+  `design`. `design` is **null** when it can't be built (reported, never a 500 — the
+  design can't take checkout down; a missing tenant still throws). Documented in
+  `backend/docs/api.md`.
   `types.ts` gains `StoreDesign` / `DesignSection`.
 - **Storefront**: the tenant layout sets the design's four colours and font as CSS
   variables on one wrapper (`lib/design.ts`); the `@theme` block is unchanged and stays
@@ -32,9 +35,10 @@ published design. Spec: `prompts/46-design-system.md` § Split.
   a new display-only cached fetch (`getDeliveryZonesForDisplay`, 60 s); checkout still
   reads the uncached tree and the server re-derives the fee. `category_nav` hides until
   categories have a public API.
-- **Parity**: decant with nothing published renders byte-identical text and identical
-  computed colours, fonts and radii to the pre-46b home (`verify-design.mjs` before/after
-  snapshot).
+- **Parity**: decant with nothing published renders identical text and identical
+  computed colours, first font family and radii to the pre-46b home (`verify-design.mjs`
+  before/after snapshot). The font stack gains Burmese fallbacks after Arial, which only
+  Burmese glyphs reach.
 - **Admin**: the Design page joins the Settings menu.
 - Tests: `DesignSystemTest` (meta serves Clean until published, publish/undo live at once,
   image paths → URLs), `TenantIsolationTest` (each shop's `/meta` serves its own design),

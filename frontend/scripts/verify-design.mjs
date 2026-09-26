@@ -135,6 +135,17 @@ for (const section of on) {
   if (!title || ["featured", "product_grid", "delivery_fees", "category_nav", "hero"].includes(section.type)) continue;
   await check(`clothing section "${section.type}" shows its title`, () => page.getByText(title, { exact: true }).first().isVisible(), (v) => v === true);
 }
+const fees = on.find((s) => s.type === "delivery_fees");
+if (fees) {
+  const zones = await fetch(`${API}/v1/${CLOTHING_SLUG}/delivery-zones`).then((r) => r.json());
+  const priced = (zones.regions ?? []).filter((region) => region.townships.length > 0);
+  if (priced.length > 0) {
+    await check("clothing delivery fees: one row per region, in Ks", () => page.getByText(fees.props.title, { exact: true }).locator("xpath=following-sibling::ul[1]/li").allInnerTexts(), (v) =>
+      v.length === priced.length && v.every((row) => /\d{1,3}(,\d{3})* Ks/.test(row)) && !v.some((row) => /\.\d/.test(row)));
+  } else {
+    console.log("SKIP  clothing delivery fees: the shop has no priced zones");
+  }
+}
 const announcement = on.find((s) => s.type === "announcement");
 if (announcement) {
   await check("clothing announcement bar shows", () => page.getByText(announcement.props.text, { exact: true }).isVisible(), (v) => v === true);

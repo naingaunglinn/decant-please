@@ -12,7 +12,7 @@ use App\Templates\Templates;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
-use JsonException;
+use Throwable;
 
 /**
  * The one writer of a shop's storefront designs (step 46; AGENTS.md P4). The
@@ -92,9 +92,10 @@ final class Designs
      * `image` path becomes its URL on the media disk, like the payment QR. The
      * stored config never holds a URL; only this response does.
      *
-     * Null when the template has no readable Clean preset: the design can't
-     * take /meta (and so checkout) down — the storefront renders its plain
-     * fallback, and the error is reported.
+     * Null when the design can't be built (no readable Clean preset, a disk
+     * that can't make URLs): the design can't take /meta (and so checkout)
+     * down — the storefront renders its plain fallback, and the error is
+     * reported. A missing tenant still throws: that is a wiring bug.
      *
      * @return array<string, mixed>|null
      */
@@ -102,21 +103,22 @@ final class Designs
     {
         try {
             $config = self::live();
-        } catch (InvalidArgumentException|JsonException $e) {
+            $disk = Storage::disk(config('filesystems.media_disk'));
+
+            foreach ($config['sections'] ?? [] as $i => $section) {
+                if (is_string($section['props']['image'] ?? null)) {
+                    $config['sections'][$i]['props']['image'] = $disk->url($section['props']['image']);
+                }
+            }
+
+            return $config;
+        } catch (TenantNotSetException $e) {
+            throw $e;
+        } catch (Throwable $e) {
             report($e);
 
             return null;
         }
-
-        $disk = Storage::disk(config('filesystems.media_disk'));
-
-        foreach ($config['sections'] ?? [] as $i => $section) {
-            if (is_string($section['props']['image'] ?? null)) {
-                $config['sections'][$i]['props']['image'] = $disk->url($section['props']['image']);
-            }
-        }
-
-        return $config;
     }
 
     /** What the admin calls a design: "Clean — default", "Preset: Bold", "Edited". */

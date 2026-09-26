@@ -20,11 +20,21 @@ use Illuminate\Support\Facades\Cache;
 
 class MetaController extends Controller
 {
+    /**
+     * Per-shop key: /meta carries the DB-backed payment block, so a global key
+     * would serve one shop's KBZPay/Wave numbers to another (findings Q5/A5).
+     * Versioned: `v2` since step 46b added `design`, so a deploy never serves an
+     * entry cached before it (every home page would render the plain fallback
+     * until it expired). Bump it when the storefront can't do without a new key.
+     */
+    public static function cacheKey(string $slug): string
+    {
+        return "api.meta.v2.{$slug}";
+    }
+
     public function __invoke(): JsonResponse
     {
-        // Per-shop key: /meta carries the DB-backed payment block, so a global key
-        // would serve one shop's KBZPay/Wave numbers to another (findings Q5/A5).
-        $key = 'api.meta.'.app(TenantContext::class)->slug();
+        $key = self::cacheKey(app(TenantContext::class)->slug());
 
         return response()->json(Cache::remember($key, 600, function (): array {
             $available = ProductVariant::query()

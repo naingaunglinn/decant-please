@@ -30,7 +30,10 @@ The step is well over one reviewable PR. It splits on the same seam as 36 and 38
   wrapper (the `globals.css` `@theme` block is untouched) and builds the home page from
   the section list. The Design page joins the menu. Publishing busts only
   `api.meta.{slug}` (`ShopSetting::booted`), so the design goes in `/meta`, or a new
-  endpoint's cache key is busted there too.
+  endpoint's cache key is busted there too. *As built:* the key is versioned
+  (`MetaController::cacheKey()`, `api.meta.v2.{slug}`) so the deploy never serves a
+  pre-46b entry without `design`, and `design` is null — never a 500 — when it can't be
+  built (the storefront then renders a plain fallback).
 - **46c (row 13c): the manual editor.** A phone-first form over the same config: colours
   (with the contrast rule shown in words), font, section order and on/off, section text,
   and decoration images (hero, about) uploaded to `shops/{id}/design/…`, compressed on the

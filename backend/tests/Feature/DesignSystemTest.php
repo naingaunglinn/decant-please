@@ -10,6 +10,7 @@ use App\Design\Theme;
 use App\Enums\DesignSource;
 use App\Exceptions\ReadOnlyImpersonationException;
 use App\Filament\Pages\ManageDesign;
+use App\Http\Controllers\Api\MetaController;
 use App\Models\Shop;
 use App\Models\ShopDesign;
 use App\Models\ShopSetting;
@@ -371,11 +372,11 @@ class DesignSystemTest extends TestCase
     public function test_publishing_busts_the_shops_cached_meta(): void
     {
         $this->getJson('/api/v1/'.config('app.shop_slug').'/meta')->assertOk();
-        $this->assertTrue(cache()->has('api.meta.'.config('app.shop_slug')));
+        $this->assertTrue(cache()->has(MetaController::cacheKey(config('app.shop_slug'))));
 
         Designs::usePreset('decant.warm');
 
-        $this->assertFalse(cache()->has('api.meta.'.config('app.shop_slug')));
+        $this->assertFalse(cache()->has(MetaController::cacheKey(config('app.shop_slug'))));
     }
 
     public function test_deleting_a_shop_removes_its_designs(): void

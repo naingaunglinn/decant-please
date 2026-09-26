@@ -22,6 +22,7 @@ use App\Filament\Widgets\OrderStats;
 use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TopFragrances;
 use App\Filament\Widgets\UpcomingDecants;
+use App\Http\Controllers\Api\MetaController;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\DeliveryTownship;
@@ -744,15 +745,15 @@ class TenantIsolationTest extends TestCase
 
     public function test_meta_cache_key_and_busting_are_per_shop(): void
     {
-        Cache::put('api.meta.'.$this->shopA->slug, ['who' => 'A'], 600);
-        Cache::put('api.meta.'.$this->shopB->slug, ['who' => 'B'], 600);
+        Cache::put(MetaController::cacheKey($this->shopA->slug), ['who' => 'A'], 600);
+        Cache::put(MetaController::cacheKey($this->shopB->slug), ['who' => 'B'], 600);
 
         // Saving A's payment settings busts only A's meta key (ShopSetting saved hook).
         $this->forShop($this->shopA);
         ShopSetting::current()->update(['kbzpay_name' => 'Daw Mya']);
 
-        $this->assertFalse(Cache::has('api.meta.'.$this->shopA->slug));
-        $this->assertTrue(Cache::has('api.meta.'.$this->shopB->slug));
+        $this->assertFalse(Cache::has(MetaController::cacheKey($this->shopA->slug)));
+        $this->assertTrue(Cache::has(MetaController::cacheKey($this->shopB->slug)));
     }
 
     public function test_shop_settings_telegram_and_social_are_per_shop(): void
