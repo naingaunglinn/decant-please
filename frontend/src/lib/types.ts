@@ -117,6 +117,33 @@ export interface CatalogMeta {
    *  Optional: a /meta cached before step 41 lacks it — read a missing list as
    *  "all on" (the server refuses a disabled feature regardless). */
   modules?: string[];
+  /** The shop's live storefront design (step 46b). Optional: a /meta cached before
+   *  46b lacks it, and it is null when the template has no readable preset — the
+   *  storefront then renders its built-in fallback. */
+  design?: StoreDesign | null;
+}
+
+/** A storefront design config (step 46, version 1) as /meta serves it: the
+ *  published row, else the template's Clean preset, `image` props as URLs.
+ *  Validated on write only — a renderer skips a section type or prop it doesn't
+ *  know, never errors on one. Text is plain text; never render it as HTML. */
+export interface StoreDesign {
+  version: number;
+  base: string; // clean | bold | warm
+  preset?: string;
+  theme: {
+    colors: { background: string; text: string; primary: string; primary_text: string };
+    font: string; // modern | classic | friendly
+  };
+  sections: DesignSection[];
+}
+
+export interface DesignSection {
+  type: string;
+  on: boolean;
+  /** The section's props, per type (backend App\Design\Sections). Strings,
+   *  `image` (a URL or null) and `items` (a list of string records). */
+  props: Record<string, unknown>;
 }
 
 export interface ProductFilters {

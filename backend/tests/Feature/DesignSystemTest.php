@@ -20,6 +20,8 @@ use App\Templates\Templates;
 use Filament\Events\TenantSet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Livewire;
@@ -423,8 +425,50 @@ class DesignSystemTest extends TestCase
         $this->assertSame($bold->id, Designs::published()->id);
     }
 
-    public function test_the_design_page_is_out_of_the_menu_until_the_storefront_renders_it(): void
+    public function test_the_design_page_is_in_the_menu_now_the_storefront_renders_it(): void
     {
-        $this->assertFalse(ManageDesign::shouldRegisterNavigation());
+        $this->assertTrue(ManageDesign::shouldRegisterNavigation());
+    }
+
+    // ---- the storefront's design (46b) ----
+
+    private function meta(): TestResponse
+    {
+        return $this->getJson('/api/v1/'.config('app.shop_slug').'/meta')->assertOk();
+    }
+
+    public function test_meta_serves_the_clean_preset_until_a_design_is_published(): void
+    {
+        $this->assertSame(Presets::get('decant.clean'), $this->meta()->json('design'));
+    }
+
+    public function test_meta_serves_the_published_design_at_once(): void
+    {
+        $this->meta(); // cached
+
+        Designs::usePreset('decant.bold');
+        // assertEquals: Postgres jsonb reorders object keys; the section list keeps its order.
+        $this->assertEquals(Presets::get('decant.bold'), $this->meta()->json('design'));
+        $this->assertSame(array_column(Presets::get('decant.bold')['sections'], 'type'), array_column($this->meta()->json('design.sections'), 'type'));
+
+        // Undo: publishing the older row is live on the next request too.
+        $first = ShopDesign::query()->oldest('id')->firstOrFail();
+        Designs::usePreset('decant.warm');
+        Designs::publish($first->id);
+        $this->assertSame('decant.bold', $this->meta()->json('design.preset'));
+    }
+
+    public function test_meta_resolves_design_image_paths_to_urls(): void
+    {
+        Storage::fake('public');
+        $path = DesignConfig::imagePrefix($this->shopId()).'hero.jpg';
+        $config = self::with($this->config(), 'sections.1.props.image', $path);
+        Designs::publish(Designs::create($config, DesignSource::Manual)->id);
+
+        $image = $this->meta()->json('design.sections.1.props.image');
+
+        $this->assertSame(Storage::disk('public')->url($path), $image);
+        // The stored row keeps the path: a config never holds a URL.
+        $this->assertSame($path, Designs::live()['sections'][1]['props']['image']);
     }
 }

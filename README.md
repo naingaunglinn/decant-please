@@ -92,8 +92,8 @@ the panel offers:
   category, and a feature that's off disappears from the menu, dashboard and forms
   (nothing is deleted)
 - Design page (step 46) — pick one of three storefront designs for the shop's category
-  (Clean, Bold, Warm), publish, and undo from the history; every change is kept. Out of
-  the menu until the storefront renders it (step 46b)
+  (Clean, Bold, Warm), publish, and undo from the history; every change is kept. The
+  storefront renders the live design: its colours, font and home-page sections (step 46b)
 - Promo code management — percent or fixed codes with caps, minimums, usage limits and dates
 - Delivery zones (Settings) — a township rate table seeded from Royal Express's coverage
   chart, with per-courier coverage/reference costs (admin-eyes only), bulk fee/cost
@@ -360,6 +360,11 @@ lives in a thin hairline-bordered pill (a vial label, not a badge), and the one 
 motion moment is the tracking timeline filling like a vial. Tokens live in
 `frontend/src/app/globals.css` (portable copy: `design-tokens.json`); the full design
 language is specified in `frontend/AGENTS.md`.
+
+That palette is Decant Please's design and every shop's default. Since step 46b each shop's
+published design (four colours, a font, a base, a home-page section list, served in
+`/meta`) overrides the tokens as CSS variables on the tenant wrapper; the `@theme` block
+itself never changes.
 
 That language is customer-side. The admin and Studio panels are deliberately a second
 register — Filament's own chrome, with stock palettes as the "which panel am I in?" cue

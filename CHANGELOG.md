@@ -9,6 +9,38 @@ Per `prompts/WORKFLOW.md` step 5, new version notes are appended **here**, at th
 
 ---
 
+## 0. What changed in v56
+
+**v56** is step 46b (**#142**, RUN-QUEUE row 13b): the storefront renders each shop's
+published design. Spec: `prompts/46-design-system.md` § Split.
+
+- **API**: `/meta` gains `design` — the live config (`Designs::forStorefront()`: the
+  published row, else the template's Clean preset), with `image` paths resolved to media
+  URLs. The stored row keeps the path. It rides the existing per-shop `api.meta.{slug}`
+  key, which publishing already busts. `design` is **null** when the template has no
+  readable preset (reported, never a 500 — the design can't take checkout down).
+  `types.ts` gains `StoreDesign` / `DesignSection`.
+- **Storefront**: the tenant layout sets the design's four colours and font as CSS
+  variables on one wrapper (`lib/design.ts`); the `@theme` block is unchanged and stays
+  the default. Softer tokens (muted, rule, tints) are mixed from the four, except for
+  today's palette, whose hand-tuned values stay. Text on a primary fill reads
+  `--on-primary` (the design's `primary_text`): `Button` solid, the cart and filter
+  badges, `::selection`. Fonts are system stacks with Burmese faces, no web-font download.
+- **Home page** = the design's section list (`components/home/Sections.tsx`), one renderer
+  per library type; an unknown type or prop renders nothing. Clean / Bold / Warm set the
+  headline scale, heading style and corner radius. `delivery_fees` reads the zones through
+  a new display-only cached fetch (`getDeliveryZonesForDisplay`, 60 s); checkout still
+  reads the uncached tree and the server re-derives the fee. `category_nav` hides until
+  categories have a public API.
+- **Parity**: decant with nothing published renders byte-identical text and identical
+  computed colours, fonts and radii to the pre-46b home (`verify-design.mjs` before/after
+  snapshot).
+- **Admin**: the Design page joins the Settings menu.
+- Tests: `DesignSystemTest` (meta serves Clean until published, publish/undo live at once,
+  image paths → URLs), `TenantIsolationTest` (each shop's `/meta` serves its own design),
+  `WeightUnitsTest` (a preset-less template still serves `/meta`), `ModuleTogglesTest`
+  menu. 610 tests on SQLite and Postgres 17.
+
 ## 0. What changed in v55
 
 **v55** is step 46a (**#142**, RUN-QUEUE row 13): the storefront design system's

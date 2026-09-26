@@ -28,7 +28,7 @@ export function FilterSheet({ brands, meta }: { brands: Brand[]; meta: CatalogMe
       >
         Filter &amp; sort
         {activeCount > 0 && (
-          <span className="flex size-5 items-center justify-center rounded-full bg-pine text-[10px] text-mist">
+          <span className="flex size-5 items-center justify-center rounded-full bg-pine text-[10px] text-[color:var(--on-primary,var(--color-mist))]">
             {activeCount}
           </span>
         )}

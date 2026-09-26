@@ -202,6 +202,22 @@ class TenantIsolationTest extends TestCase
         ShopDesign::count(); // must throw, NOT return every shop's rows
     }
 
+    public function test_meta_serves_each_shop_its_own_design(): void
+    {
+        // Step 46b: /meta carries the live design under the per-shop cache key,
+        // so shop A publishing never changes what shop B's storefront renders.
+        $this->forShop($this->shopA);
+        Designs::usePreset('decant.bold');
+        app(TenantContext::class)->set(null);
+
+        $this->getJson("/api/v1/{$this->shopB->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.clean');
+        $this->getJson("/api/v1/{$this->shopA->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.bold');
+        $this->getJson("/api/v1/{$this->shopB->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.clean');
+    }
+
     public function test_a_design_image_under_another_shops_prefix_is_refused(): void
     {
         $this->forShop($this->shopB);

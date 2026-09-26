@@ -5,7 +5,18 @@ import gsap from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { Button } from "@/components/ui/Button";
 
-export function Hero({ visual }: { visual: ReactNode }) {
+interface HeroProps {
+  title: string;
+  subtitle: string;
+  button: string;
+  trackButton: string;
+  /** The base design's headline scale (lib/design.ts). */
+  titleClass: string;
+  visual: ReactNode;
+}
+
+/** The design's hero section (step 46b): its text comes from the shop's design. */
+export function Hero({ title, subtitle, button, trackButton, titleClass, visual }: HeroProps) {
   const scope = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -46,19 +57,18 @@ export function Hero({ visual }: { visual: ReactNode }) {
       className="mx-auto grid max-w-[1280px] items-center gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-28"
     >
       <div className="flex max-w-xl flex-col items-start gap-7">
-        <h1 className="hero-headline text-[40px] font-bold leading-[1.06] tracking-tight text-ink-strong sm:text-[56px]">
-          Great perfume, five millilitres at a time.
-        </h1>
-        <p className="hero-sub max-w-md text-[15px] leading-[1.7] text-muted">
-          Authentic designer and niche bottles, hand-decanted into 5ml, 10ml and 30ml vials
-          in Yangon — so you can wear the real thing before you commit to it.
-        </p>
-        <div className="hero-cta flex flex-wrap items-center gap-4">
-          <Button href="/shop">Browse the shop</Button>
-          <Button href="/track" variant="ghost">
-            Track an order
-          </Button>
-        </div>
+        {title && <h1 className={`hero-headline ${titleClass} text-ink-strong`}>{title}</h1>}
+        {subtitle && <p className="hero-sub max-w-md text-[15px] leading-[1.7] text-muted">{subtitle}</p>}
+        {(button || trackButton) && (
+          <div className="hero-cta flex flex-wrap items-center gap-4">
+            {button && <Button href="/shop">{button}</Button>}
+            {trackButton && (
+              <Button href="/track" variant="ghost">
+                {trackButton}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="hero-visual">{visual}</div>

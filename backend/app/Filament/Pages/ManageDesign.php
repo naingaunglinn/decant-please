@@ -22,8 +22,6 @@ use UnitEnum;
  * App\Design\Designs. Scoping: this shop's shop_designs rows and settings row
  * only, through the BelongsToShop scope — Designs::publish() finds the row
  * scoped, so another shop's id is a not-found.
- *
- * Out of the menu until 46b: the storefront doesn't render the design yet.
  */
 class ManageDesign extends Page
 {
@@ -36,11 +34,6 @@ class ManageDesign extends Page
     protected static ?string $title = 'Design · ဒီဇိုင်း';
 
     private const PUBLISHED = 'Design published · ဒီဇိုင်း ပြောင်းပြီးပါပြီ';
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
 
     /** @return array<string, array{label: string, description: string, colors: array<string, string>, live: bool}> */
     public function getPresets(): array

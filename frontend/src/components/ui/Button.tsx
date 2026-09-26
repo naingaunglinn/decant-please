@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 type Variant = "solid" | "outline" | "ghost";
 
 const VARIANTS: Record<Variant, string> = {
-  solid: "bg-pine text-mist hover:bg-pine/90 border border-pine",
+  solid: "bg-pine text-[color:var(--on-primary,var(--color-mist))] hover:bg-pine/90 border border-pine",
   outline: "border border-pine text-pine hover:bg-pine-soft",
   ghost: "text-pine hover:bg-pine-soft border border-transparent",
 };

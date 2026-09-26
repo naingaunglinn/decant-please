@@ -274,6 +274,9 @@ class WeightUnitsTest extends TestCase
         $meta = $this->getJson('/api/v1/decant-please/meta')->assertOk()->json();
         $this->assertSame([['name' => 'Weight', 'values' => ['25 kyatthar', '1 viss']]], $meta['variant_options']);
         $this->assertSame([], $meta['sizes']);
+        // A template without design presets still serves /meta: design null, the
+        // storefront's plain fallback — the design never takes checkout down (46b).
+        $this->assertNull($meta['design']);
 
         $this->assertSame(['Shan Lahpet'], array_column(
             $this->getJson('/api/v1/decant-please/products?option[Weight]=1 viss')->assertOk()->json('data'), 'name'));

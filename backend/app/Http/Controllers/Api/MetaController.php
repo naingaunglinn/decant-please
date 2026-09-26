@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Design\Designs;
 use App\Enums\BrandType;
 use App\Enums\Concentration;
 use App\Enums\Gender;
@@ -80,6 +81,10 @@ class MetaController extends Controller
                 // The storefront hides the promo-code box without `promo_codes`; the
                 // server refuses a code either way (PromoCode::evaluate).
                 'modules' => Modules::enabled(),
+                // The live storefront design (step 46b): the published row, else the
+                // template's Clean preset, image paths as URLs. Publishing saves
+                // shop_settings, which busts this key (ShopSetting::booted).
+                'design' => Designs::forStorefront(),
             ];
         }));
     }
