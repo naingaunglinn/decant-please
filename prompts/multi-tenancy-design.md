@@ -458,7 +458,8 @@ the create side — a bare scope can't do that second half; the hook has to.
   per request with `once()`, keyed on the shop **id** (the closure captures it), and
   flushed (`Once::flush()`) by `ShopSetting`'s `saved` hook. They never reach the cache
   store, so there is no new shared key. `/meta` gained `filters`, `variant_options` and `modules` under the
-  existing per-shop `api.meta.{slug}` key, busted by the same hook.
+  existing per-shop `api.meta.{slug}` key, busted by the same hook. (Step 46b versions it as
+  `api.meta.v2.{slug}`, spelled once in `MetaController::cacheKey()`.)
 - **Cost stays admin-only.** The reference-cost pair (`reference_cost_mmk` /
   `reference_amount`, renamed off `bottle_*` in 40b) and `product_variants.unit_cost_mmk`
   are absent from `app/Http` like the columns above.

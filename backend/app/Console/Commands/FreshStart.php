@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Controllers\Api\MetaController;
 use App\Models\DeliveryTownship;
 use App\Models\Expense;
 use App\Models\Order;
@@ -101,7 +102,7 @@ class FreshStart extends Command
         // Per-shop keys (Step 23 §6). The bulk zone update above fires no model
         // events, so its cache is dropped here rather than by a saved hook.
         $slug = $this->tenantSlug();
-        Cache::forget("api.meta.{$slug}");
+        Cache::forget(MetaController::cacheKey($slug));
         Cache::forget("api.brands.{$slug}");
         Cache::forget("api.delivery-zones.{$slug}");
 

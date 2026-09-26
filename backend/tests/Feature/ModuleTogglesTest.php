@@ -144,7 +144,7 @@ class ModuleTogglesTest extends TestCase
 
         // the baseline the next test's menu is compared against
         $this->assertSame(
-            ['Dashboard', 'Brands', 'Fragrances', 'Orders', 'Production Schedule', 'Payment', 'Promo Codes', 'Profit &amp; loss', 'Expenses', 'Features', 'Delivery Zones'],
+            ['Dashboard', 'Brands', 'Fragrances', 'Orders', 'Production Schedule', 'Payment', 'Promo Codes', 'Profit &amp; loss', 'Expenses', 'Design · ဒီဇိုင်း', 'Features', 'Delivery Zones'],
             $this->menu(),
         );
     }
@@ -174,7 +174,7 @@ class ModuleTogglesTest extends TestCase
 
         // and the menu no longer lists them; core pages still open
         $this->assertSame(
-            ['Dashboard', 'Brands', 'Fragrances', 'Orders', 'Payment', 'Features', 'Delivery Zones'],
+            ['Dashboard', 'Brands', 'Fragrances', 'Orders', 'Payment', 'Design · ဒီဇိုင်း', 'Features', 'Delivery Zones'],
             $this->menu(),
         );
     }

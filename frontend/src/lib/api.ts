@@ -98,6 +98,13 @@ export async function getDeliveryZones(shop: string): Promise<DeliveryZones> {
   return apiFetch(shop, "/delivery-zones", { cache: "no-store" });
 }
 
+/** The same tree for the home page's delivery-fees section: cached like the
+ *  catalog, so the section keeps the home page on ISR (display only — checkout
+ *  always reads the uncached tree above, and the server re-derives the fee). */
+export async function getDeliveryZonesForDisplay(shop: string): Promise<DeliveryZones> {
+  return apiFetch(shop, "/delivery-zones", { next: { revalidate: 60 } });
+}
+
 export async function createOrder(
   shop: string,
   payload: CheckoutPayload,

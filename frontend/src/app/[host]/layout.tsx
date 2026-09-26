@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CartProvider } from "@/lib/cart-context";
 import { TenantProvider } from "@/lib/tenant-context";
 import { originForHost, resolveTenant } from "@/lib/tenant";
+import { getMeta } from "@/lib/api";
+import { themeStyle } from "@/lib/design";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
@@ -54,13 +56,22 @@ export default async function HostLayout({
   // default shop, never a fallback tenant.
   if (!tenant) notFound();
 
+  // Step 46b: the shop's design colours and font, as CSS variables on one
+  // wrapper around the whole frame (the @theme block stays the default).
+  // /meta unreachable → today's palette; the same fetch the pages make, cached.
+  const design = await getMeta(tenant.slug)
+    .then((meta) => meta.design ?? null)
+    .catch(() => null);
+
   return (
     <TenantProvider tenant={{ slug: tenant.slug, name: tenant.name }}>
       <CartProvider>
-        <Navbar name={tenant.name} />
-        <main className="flex-1">{children}</main>
-        <Footer shop={tenant.slug} name={tenant.name} />
-        <CartDrawer />
+        <div style={themeStyle(design)} className="flex flex-1 flex-col bg-mist font-sans text-ink">
+          <Navbar name={tenant.name} />
+          <main className="flex-1">{children}</main>
+          <Footer shop={tenant.slug} name={tenant.name} />
+          <CartDrawer />
+        </div>
       </CartProvider>
     </TenantProvider>
   );

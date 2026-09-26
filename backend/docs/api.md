@@ -197,9 +197,31 @@ Everything a client needs to build filter UI without hardcoding:
   "social": { "tiktok_url": "https://…", "facebook_url": null },
   "payment": { "kbzpay_name": "…", "kbzpay_number": "…", "wave_name": "…",
                "wave_number": "…", "qr_url": "https://…", "instructions": "…" },
-  "modules": ["stock", "cost_margin", "production_schedule", "promo_codes", "expenses"]
+  "modules": ["stock", "cost_margin", "production_schedule", "promo_codes", "expenses"],
+  "design": {
+    "version": 1, "base": "clean", "preset": "decant.clean",
+    "theme": { "colors": { "background": "#f2f8fc", "text": "#212121",
+                           "primary": "#013e37", "primary_text": "#f2f8fc" },
+               "font": "modern" },
+    "sections": [
+      { "type": "hero", "on": true,
+        "props": { "title": "…", "subtitle": "…", "button": "…", "track_button": "…", "image": null } },
+      { "type": "featured", "on": true, "props": { "title": "Featured" } }, …
+    ]
+  }
 }
 ```
+
+`design` (step 46b) is the shop's live storefront design: the published `shop_designs`
+row, else the template's Clean preset. Its shape is the design config of
+`prompts/46-design-system.md` (validated on write, by `App\Design\DesignConfig`), with
+one change: each section's `image` is a **URL** on the media disk (or `null`) — the
+stored row holds a path. `preset` is `null` for a hand-edited design. The text is plain
+text: render it as text, never HTML. A client must skip a section `type` or prop it
+doesn't know, and a section with no props may arrive as `[]`. `design` is **`null`** when
+it can't be built (a template without a readable preset); the rest of `/meta` is served
+as usual. Publishing a design saves `shop_settings`, which busts this shop's cached
+`/meta` (`MetaController::cacheKey()`).
 
 `filters` (step 37) is the shop template's filterable attributes, in order: each is
 a `/products` query parameter named by `key`. A `select` lists its options; a `text`

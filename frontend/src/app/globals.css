@@ -25,7 +25,7 @@ body {
 
 ::selection {
   background: var(--color-pine);
-  color: var(--color-mist);
+  color: var(--on-primary, var(--color-mist)); /* a design's primary_text (step 46b) */
 }
 
 :focus-visible {

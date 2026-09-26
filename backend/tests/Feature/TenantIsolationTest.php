@@ -22,6 +22,7 @@ use App\Filament\Widgets\OrderStats;
 use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TopFragrances;
 use App\Filament\Widgets\UpcomingDecants;
+use App\Http\Controllers\Api\MetaController;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\DeliveryTownship;
@@ -200,6 +201,22 @@ class TenantIsolationTest extends TestCase
         app(TenantContext::class)->set(null);
         $this->expectException(TenantNotSetException::class);
         ShopDesign::count(); // must throw, NOT return every shop's rows
+    }
+
+    public function test_meta_serves_each_shop_its_own_design(): void
+    {
+        // Step 46b: /meta carries the live design under the per-shop cache key,
+        // so shop A publishing never changes what shop B's storefront renders.
+        $this->forShop($this->shopA);
+        Designs::usePreset('decant.bold');
+        app(TenantContext::class)->set(null);
+
+        $this->getJson("/api/v1/{$this->shopB->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.clean');
+        $this->getJson("/api/v1/{$this->shopA->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.bold');
+        $this->getJson("/api/v1/{$this->shopB->slug}/meta")->assertOk()
+            ->assertJsonPath('design.preset', 'decant.clean');
     }
 
     public function test_a_design_image_under_another_shops_prefix_is_refused(): void
@@ -728,15 +745,15 @@ class TenantIsolationTest extends TestCase
 
     public function test_meta_cache_key_and_busting_are_per_shop(): void
     {
-        Cache::put('api.meta.'.$this->shopA->slug, ['who' => 'A'], 600);
-        Cache::put('api.meta.'.$this->shopB->slug, ['who' => 'B'], 600);
+        Cache::put(MetaController::cacheKey($this->shopA->slug), ['who' => 'A'], 600);
+        Cache::put(MetaController::cacheKey($this->shopB->slug), ['who' => 'B'], 600);
 
         // Saving A's payment settings busts only A's meta key (ShopSetting saved hook).
         $this->forShop($this->shopA);
         ShopSetting::current()->update(['kbzpay_name' => 'Daw Mya']);
 
-        $this->assertFalse(Cache::has('api.meta.'.$this->shopA->slug));
-        $this->assertTrue(Cache::has('api.meta.'.$this->shopB->slug));
+        $this->assertFalse(Cache::has(MetaController::cacheKey($this->shopA->slug)));
+        $this->assertTrue(Cache::has(MetaController::cacheKey($this->shopB->slug)));
     }
 
     public function test_shop_settings_telegram_and_social_are_per_shop(): void

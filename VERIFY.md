@@ -30,6 +30,7 @@ keep editing. See `AGENTS.md` § 9.
 | Anything visual or flow-level | the matching `verify-*.mjs` | a green build says nothing about a correct UI |
 | The proxy, the `[host]` tree, the tenant resolver, or robots/sitemap | `verify-tenant-hosts.mjs` — against a **production build** (`next start`; the run form is in the script header) | the step-32 response-cache leak class lives here, and `next dev` has no route cache to leak from |
 | The product page, option picker, catalog filters, or anything a non-decant template renders | `verify-clothing.mjs` against the demo clothing shop (seed + run form in the script header) | decant's scripts never exercise option variants, a brandless product or a size guide |
+| The home page, a design section, the theme variables, or the design in `/meta` | `verify-design.mjs` (decant parity + the demo clothing shop's live design; before/after snapshot form in the script header) | the default palette must not move while every other shop's colours do |
 | A shared primitive (`components/ui/**`, `layout/**`) | `verify-responsive.mjs` at minimum | blast radius is every surface |
 | A migration | `php artisan migrate:fresh --seed` then `composer test` | seeders feed the browser checks |
 | Money anywhere — including "just formatting" | `composer test` + the money-touching Feature tests, named individually | currency bugs hide in cosmetic changes |
@@ -80,6 +81,9 @@ Notes that will otherwise cost you an hour:
 - `verify-clothing.mjs` needs the demo clothing shop:
   `php artisan db:seed --class=DemoClothingShopSeeder --force` (idempotent). It places
   one real order in that demo shop per run.
+- `verify-design.mjs` needs the demo clothing shop too. Its decant parity checks run only
+  while decant has nothing published (SKIP otherwise); the storefront caches `/meta` for
+  60 s, so wait that long after publishing before re-running.
 - `verify-print.mjs` needs a real order: `CODE=... PHONE=... node scripts/verify-print.mjs`.
 - `ENGINE=webkit` re-runs the responsive matrix in WebKit — the closest local proxy for
   iOS Safari's focus-zoom rule.

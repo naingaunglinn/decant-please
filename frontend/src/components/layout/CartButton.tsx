@@ -19,7 +19,7 @@ export function CartButton() {
         <path d="M4.5 13.5h9v4.5a3.75 3.75 0 0 1-3.75 3.75h-1.5a3.75 3.75 0 0 1-3.75-3.75z" fill="currentColor" opacity="0.25" />
       </svg>
       {hydrated && count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-pine text-[10px] font-medium text-mist">
+        <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-pine text-[10px] font-medium text-[color:var(--on-primary,var(--color-mist))]">
           {count > 9 ? "9+" : count}
         </span>
       )}
